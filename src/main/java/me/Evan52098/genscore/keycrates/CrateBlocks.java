@@ -1,0 +1,331 @@
+package me.Evan52098.genscore.keycrates;
+
+import me.Evan52098.genscore.GensCore;
+import me.Evan52098.genscore.scheduler.Tasks;
+import me.Evan52098.genscore.util.Msg;
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
+
+/**
+ * Crate blocks placed by admins ({@code /crate set}) or listed under a crate's {@code locations}: left-click previews,
+ * right-click opens one, sneak + right-click opens all. The blocks cannot be broken, burnt, blown up or pushed.
+ * Holograms are non-persistent TextDisplays, spawned again whenever their chunk loads (the {@code leaderboards}
+ * pattern). Folia: displays are touched only on the region thread that owns them.
+ */
+final class CrateBlocks implements Listener {
+
+    record Pos(String world, int x, int y, int z) {
+        static Pos of(Block b) {
+            return new Pos(b.getWorld().getName(), b.getX(), b.getY(), b.getZ());
+        }
+
+        Location center(World w, double up) {
+            return new Location(w, x + 0.5, y + up, z + 0.5);
+        }
+    }
+
+    private static final class Spot {
+        final String crate;
+        final boolean fromConfig;
+        volatile TextDisplay display;
+
+        Spot(String crate, boolean fromConfig) {
+            this.crate = crate;
+            this.fromConfig = fromConfig;
+        }
+    }
+
+    private final CrateService service;
+    private final CrateMenus menus;
+    private final Logger logger;
+    private final Map<Pos, Spot> spots = new ConcurrentHashMap<>();
+
+    CrateBlocks(CrateService service, CrateMenus menus, Logger logger) {
+        this.service = service;
+        this.menus = menus;
+        this.logger = logger;
+    }
+
+    void start(GensCore plugin) throws Exception {
+        for (CrateStore.BlockRow row : service.store().loadBlocks()) {
+            spots.put(new Pos(row.world(), row.x(), row.y(), row.z()), new Spot(row.crate(), false));
+        }
+        loadConfigLocations();
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Tasks.global.later(this::refreshAll, 40);
+    }
+
+    void stop() {
+        HandlerList.unregisterAll(this);
+        removeAllDisplays();
+    }
+
+    /** After /crate reload: locations from crates.yml again, then every hologram redrawn. */
+    void reload() {
+        spots.entrySet().removeIf(e -> {
+            if (e.getValue().fromConfig) {
+                removeDisplay(e.getKey(), e.getValue());
+                return true;
+            }
+            return false;
+        });
+        loadConfigLocations();
+        refreshAll();
+    }
+
+    private void loadConfigLocations() {
+        for (CrateConfig.Crate crate : service.config().all()) {
+            for (String loc : crate.locations()) {
+                String[] p = loc.split(",");
+                try {
+                    Pos pos = new Pos(p[0].trim(), Integer.parseInt(p[1].trim()), Integer.parseInt(p[2].trim()), Integer.parseInt(p[3].trim()));
+                    spots.putIfAbsent(pos, new Spot(crate.id(), true));
+                } catch (RuntimeException e) {
+                    logger.warning("[keycrates] Crate '" + crate.id() + "' location '" + loc + "' is not world,x,y,z; ignored.");
+                }
+            }
+        }
+    }
+
+    @Nullable String crateAt(Block b) {
+        Spot s = spots.get(Pos.of(b));
+        return s == null ? null : s.crate;
+    }
+
+    void set(Block block, String crate) {
+        Pos pos = Pos.of(block);
+        Spot old = spots.put(pos, new Spot(crate, false));
+        if (old != null) {
+            removeDisplay(pos, old);
+        }
+        service.store().putBlock(new CrateStore.BlockRow(pos.world(), pos.x(), pos.y(), pos.z(), crate));
+        refresh(pos);
+    }
+
+    /** Returns false when the block is not a crate, or is one from crates.yml (remove it there). */
+    boolean remove(Block block) {
+        Pos pos = Pos.of(block);
+        Spot s = spots.get(pos);
+        if (s == null || s.fromConfig) {
+            return false;
+        }
+        spots.remove(pos, s);
+        removeDisplay(pos, s);
+        service.store().removeBlock(pos.world(), pos.x(), pos.y(), pos.z());
+        return true;
+    }
+
+    List<String> describe() {
+        return spots.entrySet().stream()
+                .map(e -> e.getValue().crate + " @ " + e.getKey().world() + " " + e.getKey().x() + " " + e.getKey().y() + " " + e.getKey().z()
+                        + (e.getValue().fromConfig ? " (crates.yml)" : ""))
+                .sorted().toList();
+    }
+
+    // ------------------------------------------------------------------ holograms
+
+    private void refreshAll() {
+        for (Pos pos : spots.keySet()) {
+            refresh(pos);
+        }
+    }
+
+    private void refresh(Pos pos) {
+        World w = Bukkit.getWorld(pos.world());
+        if (w == null) {
+            return;
+        }
+        Tasks.region.run(pos.center(w, 0), () -> {
+            if (w.isChunkLoaded(pos.x() >> 4, pos.z() >> 4)) {
+                ensure(pos, w, true);
+            }
+        });
+    }
+
+    /** On the region thread owning the position. */
+    private void ensure(Pos pos, World w, boolean redraw) {
+        Spot spot = spots.get(pos);
+        if (spot == null) {
+            return;
+        }
+        CrateConfig.Crate crate = service.config().crate(spot.crate);
+        TextDisplay current = spot.display;
+        if (crate == null || crate.hologram().isEmpty()) {
+            if (current != null && current.isValid()) {
+                current.remove();
+            }
+            spot.display = null;
+            return;
+        }
+        String text = String.join("\n", crate.hologram());
+        if (current != null && current.isValid()) {
+            if (redraw) {
+                current.text(CrateConfig.text(text));
+                current.teleportAsync(pos.center(w, crate.hologramHeight()));
+            }
+            return;
+        }
+        spot.display = w.spawn(pos.center(w, crate.hologramHeight()), TextDisplay.class, d -> {
+            d.setBillboard(Display.Billboard.CENTER);
+            d.setShadowed(true);
+            d.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
+            d.setPersistent(false); // never saved with the world; spawned again on chunk load
+            d.text(CrateConfig.text(text));
+        });
+    }
+
+    private void removeDisplay(Pos pos, Spot spot) {
+        TextDisplay d = spot.display;
+        World w = Bukkit.getWorld(pos.world());
+        spot.display = null;
+        if (d == null || w == null) {
+            return;
+        }
+        Tasks.region.run(pos.center(w, 0), () -> {
+            if (d.isValid()) {
+                d.remove();
+            }
+        });
+    }
+
+    private void removeAllDisplays() {
+        spots.forEach(this::removeDisplay);
+    }
+
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        String world = event.getWorld().getName();
+        int cx = event.getChunk().getX();
+        int cz = event.getChunk().getZ();
+        for (Pos pos : spots.keySet()) {
+            if (pos.world().equals(world) && pos.x() >> 4 == cx && pos.z() >> 4 == cz) {
+                World w = event.getWorld();
+                Tasks.region.run(pos.center(w, 0), () -> ensure(pos, w, false));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ using crates
+
+    @EventHandler(priority = EventPriority.LOW)
+    public void onInteract(PlayerInteractEvent event) {
+        Block b = event.getClickedBlock();
+        if (b == null || (event.getAction() != Action.LEFT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_BLOCK)) {
+            return;
+        }
+        String crateId = crateAt(b);
+        if (crateId == null) {
+            return;
+        }
+        event.setCancelled(true); // no chest opening, no breaking, no placing against it
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return; // the off-hand fires a second event
+        }
+        Player player = event.getPlayer();
+        CrateConfig.Crate crate = service.config().crate(crateId);
+        if (crate == null) {
+            player.sendMessage(Msg.bad("This crate is closed."));
+            return;
+        }
+        if (event.getAction() == Action.LEFT_CLICK_BLOCK) {
+            if (player.isSneaking() && player.hasPermission("genscore.keycrates.admin")) {
+                player.sendMessage(Msg.neutral("This is the " + Msg.white(crate.id()) + " crate. Remove it with " + Msg.white("/crate remove") + "."));
+                return;
+            }
+            menus.preview(player, crate, 0, false);
+            return;
+        }
+        if (service.keys().count(player.getInventory(), crate.id()) <= 0) {
+            menus.preview(player, crate, 0, false);
+            player.sendMessage(Msg.bad("You need a key to open this crate. Earn them by playing and voting."));
+            return;
+        }
+        service.open(player, crate.id(), player.isSneaking() ? Integer.MAX_VALUE : 1);
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBreak(BlockBreakEvent event) {
+        if (crateAt(event.getBlock()) != null) {
+            event.setCancelled(true);
+            if (event.getPlayer().hasPermission("genscore.keycrates.admin")) {
+                event.getPlayer().sendMessage(Msg.neutral("That is a crate. Remove it with " + Msg.white("/crate remove") + " first."));
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        event.blockList().removeIf(b -> crateAt(b) != null);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        event.blockList().removeIf(b -> crateAt(b) != null);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBurn(BlockBurnEvent event) {
+        if (crateAt(event.getBlock()) != null) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityChange(EntityChangeBlockEvent event) {
+        if (crateAt(event.getBlock()) != null) {
+            event.setCancelled(true); // endermen, withers, ravagers
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        for (Block b : event.getBlocks()) {
+            if (crateAt(b) != null) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        for (Block b : event.getBlocks()) {
+            if (crateAt(b) != null) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    static String normalise(String crate) {
+        return crate.toLowerCase(Locale.ROOT);
+    }
+}

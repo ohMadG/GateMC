@@ -1,0 +1,230 @@
+name: GensCore
+version: '${project.version}'
+main: me.Evan52098.genscore.GensCore
+api-version: '1.21'
+folia-supported: true
+description: Core plugin for the gens server (plots, belts, raiding, economy).
+# Downloaded by the server at startup, so the jar stays small. Keep versions in step with pom.xml.
+# SQLite needs nothing here: the server already includes its driver.
+libraries:
+  - com.zaxxer:HikariCP:7.0.2
+  - org.postgresql:postgresql:42.7.13
+  - io.github.revxrsal:lamp.common:4.0.0-rc.18
+  - io.github.revxrsal:lamp.bukkit:4.0.0-rc.18
+  - io.github.revxrsal:lamp.brigadier:4.0.0-rc.18
+permissions:
+  genscore.plot: {default: true}
+  genscore.admin.plots: {default: op}
+  genscore.plots.build: {default: op}
+  genscore.admin.reload: {default: op}
+  genscore.balance: {default: true}
+  genscore.pay: {default: true}
+  genscore.pay.toggle: {default: true}
+  genscore.pay.confirm.toggle: {default: true}
+  genscore.baltop: {default: true}
+  genscore.balance.others: {default: op}
+  genscore.admin.eco: {default: op}
+  genscore.home: {default: true}
+  genscore.sethome: {default: true}
+  genscore.delhome: {default: true}
+  genscore.renamehome: {default: true}
+  genscore.homes.unlimited: {default: false}
+  genscore.warp: {default: true}
+  genscore.warp.list: {default: true}
+  genscore.setwarp: {default: op}
+  genscore.delwarp: {default: op}
+  genscore.spawn: {default: true}
+  genscore.setspawn: {default: op}
+  genscore.tpa: {default: true}
+  genscore.back: {default: op}
+  genscore.top: {default: op}
+  genscore.teleport.bypasswarmup: {default: op}
+  # essentials: player commands default to everyone, the rest to ops (adjust with LuckPerms)
+  genscore.msg: {default: true}
+  genscore.ignore: {default: true}
+  genscore.afk: {default: true}
+  genscore.seen: {default: true}
+  genscore.playtime: {default: true}
+  genscore.rules: {default: true}
+  genscore.kill: {default: true}
+  genscore.disposal: {default: true}
+  genscore.enderchest: {default: op}
+  genscore.craft: {default: op}
+  genscore.anvil: {default: op}
+  genscore.near: {default: op}
+  genscore.nickname: {default: op}
+  genscore.realname: {default: true}
+  genscore.msg.bypass: {default: op}
+  genscore.ignore.exempt: {default: op}
+  genscore.socialspy: {default: op}
+  genscore.nickname.admin: {default: op}
+  genscore.nickname.bypasscooldown: {default: op}
+  genscore.heal: {default: op}
+  genscore.heal.others: {default: op}
+  genscore.feed: {default: op}
+  genscore.feed.others: {default: op}
+  genscore.fly: {default: op}
+  genscore.fly.others: {default: op}
+  genscore.god: {default: op}
+  genscore.god.others: {default: op}
+  genscore.speed: {default: op}
+  genscore.speed.others: {default: op}
+  genscore.gamemode.survival: {default: op}
+  genscore.gamemode.creative: {default: op}
+  genscore.gamemode.adventure: {default: op}
+  genscore.gamemode.spectator: {default: op}
+  genscore.gamemode.others: {default: op}
+  genscore.exp: {default: true}
+  genscore.exp.others: {default: op}
+  genscore.ptime: {default: op}
+  genscore.pweather: {default: op}
+  genscore.hat: {default: op}
+  genscore.ci: {default: op}
+  genscore.ci.others: {default: op}
+  genscore.admin.give: {default: op}
+  genscore.fix: {default: op}
+  genscore.fix.bypasscooldown: {default: op}
+  genscore.itemrename: {default: op}
+  genscore.itemrename.color: {default: op}
+  genscore.itemlore: {default: op}
+  genscore.echest.view: {default: op}
+  genscore.echest.edit: {default: op}
+  genscore.invsee.view: {default: op}
+  genscore.invsee.edit: {default: op}
+  # chat
+  genscore.chat.color: {default: op}
+  genscore.chat.alerts: {default: op}
+  genscore.chat.bypass.filter: {default: op}
+  genscore.chat.bypass.cooldown: {default: op}
+  genscore.clearchat: {default: op}
+  genscore.clearchat.exempt: {default: op}
+  genscore.broadcast: {default: op}
+  # staff
+  genscore.vanish: {default: op}
+  genscore.vanish.others: {default: op}
+  genscore.vanish.see: {default: op}
+  genscore.staffchat: {default: op}
+  genscore.adminchat: {default: op}
+  genscore.freeze: {default: op}
+  genscore.freeze.exempt: {default: op}
+  genscore.commandspy: {default: op}
+  genscore.commandspy.exempt: {default: false}
+  genscore.signspy: {default: op}
+  genscore.staff.alerts: {default: op}
+  genscore.invhistory: {default: op}
+  genscore.report: {default: true}
+  genscore.reports: {default: op}
+  # kits, vaults, announcements
+  genscore.kit: {default: true}
+  genscore.kits.admin: {default: op}
+  genscore.kits.bypasscooldown: {default: op}
+  genscore.vault: {default: true}
+  genscore.buyvault: {default: true}
+  genscore.vaults.others: {default: op}
+  genscore.vaults.unlimited: {default: false}
+  genscore.announcements.admin: {default: op}
+  genscore.announcements.hide: {default: false}
+  # crates (Daily Lockbox), vouchers, daily
+  genscore.lockbox.play: {default: true}
+  genscore.lockbox.admin.inspect: {default: op}
+  genscore.lockbox.admin.reload: {default: op}
+  genscore.lockbox.admin.reconcile: {default: op}
+  genscore.voucher.check: {default: true}
+  genscore.admin.voucher: {default: op}
+  genscore.command.daily: {default: true}
+  genscore.admin.dailyreward: {default: op}
+  # auction, sell, homes
+  # settings, trade, mail, vote, polls, leaderboards
+  genscore.command.settings: {default: true}
+  genscore.tptoggle: {default: true}
+  genscore.tp.toggle.bypass: {default: op}
+  genscore.prefs: {default: op}
+  genscore.trade: {default: true}
+  genscore.mail: {default: true}
+  genscore.admin.poll: {default: op}
+  genscore.admin.votes: {default: op}
+  genscore.leaderboard: {default: true}
+  genscore.admin.leaderboards: {default: op}
+  # anti x-ray, anti-hack, lag watch, wipe
+  genscore.antihack.alert: {default: op}
+  genscore.antihack.admin: {default: op}
+  genscore.antihack.bypass: {default: op}
+  genscore.admin.wipe: {default: op}
+  # ---- HXSMP groups E-N ----
+  # info
+  genscore.info: {default: true}
+  # store
+  genscore.store: {default: true}
+  genscore.store.admin: {default: op}
+  genscore.store.popup.exempt: {default: false}
+  # ranks
+  genscore.tags: {default: true}
+  # (genscore.tag.<id> unlocks a tag; badges use LuckPerms' group.<id> or the permission set per badge)
+  # shards
+  genscore.shards: {default: true}
+  genscore.shards.others: {default: true}
+  genscore.shards.top: {default: true}
+  genscore.shards.admin: {default: op}
+  # (genscore.shards.rank.<name> for the per-minute rates under shards.earn.ranks; grant with LuckPerms)
+  # key crates
+  genscore.keycrates: {default: true}
+  genscore.keycrates.admin: {default: op}
+  # super powers
+  # season pass
+  genscore.pass: {default: true}
+  genscore.pass.premium: {default: false}   # the premium track: grant with Tebex / LuckPerms
+  genscore.pass.admin: {default: op}        # /pass progress, /pass xp give|set
+  # holidays
+  # sell multipliers (the menu uses genscore.sell, which group A already adds)
+  # shop
+  # orders
+  # (genscore.order.limit.<number> raises the open-order cap; grant with LuckPerms)
+  # gamble
+  # reputation
+  genscore.reputation: {default: true}
+  genscore.reputation.staff: {default: op}
+  genscore.reputation.admin: {default: op}
+  # chat games
+  genscore.chatgames.start: {default: op}
+  # rtp
+  # worldrules
+  genscore.worldrules.admin: {default: op}
+  genscore.spawn.bypassclosed: {default: op}
+  genscore.endlock.bypass: {default: op}    # only works in creative or spectator (HxCore rule)
+  # arena
+  # maintenance
+  genscore.reboot: {default: op}
+  genscore.clearlag: {default: op}
+  # mobspawns
+  # sit
+  genscore.sit: {default: true}
+  genscore.sit.admin: {default: op}
+  # drills (SEBDrill: sebdrill.use, .give, .admin, .settings, .bonemash.use, .bonemash.give)
+  # spawners (SEBSmartSpawners: sebsmartspawners.admin); /spawnerrecipes needs no permission
+  # structures (HxCore: hxcore.structures, hxcore.stashundo; SEBStaff: sebstaff.spawnstash)
+  # combat
+  # sus
+  genscore.sus: {default: op}                   # /sus and alerts (was hxcore.sus)
+  genscore.sus.tp: {default: op}                # [TP] buttons and /sustp (was hxcore.sus.tp)
+  genscore.sus.exempt: {default: false}         # never flagged
+  # staff mode and extras
+  genscore.staffmode: {default: op}             # /staffmode (was sebstaff.staffmode)
+  genscore.staffmode.bypass: {default: false}   # keep F3 coordinates and /sethome in staff mode (was hxcore.staffmode.bypass)
+  genscore.supervanish: {default: false}        # owner: when vanished, hidden even from staff (was hxcore.supervanish)
+  genscore.supervanish.see: {default: false}    # can see a super-vanished owner (was hxcore.supervanish.see)
+  genscore.hiddenalts.bypass: {default: false}  # sees real alt results for hidden accounts (was hxcore.hiddenalts.bypass)
+  genscore.allhomes: {default: op}              # /allhomes (was hxcore.allhomes)
+  genscore.cosmetics: {default: true}        # /cosmetics, /killrank
+  genscore.cosmetics.admin: {default: op}    # give/revoke/reload; also owns every cosmetic
+  genscore.homeicon: {default: false}        # /homeicon, grant to paid ranks (was hxcore.homes.style)
+  # Each cosmetic: genscore.cosmetics.<category>.<id>, e.g. genscore.cosmetics.trails.flame,
+  # genscore.cosmetics.kill-effects.thunder. Grant with LuckPerms (store ranks). Categories: kill-effects,
+  # explosive-kills, join-messages, leave-messages, name-colors, trails, tool-skins.
+softdepend:
+  - Vault
+  - LuckPerms
+  - PlaceholderAPI
+  - floodgate
+  - FastAsyncWorldEdit
+  - packetevents
+  - FancyNpcs

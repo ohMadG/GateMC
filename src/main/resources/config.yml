@@ -1,0 +1,934 @@
+# GensCore main config.
+
+storage:
+  # sqlite: a single file in the plugin folder, good for testing.
+  # postgres: for the live server.
+  type: sqlite
+  sqlite-file: data.db
+
+  # Postgres only.
+  host: localhost
+  port: 5432
+  database: genscore
+  username: genscore
+  # Leave empty and set the environment variable GENSCORE_DB_PASSWORD instead, so the password is never in this file.
+  password: ''
+  pool-size: 8
+
+  # How often online players' data is saved (it is also saved on quit and at shutdown).
+  autosave-minutes: 5
+
+# Chat message style (MiniMessage). Used by every module.
+messages:
+  good-prefix: '<#10b900>✔ '
+  bad-prefix: '<#b90000>✘ '
+  neutral-prefix: '<#e0b000>» '
+  good-color: '<#10b900>'
+  bad-color: '<#b90000>'
+  neutral-color: '<#e0b000>'
+
+# Plots (gens roadmap phase 1). One plot per online player, built from one template on join and removed after they
+# leave. Plot blocks are never saved; the owner's plot data (belt length, lock level, shield) is.
+#
+# The world must exist at start-up: Folia cannot create worlds while running. Use the main world (level-name) and
+# make it void before it is first generated, in server.properties:
+#   level-type=minecraft:flat
+#   generator-settings={"layers":[{"block":"minecraft:air","height":1}],"biome":"minecraft:the_void"}
+# Build the spawn lobby near 0,0; plots start at the grid origin, well away from it.
+plots:
+  world: world
+  size: 25                   # plots are size x size blocks (restart to change)
+  grid:                      # restart to change. Folia: keep spacing a multiple of 256 so each plot is its own region
+    origin-x: 1088           # lowest corner of slot 0; a multiple of 16, a few chunks into a 256-block section
+    origin-z: 1088
+    floor-y: 64              # the template's bottom layer is placed at this height
+    spacing: 1024            # distance between slots
+    columns: 32              # slots per row
+    max-slots: 512           # most plots at once (one per online player, plus plots waiting to be removed)
+  template:
+    file: template.nbt       # in plugins/GensCore/modules/plots/. Make it in game with /plotadmin template pos1|pos2|save
+    fallback-floor: grass_block   # used while there is no template file
+    fallback-border: stone_bricks
+    # Marker blocks in the template mark places instead of being built as-is; each is replaced with replace-with.
+    # "spawn" is where players arrive. "belt" and "pad" are read by the belt and gens phases.
+    markers:
+      spawn: {block: lime_glazed_terracotta, replace-with: 'minecraft:air'}
+      belt: {block: magenta_glazed_terracotta, replace-with: 'minecraft:smooth_stone'}
+      pad: {block: light_blue_glazed_terracotta, replace-with: 'minecraft:polished_andesite'}
+  build:
+    blocks-per-tick: 2000        # template blocks placed per tick while building a plot
+    clear-checks-per-tick: 8000  # positions checked per tick while clearing one
+    clear-height: 64             # how far above floor-y a clear reaches (raised to the template height if lower)
+    max-concurrent: 4            # plots built or cleared at the same time; the rest queue. Each one loads a ring of
+                                 # chunks around the plot, so a high number can run the server out of memory.
+                                 # Pre-generate the grid area once (e.g. with Chunky) to make builds cheaper.
+  # Seconds a plot stays after its owner leaves. 0 = removed at once. Phase 3 (raiding) replaces this with the
+  # disconnect timer and /logout.
+  remove-delay-seconds: 0
+  teleport-on-join: true
+  spawn-yaw: 0
+  void-y: 0                  # a player below this height in the plot world is sent back to their plot
+  protect-world: true        # only genscore.plots.build may break or place blocks in the plot world
+  defaults:
+    belt-length: 8           # a new player's starting belt length
+
+economy:
+  starting-balance: 0
+  currency-singular: Dollar
+  currency-plural: Dollars
+  pay:
+    min-amount: 1.0
+    max-amount: 1000000.0
+    # Payments this large ask for /pay confirm (players can turn this off with /pay confirmtoggle).
+    confirm-threshold: 10000.0
+  balance-top:
+    cache-size: 100
+    cache-seconds: 60
+    entries-per-page: 10
+
+teleport:
+  # Seconds a player must stand still before a teleport. 0 = instant. genscore.teleport.bypasswarmup skips it.
+  warmup-seconds:
+    home: 5
+    warp: 5
+    spawn: 5
+    tpa: 5
+    back: 5
+    other: 0
+  cancel-on-move: true
+  cancel-on-damage: true
+  homes:
+    # More with the permission genscore.homes.<number>, or genscore.homes.unlimited.
+    max-default: 3
+  tpa:
+    timeout-seconds: 60
+    cooldown-seconds: 30
+  back:
+    on-death: true
+  spawn:
+    respawn-at-spawn: true
+    first-join-at-spawn: true
+
+essentials:
+  heal:
+    extinguish: true
+    clear-effects: false
+  speed:
+    min: 0.1
+    max: 10
+  fix:
+    cooldown-seconds: 300
+  nickname:
+    min-length: 3
+    max-length: 16
+    cooldown-seconds: 3600
+  afk:
+    # Mark players AFK after this many minutes without moving. 0 = off.
+    auto-minutes: 5
+  # Lines shown by /rules (MiniMessage).
+  rules:
+    - '<gold><bold>Server rules</bold>'
+    - '<gray>1. <white>No cheating or exploiting.'
+    - '<gray>2. <white>Be respectful in chat.'
+
+chat:
+  # MiniMessage. <prefix> and <suffix> come from LuckPerms, <name> is the nickname if set.
+  format: '<badge><tag><prefix><name><gray>: </gray><message>'
+  cooldown-ms: 1000
+  filter:
+    enabled: true
+    # Matched after removing look-alike letters, leetspeak, repeats and spacing (so "b a d" and "b4d" count).
+    zero-tolerance-words: []
+    banned-words: []
+    # Words that contain a banned word but are fine (e.g. "assassin" if "ass" is banned).
+    safe-words: []
+    advertising:
+      enabled: true
+      allowed-domains: []
+    caps:
+      min-length: 8
+      max-ratio: 0.7
+    spam:
+      repeat-window-seconds: 30
+      burst-messages: 5
+      burst-seconds: 5
+
+staff:
+  reports:
+    cooldown-seconds: 60
+
+vaults:
+  # Vaults everyone has. More with genscore.vaults.<number>, genscore.vaults.unlimited, or /buyvault.
+  default: 1
+  max-number: 50
+  rows: 6
+  buy:
+    enabled: true
+    base-cost: 3000
+    cost-increment-per-slot: 2000
+    max-bonus-slots: 5
+
+announcements:
+  interval-seconds: 300
+  random: false
+  # Each entry is one message (a line or a list of lines, MiniMessage). Edit, then /announce reload.
+  messages:
+    discord:
+      - '<dark_gray>[<gold>Tip</gold>]</dark_gray> <gray>Join our Discord for events and giveaways.'
+    rules:
+      - '<dark_gray>[<gold>Tip</gold>]</dark_gray> <gray>Read the rules with <white>/rules</white>.'
+
+crates:
+  # The Daily Lockbox (/lockbox): guess a secret 3-symbol code. One game every 24 hours.
+  lockbox:
+    # The first game of a player is keyed by the date in this time zone.
+    reset-timezone: America/New_York
+    # 1 to 4 (the board has four rows).
+    max-attempts: 4
+    rewards:
+      # Money for cracking it on the 1st, 2nd, 3rd, 4th guess. "$1000" or "1000". Credits do not exist here.
+      by-guess: ['$2500', '$1000', '$500', '$250']
+      # Paid when all guesses are used without cracking it. '$0' for nothing.
+      participation: '$50'
+    # Smallest gap between two guesses by one player.
+    rate-limit-millis: 1000
+    # Playtime needed before lockbox rewards are paid (0 = none). Games can still be played.
+    min-playtime-minutes: 0
+
+daily:
+  enabled: true
+  # A claim is allowed once per calendar day in this time zone; claiming on consecutive days builds the streak.
+  reset-timezone: America/New_York
+  streak:
+    # Every tier except the first has its weight multiplied by (1 + streak * multiplier-per-day), capped at max-multiplier.
+    multiplier-per-day: 0.05
+    max-multiplier: 3.0
+    # Guaranteed bonus commands the day a streak reaches this many days.
+    milestones:
+      7:
+        display-name: '&b7-Day Streak'
+        commands:
+          - 'eco give {player} 2500'
+      30:
+        display-name: '&630-Day Streak'
+        commands:
+          - 'eco give {player} 6000'
+  # The five layers, shallowest first: order is depth and depth is rarity (at most five are used).
+  # Commands run from the console; {player} and {uuid} are replaced. They must be safe to run from the console on Folia.
+  tiers:
+    - id: 'coal'
+      display-name: '&7Coal'
+      weight: 50
+      icon: 'COAL_BLOCK'
+      reward-text: '$150 and 16 coal'
+      commands:
+        - 'eco give {player} 150'
+        - 'item coal 16 {player}'
+    - id: 'iron'
+      display-name: '&fIron'
+      weight: 30
+      icon: 'RAW_IRON_BLOCK'
+      reward-text: '$400 and 8 iron ingots'
+      commands:
+        - 'eco give {player} 400'
+        - 'item iron_ingot 8 {player}'
+    - id: 'gold'
+      display-name: '&6Gold'
+      weight: 13
+      icon: 'RAW_GOLD_BLOCK'
+      reward-text: '$1,000 and 6 gold ingots'
+      commands:
+        - 'eco give {player} 1000'
+        - 'item gold_ingot 6 {player}'
+    - id: 'diamond'
+      display-name: '&bDiamond'
+      weight: 6
+      icon: 'DIAMOND_BLOCK'
+      reward-text: '$2,500 and 3 diamonds'
+      commands:
+        - 'eco give {player} 2500'
+        - 'item diamond 3 {player}'
+      broadcast: true
+    - id: 'netherite'
+      display-name: '&5&lNETHERITE'
+      weight: 1
+      icon: 'NETHERITE_BLOCK'
+      reward-text: '$10,000 and a netherite ingot'
+      commands:
+        - 'eco give {player} 10000'
+        - 'item netherite_ingot 1 {player}'
+      broadcast: true
+
+trade:
+  # How long a /trade request stays valid.
+  request-seconds: 60
+  # Seconds from both players confirming to the trade going through.
+  countdown-seconds: 5
+  # Seconds between /trade requests from one player.
+  request-cooldown-seconds: 5
+  # Teleporting further than this (or to another world) cancels the trade. 0 = never.
+  cancel-teleport-distance: 16
+  # true: a player who dies mid-trade drops their offered items with the rest of their inventory.
+  # false: the items go back to them like a cancel (only safe if deaths keep inventories anyway).
+  drop-escrow-on-death: true
+
+mail:
+  send-cooldown-seconds: 10
+  max-length: 256
+  # Mail is refused once a player has this many unread messages.
+  max-unread-per-player: 50
+
+polls:
+  # Money paid for voting in a poll (BlockvilleCore paid 5 credits; this server has no credits). 0 = no reward.
+  reward: 100
+
+vote:
+  enabled: true
+  # Days start and streaks count in this timezone.
+  timezone: "America/New_York"
+  # GensCore's own Votifier listener (no Votifier plugin needed). Open the port in the firewall.
+  # On first start it creates modules/vote/votifier/rsa/public.key (paste it into each voting site) and
+  # modules/vote/votifier/token.txt (the v2 token for sites that ask for one; keep it secret, you may replace it).
+  listener:
+    enabled: false
+    host: "0.0.0.0"
+    port: 8192
+    max-per-ip-per-minute: 30
+    # Votes from the same name on the same site this close together count once (sites retry on timeouts).
+    duplicate-window-minutes: 60
+    # Votes older than this that were never claimed (the name never joined) are not paid.
+    expire-days: 30
+  # Shown in /vote. "service" is the name the site sends with its votes (logged the first time an unknown one arrives).
+  sites: {}
+  #  example:
+  #    name: "ExampleList"
+  #    url: "https://example.org/vote/000000"
+  #    service: "ExampleList"
+  #    cooldown-hours: 24
+  #    icon: "EMERALD"
+  # Paid for every vote. money is dollars, xp is vanilla experience points, commands run from the console
+  # ({player}, {uuid}, {site}). display = lines shown in /vote for what the commands give.
+  reward:
+    money: 250
+    xp: 0
+    commands: []
+    display: []
+    message: "Thanks for voting on <white>{site}</white>! +<white>{money}</white>."
+  streak:
+    milestones:
+      3:
+        money: 500
+      7:
+        money: 1500
+      14:
+        money: 3000
+      30:
+        money: 7500
+  party:
+    enabled: true
+    goal: 50
+    money: 500
+    commands: []
+  # Shown to everyone when someone votes. Empty = off.
+  announce: "<white>{player}</white> voted for the server! <gray>Type</gray> <white>/vote</white> <gray>to vote too.</gray>"
+  reminder:
+    on-join: true
+
+leaderboards:
+  # How long a board is cached before it is read again.
+  cache-seconds: 60
+  # Rows per board (at most 10).
+  size: 10
+
+# Anti x-ray: ore-watch vein alerts plus the "Nightwatch" anti-autominer (BlockvilleCore's ore-watch: and anti-miner:).
+antihack:
+  enabled: true
+  strict: false
+  setback: false
+  kick: false
+  alert-level: medium
+
+# Lag machine watch. It only reports. Every report also goes to plugins/GensCore/lagwatch.log.
+lagwatch:
+  enabled: true
+  ignore-worlds: []
+  discord-webhook-url: ''
+  # Paper: alert when the average tick time stays above this (ms) for 30 s. 0 = off.
+  slow-mspt: 45
+  # Folia: alert when a region's measured TPS stays below this for 30 s. 0 = off.
+  slow-tps: 18.0
+  thresholds:
+    redstone: 3000
+    pistons: 300
+    hopper-moves: 6000
+    dispensers: 600
+    item-drops: 2000
+    falling-blocks: 200
+    tnt: 80
+    mob-spawns: 100
+    vehicle-spawns: 60
+    portals: 150
+    items: 600
+    vehicles: 80
+    armor-stands: 100
+    item-frames: 400
+    mobs: 250
+    villagers: 80
+    projectiles: 300
+    falling-standing: 150
+    hoppers: 600
+
+# Wipes. /gensadmin wipeplayer <player> full [preview|confirm], /wipe <player> (menu), /gensadmin wipeseason [preview|confirm]
+# (every player; confirm from the console), /gensadmin wiperestore <player|season> [file], /wipereason <id>.
+wipe:
+  # Ticks to wait after kicking / closing vault views before touching anything (20 = 1 s).
+  settle-ticks: 40
+  # How long to wait for a kicked player's data to be released before giving up (nothing is deleted then).
+  max-wait-ticks: 400
+  # PostgreSQL statement timeout inside a wipe or restore transaction.
+  run-timeout-seconds: 120
+  # How long a preview stays valid for its confirm.
+  confirm-window-minutes: 10
+  # Under plugins/GensCore/modules/wipe/. Nothing ever deletes these files.
+  backup-folder: backups
+  # After their inventory is emptied on join, send them to the main world's spawn.
+  send-to-spawn: true
+  discord-webhook-url: ''
+  season:
+    # What a season wipe (and the menu's defaults) keeps, by module and section id as the preview prints them; "*" keeps
+    # a whole module; "categories" keeps whole wipe categories (places, economy, progress, items, identity, purchases,
+    # factions), which also covers modules added later. A season wipe that keeps nothing is refused.
+    keep:
+      core: [playtime, nickname, msg_prefs, economy_prefs, ignores]
+      settings: [settings]
+      mail: [inbox]
+      vote: [stats]
+  # Extra player tables a wipe takes (data-driven; also how modules added later join without code). key-column holds
+  # the player's UUID as TEXT. "reset:" sets columns instead of deleting the row. The entries below map the other groups'
+  # current tables; each owning module should confirm it keeps no copy of these rows in memory while the player is offline.
+  sections:
+    - {module: trade, id: claims, label: trade claim box, table: pvp_trade_claims, key-column: uuid, category: items}
+    - {module: vouchers, id: returns, label: vouchers owed back, table: pvp_voucher_returns, key-column: uuid, category: items}
+    - {module: daily, id: claims, label: daily reward claims, table: pvp_daily_claims, key-column: uuid, category: progress}
+    - {module: daily, id: stats, label: daily reward streak, table: pvp_daily_stats, key-column: uuid, category: progress}
+    - {module: plots, id: plot, label: plot upgrades (belt length, lock level, shield), table: gens_plots, key-column: uuid, category: progress}
+    - {module: plots, id: progress, label: rebirths, table: gens_players, key-column: uuid, category: progress}
+    - {module: vote, id: stats, label: vote totals and streak, table: pvp_vote_stats, key-column: uuid, category: progress}
+    - {module: settings, id: settings, label: personal settings, table: pvp_settings, key-column: uuid, category: identity}
+    - {module: mail, id: inbox, label: mail inbox, table: pvp_mail, key-column: recipient_uuid, category: identity}
+  # Receipt wording overrides, e.g. receipts: {core: {describe: "..."}}
+  receipts: {}
+
+# Each feature is a module and can be switched off here. A module that is off is never loaded.
+# ---- group E (integration/group-e.md) ----
+# /rules, /guide (/helpmenu), /ranks menus and /discord. "command" runs as the player when the item is clicked.
+# "chat" lines are shown instead of the menu to Bedrock players (and to everyone if a menu has no items).
+info:
+  # Register /rules here. Set false if the essentials module keeps its own /rules.
+  rules-command: true
+  discord:
+    url: 'https://discord.gg/hxsmp'
+    label: '&9&l[CLICK FOR DISCORD]'
+    message:
+      - '&9&lDISCORD &8» &7Join the community: {discord}'
+  menus:
+    rules:
+      title: '&c&l❄ &f&lRULES &c&l❄'
+      size: 54
+      items:
+        title:   { slot: 4,  material: WRITABLE_BOOK, glow: true, name: '&6&l❄ RULES ❄', lore: ['&7Here''s what''s fair game and what isn''t.'] }
+        ok:      { slot: 10, material: LIME_CONCRETE, name: '&a&l✔ ALLOWED' }
+        no:      { slot: 16, material: RED_CONCRETE,  name: '&c&l✘ NOT ALLOWED' }
+        raid:    { slot: 19, material: TNT,           name: '&a✔ Raiding',        lore: ['&7Raid bases that are raidable.'] }
+        steal:   { slot: 20, material: CHEST,         name: '&a✔ Stealing',       lore: ['&7Loot whatever you can reach.'] }
+        scam:    { slot: 28, material: GOLD_INGOT,    name: '&a✔ Scamming',       lore: ['&7Trades are at your own risk.', '&7Trust no one.'] }
+        pvp:     { slot: 29, material: END_CRYSTAL,   name: '&a✔ PvP everywhere', lore: ['&7Except inside spawn.'] }
+        traps:   { slot: 37, material: COBWEB,        name: '&a✔ Traps',          lore: ['&7Traps and ambushes are fair game.'] }
+        hacks:   { slot: 24, material: COMMAND_BLOCK, name: '&c✘ Hacked clients', lore: ['&7No cheat clients, macros,', '&7auto-clickers or auto-crystal.'] }
+        freecam: { slot: 25, material: ENDER_EYE,     name: '&c✘ Freecam & X-ray', lore: ['&7No freecam, x-ray, ESP or', '&7see-through mods/packs.'] }
+        flood:   { slot: 33, material: WATER_BUCKET,  name: '&c✘ Flooding',       lore: ['&7No flooding or lava-casting', '&7land or bases.'] }
+        dupe:    { slot: 34, material: STRUCTURE_VOID, name: '&c✘ Duping & exploits', lore: ['&7Found a bug? Report it to staff.'] }
+        log:     { slot: 42, material: IRON_SWORD,    name: '&c✘ Combat logging', lore: ['&7Logging out mid-fight kills you.'] }
+        dox:     { slot: 43, material: BARRIER,       name: '&c✘ Doxxing & real threats', lore: ['&7Keep it in the game.'] }
+        final:   { slot: 49, material: NETHER_STAR,   glow: true, name: '&6Staff decisions are final', lore: ['&7Questions? Ask a staff member.'] }
+      chat:
+        - '&8&m                                        '
+        - '&4&lRULES'
+        - '&c1. &7No hacks / x-ray   &c2. &7No duping or exploits'
+        - '&c3. &7No flooding   &c4. &7No combat logging'
+        - '&c5. &7No doxxing or real threats   &c6. &7Staff decisions are final'
+        - '&8&m                                        '
+    guide:
+      title: '&c&l❄ &f&lGUIDE &c&l❄'
+      size: 54
+      items:
+        title:    { slot: 4,  material: BOOK,          glow: true, name: '&6&l❄ GUIDE ❄', lore: ['&7Click anything to use it!'] }
+        rtp:      { slot: 19, material: COMPASS,       name: '&a/rtp',      lore: ['&7Teleport somewhere random.'], command: rtp }
+        spawn:    { slot: 20, material: ENDER_PEARL,   name: '&a/spawn',    lore: ['&7Back to spawn.'], command: spawn }
+        home:     { slot: 21, material: RED_BED,       name: '&a/sethome &7& &a/home', lore: ['&7Save your homes.'], command: home }
+        kits:     { slot: 22, material: CHEST,         name: '&a/kits',     lore: ['&7Kits you can claim.'], command: kits }
+        sell:     { slot: 23, material: HOPPER,        name: '&6/sell',     lore: ['&7Drop items in, close to sell.'], command: sell }
+        multi:    { slot: 24, material: NETHER_STAR,   name: '&e/sellmulti', lore: ['&7Your sell multipliers.'], command: sellmulti }
+        ah:       { slot: 25, material: GOLD_INGOT,    name: '&e/ah',       lore: ['&7Auction house.'], command: ah }
+        tags:     { slot: 29, material: NAME_TAG,      name: '&5/tags',     lore: ['&7Wear a chat tag.'], command: tags }
+        lb:       { slot: 30, material: PLAYER_HEAD,   name: '&e/leaderboard', lore: ['&7Richest players and more.'], command: leaderboard }
+        daily:    { slot: 31, material: CLOCK,         name: '&a/daily',    lore: ['&7Daily rewards.'], command: daily }
+        vote:     { slot: 32, material: LIME_DYE,      name: '&a/vote',     lore: ['&7Vote for rewards.'], command: vote }
+        rules:    { slot: 33, material: WRITABLE_BOOK, name: '&c/rules',    lore: ['&7What''s allowed.'], command: rules }
+        store:    { slot: 40, material: GOLD_BLOCK,    glow: true, name: '&6&l/store', lore: ['&7Ranks, keys and more.'], command: store }
+      chat:
+        - '&8&m                                        '
+        - '&6&lGUIDE'
+        - '&e/rtp   &e/spawn   &e/sethome &7+ &e/home   &e/tpa <name>'
+        - '&e/kits   &e/sell   &e/ah   &e/tags   &e/daily   &e/vote'
+        - '&8&m                                        '
+    ranks:
+      title: '&c&l❄ &f&lRANKS &c&l❄'
+      size: 54
+      items:
+        title:   { slot: 4,  material: GOLD_BLOCK, glow: true, name: '&6&l❄ STORE RANKS ❄', lore: ['&7Click any rank to open the store.'] }
+        vip:     { slot: 20, material: IRON_INGOT,  name: '&b&lHexling',   command: store, lore: ['&8┃ &bHexling &7badge in chat & tab', '&8┃ &7Hexling kit every 6h'] }
+        vipplus: { slot: 21, material: GOLD_INGOT,  name: '&9&lHexbound',  command: store, lore: ['&8┃ &9Hexbound &7badge', '&8┃ &7Hexling + Hexbound kits'] }
+        mvp:     { slot: 22, material: DIAMOND,     name: '&d&lHexborn',   glow: true, command: store, lore: ['&8┃ &dHexborn &7badge', '&8┃ &7All kits up to Hexborn'] }
+        mvpplus: { slot: 23, material: EMERALD,     name: '&5&lHexlord',   glow: true, command: store, lore: ['&8┃ &5Hexlord &7badge', '&8┃ &7All kits up to Hexlord'] }
+        legend:  { slot: 24, material: NETHER_STAR, name: '&6&lHexmaster', glow: true, command: store, lore: ['&8┃ &6Hexmaster &7badge', '&8┃ &7Every kit'] }
+        media:   { slot: 31, material: PINK_DYE,    name: '&d&lMEDIA', command: discord, lore: ['&7For YouTubers & streamers.', '&7Apply in our Discord!'] }
+        crates:  { slot: 40, material: ENDER_CHEST, name: '&5&lCrate keys', command: store, lore: ['&7Keys are on the store too.'] }
+
+store:
+  url: 'https://hxsmp.tebex.store'
+  link-label: '&6&l[CLICK FOR STORE]'
+  message:
+    - '&6&lSTORE &8» &7Ranks, crate keys & more: {store}'
+  # Each Tebex package runs (as console):  storeadmin purchase {username} <item name>
+  purchase-announce:
+    format: '&8[&6&lSTORE&8] &e{player} &7just bought {item}&7! &8» &bClick to visit the store'
+    hover: '&7Click to open the store'
+  # Completed payments are read from the Tebex plugin API with the secret key that is ALREADY in the Tebex plugin's
+  # own config file. Never copy the key here. config-file is relative to the plugins folder.
+  tebex:
+    enabled: true
+    config-file: 'Tebex/config.yml'
+    # Where the key sits in that file; the first one found is used.
+    key-paths: [server.secret-key, secret-key, secret]
+    refresh-minutes: 10
+    # After the first full read, each refresh reads new pages plus this many to catch refunds and chargebacks.
+    recheck-pages: 2
+    max-pages: 200
+  # The "spenders" leaderboard (/leaderboard spenders, and /lbholo place spenders). All-time completed payments.
+  top-spenders:
+    enabled: true
+    exclude: []
+    currency-symbol: '$'
+  popup:
+    enabled: true
+    cooldown-minutes: 10
+    title: 'STORE'
+    message: 'Crate keys, ranks and bundles - bundles save up to 40%! Every purchase helps keep the server running.'
+    open-button: 'Open store'
+    close-button: 'Not now'
+    chat-link: true
+    zones: []
+    # - { world: world, min: [-42, 158, 23], max: [-31, 176, 43] }
+  # Community goal: this month's completed payments (in timezone) against target. /goal shows it.
+  goal:
+    enabled: true
+    target: 500.00
+    timezone: 'UTC'
+    bar-length: 20
+    line: '&d&lCOMMUNITY GOAL &8» &f{current} &7/ &f{target} &8[{bar}&8] &f{percent}%'
+    reached-broadcast: '&d&lCOMMUNITY GOAL &8» &7This month''s store goal of &f{target} &7was reached! Everyone online gets a reward.'
+    # Given once per month to everyone online when the goal is reached.
+    reward:
+      money: 0
+      console-commands: []
+      player-commands: []     # {player} = each online player's name
+  # Store party: a Tebex package runs  storeadmin party {username} {transaction}
+  party:
+    enabled: true
+    countdown-seconds: 10
+    # Pay one account per IP address, so a party can't be multiplied with alts.
+    one-per-ip: true
+    start-broadcast: '&d&lSTORE PARTY &8» &f{player} &7started a store party! Rewards in &f{seconds}s&7...'
+    done-broadcast: '&d&lSTORE PARTY &8» &7Everyone online got a reward. Say thanks to &f{player}&7!'
+    reward:
+      money: 250
+      console-commands: []
+      player-commands: []
+
+# Rank badges and chat tags. Badges: the first entry the player has the permission for (default group.<id>, which
+# LuckPerms gives every member of that group) - keep the highest rank first. "logo" is a resource-pack glyph shown to
+# Java players when use-logo is true; "text" is used for Bedrock players and ranks without a logo.
+ranks:
+  use-logo: true
+  badges:
+    owner:    { logo: '', text: '&4&lOWNER &r' }
+    manager:  { logo: '', text: '&c&lMANAGER &r' }
+    admin:    { logo: '', text: '&c&lADMIN &r' }
+    dev:      { logo: '', text: '&3&lDEV &r' }
+    mod:      { logo: '', text: '&9&lMOD &r' }
+    helper:   { logo: '', text: '&b&lHELPER &r' }
+    guide:    { logo: '', text: '&a&lGUIDE &r' }
+    media:    { logo: '', text: '&d&lMEDIA &r' }
+    legend:   { logo: '', text: '&6&lHEXMASTER &r' }
+    mvpplus:  { logo: '', text: '&5&lHEXLORD &r' }
+    mvp:      { logo: '', text: '&d&lHEXBORN &r' }
+    vipplus:  { logo: '', text: '&9&lHEXBOUND &r' }
+    vip:      { logo: '', text: '&b&lHEXLING &r' }
+    default:  { logo: '', text: '&7&lMEMBER &r' }   # everyone without a rank
+  tags-menu-title: '&c&l❄ &f&lTAGS &c&l❄'
+  # Unlocked with the permission genscore.tag.<id> (crates, store packages or LuckPerms give it).
+  tags:
+    ghoul:        { display: '&#B4F07BG&#9ADE70H&#81CC66O&#68BA5CU&#4EA851L' }
+    boo:          { display: '&#FFFFFFB&#E7EBEFO&#D0D8E0O&#B8C4D0!' }
+    hexed:        { display: '&#E56BFFH&#CE5BF8E&#B84BF0X&#A13BE9E&#8A2BE2D' }
+    bones:        { display: '&#FFFFFFB&#F0F0E9O&#E2E2D4N&#D3D3BEE&#C4C4A8S' }
+    phantom:      { display: '&#BFF3FFP&#AFE6F8H&#9FDAF0A&#8FCEE9N&#7FC1E2T&#6FB4DAO&#5FA8D3M' }
+    vampire:      { display: '&#FF4D5EV&#F24054A&#E53349M&#D8263FP&#CA1A35I&#BD0D2AR&#B00020E' }
+    cursed:       { display: '&#FF7AE0C&#EC71E2U&#D967E3R&#C65EE5S&#B354E6E&#A04BE8D' }
+    wraith:       { display: '&#D0D0E0W&#BFBFD0R&#AEAEC1A&#9C9CB1I&#8B8BA2T&#7A7A92H' }
+    bloodmoon:    { display: '&#FF2A2A&lB&#FF4236&lL&#FF5A43&lO&#FF7250&lO&#FF8A5C&lD&#EF6849&lM&#E04536&lO&#D02223&lO&#C00010&lN' }
+    grim:         { display: '&8[&7GRIM&8]' }
+    pumpkin_king: { display: '&#FFE066&lP&#FFCC52&lU&#FFB73D&lM&#FFA329&lP&#FF8E14&lK&#FF7A00&lI&#FF8E14&lN &#FFA329&lK&#FFB73D&lI&#FFCC52&lN&#FFE066&lG' }
+    soulreaper:   { display: '&#FF4DD2&lS&#EA4DD7&lO&#D54CDC&lU&#C04CE1&lL&#AB4BE6&lR&#955CEB&lE&#7E7DF0&lA&#679EF5&lP&#51BFFA&lE&#3AE0FF&lR' }
+    zzz:          { display: '&#D0DAE4Z&#B0BECEZ&#8FA3B8Z' }
+    couch_potato: { display: '&#ECCB94C&#E7C38BO&#E2BC83U&#DCB47AC&#D7AD71H &#D2A568P&#CD9D60O&#C89657T&#C28E4EA&#BD8746T&#B87F3DO' }
+    sleepwalker:  { display: '&#AFC4FFS&#A7BDFCL&#9FB7FAE&#97B0F8E&#8FAAF5P&#87A3F2W&#7F9CF0A&#7796EEL&#6F8FEBK&#6789E8E&#5F82E6R' }
+    grinder:      { display: '&#FFE066G&#FFD65BR&#FFCD51I&#FFC446N&#FFBA3BD&#FFB031E&#FFA726R' }
+    afk_maxxer:   { display: '&#7FF6FF&lA&#6AE2FF&lF&#55CEFF&lK &#40BAFF&lM&#2BA6FF&lA&#40BAFF&lX&#55CEFF&lX&#6AE2FF&lE&#7FF6FF&lR' }
+    no_life:      { display: '&#FF5A5A&lN&#FF8A55&lO &#FFBA50&lL&#FFBA50&lI&#FF8A55&lF&#FF5A5A&lE' }
+
+# A title and a chat line when one of these kits (kit ids from /kits) can be claimed again.
+kitalerts:
+  enabled: true
+  check-seconds: 10
+  kits: [vip, vipplus, mvp, mvpplus, legend]
+  # How each kit is named in the alert (optional; the kit id is used otherwise).
+  names:
+    vip: '&b&lHexling'
+    vipplus: '&9&lHexbound'
+    mvp: '&d&lHexborn'
+    mvpplus: '&5&lHexlord'
+    legend: '&6&lHexmaster'
+  title: '&a&lKIT READY'
+  subtitle: '{kits} &fcan be claimed again!'
+  chat: '&a&lKITS &8» {kits} &fis ready again! &7Claim it with &e/kit'
+# ---- group F (integration/group-f.md) ----
+# Shards: the second currency (whole numbers). They buy super powers.
+shards:
+  max-balance: 1000000000
+  # The most one /shards give or take can move.
+  max-admin-amount: 10000000
+  earn:
+    enabled: true
+    # Shards a minute, AFK or not ("anywhere", as on HXSMP). false = only while not AFK.
+    count-afk: true
+    base-per-minute: 0.5
+    # Per-minute rate for players with genscore.shards.rank.<name>; the best matching rank counts.
+    ranks: { vip: 2, vipplus: 3, mvp: 4, mvpplus: 5, legend: 6 }
+    # Shown to ranked players when whole shards are paid. '' = off.
+    actionbar: '&b+{amount} shards &8| &bShards: &f{shards}'
+  top:
+    size: 10
+    cache-seconds: 60
+
+# Key crates. The crates themselves are in modules/keycrates/crates.yml (/crate reload after editing).
+keycrates:
+  menu-title: '&c&l❄ &f&lCRATES &c&l❄'
+  # One key for every N minutes of playtime. AFK time doesn't count unless count-afk is true.
+  playtime:
+    crate: amethyst
+    minutes: 60
+    count-afk: false
+  # Paid by the vote module hook (group-f.md section 2).
+  vote:
+    crate: vote
+    keys: 1
+    shards: 30
+    message: '&a&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}'
+  # Every crate win is announced. Wins with a chance below broadcast-under % get the "rare" line.
+  broadcast-under: 5.0
+  broadcast: '&5&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!'
+  broadcast-rare: '&d&l✦ RARE WIN ✦ &f{player} &7won {reward} &7from the {crate}&7! &8({chance}%)'
+  broadcast-bulk: '&5&lCRATES &8» &f{player} &7opened &f{amount}x {crate}&7!'
+  # On an open-all, at most this many rare lines are broadcast after the bulk line.
+  bulk-rare-lines: 5
+  # Rarity labels by chance %.
+  rarities:
+    - { min: 15,  label: '&7&lCOMMON' }
+    - { min: 6,   label: '&a&lUNCOMMON' }
+    - { min: 2,   label: '&9&lRARE' }
+    - { min: 0.5, label: '&5&lEPIC' }
+    - { min: 0,   label: '&6&lLEGENDARY' }
+  # Keys of closed crates turn into this many shards each, wherever they turn up (inventory, ender chest, chests,
+  # pickups, /claim). Only applies to crates that are not in crates.yml or have enabled: false.
+  retired-keys: { afk: 30, vote: 45 }
+  # The most keys one "open all" uses.
+  open-all-max: 128
+  open-cooldown-ms: 600
+  # The spinning reel for single opens. false = rewards at once.
+  animation: true
+  # A free spin for first-time players (once per player, ever).
+  welcome-spin:
+    enabled: true
+    crate: vote
+    delay-seconds: 5
+    message: '&d&lWELCOME! &7Here''s a free spin of the {crate}&7!'
+  # Claim-box rows handled per /claim.
+  claim-rows-per-use: 100
+# ---- group H (integration/group-h.md) ----
+# Season Pass (HXSMP /pass). Free and premium tracks; premium = permission genscore.pass.premium (grant with Tebex/LuckPerms).
+# Pass XP comes from daily and weekly challenges. Changing season-id starts a new season (old progress is kept in the
+# database under the old id). Rewards: money, shards, keys {crate, amount}, item {material, amount, name, lore, enchants,
+# glow}, command (console, {player} = name), each with an optional display text.
+seasonpass:
+  enabled: true
+  season-id: winter-2026
+  season-name: 'Winter Season'
+  timezone: America/New_York
+  # The season runs from start (inclusive) to end (exclusive), in the timezone above.
+  start: '2026-12-01T00:00'
+  end: '2027-03-01T00:00'
+  tier-count: 30
+  # Tier N needs N * xp-per-tier XP in total.
+  xp-per-tier: 100
+  anti-farm:
+    # A kill of the same player counts once per this many minutes for each killer.
+    same-victim-minutes: 30
+    # Mobs from spawners count toward KILL_MOBS challenges.
+    count-spawner-mobs: false
+    # AFK minutes (essentials AFK) count toward PLAYTIME_MINUTES challenges.
+    count-afk-playtime: false
+  challenges:
+    # How many challenges of each pool are active; picked the same for everyone, new each day / ISO week.
+    daily-count: 3
+    weekly-count: 3
+    # type: KILL_PLAYERS, KILL_MOBS, MINE_BLOCKS, FISH, BREED_ANIMALS, PLAYTIME_MINUTES (counted by GensCore),
+    # SELL_ITEMS, OPEN_CRATES, VOTE (need the hooks in integration/group-h.md, or /pass progress), CUSTOM (/pass progress
+    # with the filter as a tag). filter: material / entity type names (empty = anything).
+    daily:
+      - {id: mine-stone, type: MINE_BLOCKS, amount: 500, xp: 40, filter: [STONE, DEEPSLATE, COBBLESTONE], name: '&fMine 500 stone'}
+      - {id: mine-ores, type: MINE_BLOCKS, amount: 32, xp: 50, filter: [COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, DEEPSLATE_COAL_ORE, DEEPSLATE_IRON_ORE, DEEPSLATE_GOLD_ORE, DEEPSLATE_DIAMOND_ORE, ANCIENT_DEBRIS], name: '&fMine 32 ores'}
+      - {id: kill-mobs, type: KILL_MOBS, amount: 50, xp: 40, name: '&fKill 50 mobs'}
+      - {id: kill-zombies, type: KILL_MOBS, amount: 25, xp: 35, filter: [ZOMBIE, HUSK, DROWNED, ZOMBIE_VILLAGER], name: '&fKill 25 zombies'}
+      - {id: kill-players, type: KILL_PLAYERS, amount: 3, xp: 60, name: '&fKill 3 players'}
+      - {id: fish, type: FISH, amount: 15, xp: 40, name: '&fCatch 15 fish'}
+      - {id: breed, type: BREED_ANIMALS, amount: 10, xp: 30, name: '&fBreed 10 animals'}
+      - {id: play-60, type: PLAYTIME_MINUTES, amount: 60, xp: 50, name: '&fPlay for an hour'}
+      - {id: sell-items, type: SELL_ITEMS, amount: 500, xp: 40, name: '&fSell 500 items'}
+      - {id: vote, type: VOTE, amount: 1, xp: 40, name: '&fVote for the server'}
+    weekly:
+      - {id: kill-players-w, type: KILL_PLAYERS, amount: 25, xp: 250, name: '&fKill 25 players'}
+      - {id: kill-mobs-w, type: KILL_MOBS, amount: 500, xp: 200, name: '&fKill 500 mobs'}
+      - {id: mine-w, type: MINE_BLOCKS, amount: 5000, xp: 200, name: '&fMine 5,000 blocks'}
+      - {id: diamonds-w, type: MINE_BLOCKS, amount: 64, xp: 250, filter: [DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE], name: '&fMine 64 diamond ore'}
+      - {id: play-w, type: PLAYTIME_MINUTES, amount: 600, xp: 250, name: '&fPlay for 10 hours'}
+      - {id: crates-w, type: OPEN_CRATES, amount: 10, xp: 200, name: '&fOpen 10 crates'}
+      - {id: vote-w, type: VOTE, amount: 7, xp: 250, name: '&fVote 7 times'}
+      - {id: fish-w, type: FISH, amount: 100, xp: 200, name: '&fCatch 100 fish'}
+  # Rewards per tier. Tiers not listed have no reward on that track. Placeholder amounts: tune them for the economy.
+  tiers:
+    1:  {free: [{money: 1000}], premium: [{shards: 25}, {keys: {crate: vote, amount: 1}}]}
+    2:  {free: [{item: {material: COOKED_BEEF, amount: 32}}], premium: [{money: 5000}]}
+    3:  {free: [{money: 1500}], premium: [{item: {material: GOLDEN_APPLE, amount: 8}}]}
+    4:  {free: [{item: {material: EXPERIENCE_BOTTLE, amount: 32}}], premium: [{shards: 40}]}
+    5:  {free: [{keys: {crate: vote, amount: 1}}], premium: [{keys: {crate: amethyst, amount: 1}}, {money: 7500}]}
+    6:  {free: [{money: 2000}], premium: [{item: {material: ENDER_PEARL, amount: 16}}]}
+    7:  {free: [{item: {material: IRON_BLOCK, amount: 16}}], premium: [{shards: 50}]}
+    8:  {free: [{money: 2500}], premium: [{item: {material: TOTEM_OF_UNDYING, amount: 1}}]}
+    9:  {free: [{shards: 20}], premium: [{money: 10000}]}
+    10: {free: [{keys: {crate: vote, amount: 2}}], premium: [{keys: {crate: amethyst, amount: 2}}, {item: {material: DIAMOND_BLOCK, amount: 4}}]}
+    11: {free: [{money: 3000}], premium: [{shards: 60}]}
+    12: {free: [{item: {material: GOLDEN_APPLE, amount: 8}}], premium: [{money: 12500}]}
+    13: {free: [{money: 3500}], premium: [{item: {material: EXPERIENCE_BOTTLE, amount: 64}}]}
+    14: {free: [{shards: 25}], premium: [{item: {material: TOTEM_OF_UNDYING, amount: 1}}, {item: {material: TOTEM_OF_UNDYING, amount: 1}}]}
+    15: {free: [{keys: {crate: vote, amount: 2}}], premium: [{keys: {crate: amethyst, amount: 2}}, {money: 15000}]}
+    16: {free: [{money: 4000}], premium: [{shards: 75}]}
+    17: {free: [{item: {material: DIAMOND, amount: 16}}], premium: [{money: 17500}]}
+    18: {free: [{money: 4500}], premium: [{item: {material: ENCHANTED_GOLDEN_APPLE, amount: 1}}]}
+    19: {free: [{shards: 30}], premium: [{money: 20000}]}
+    20: {free: [{keys: {crate: vote, amount: 3}}], premium: [{keys: {crate: amethyst, amount: 3}}, {shards: 100}]}
+    21: {free: [{money: 5000}], premium: [{item: {material: NETHERITE_SCRAP, amount: 4}}]}
+    22: {free: [{item: {material: ENDER_PEARL, amount: 16}}], premium: [{money: 25000}]}
+    23: {free: [{money: 6000}], premium: [{shards: 125}]}
+    24: {free: [{shards: 40}], premium: [{item: {material: TOTEM_OF_UNDYING, amount: 1}}, {item: {material: TOTEM_OF_UNDYING, amount: 1}}, {item: {material: TOTEM_OF_UNDYING, amount: 1}}]}
+    25: {free: [{keys: {crate: vote, amount: 3}}], premium: [{keys: {crate: amethyst, amount: 4}}, {money: 30000}]}
+    26: {free: [{money: 7500}], premium: [{shards: 150}]}
+    27: {free: [{item: {material: DIAMOND_BLOCK, amount: 4}}], premium: [{money: 40000}]}
+    28: {free: [{money: 10000}], premium: [{item: {material: NETHERITE_INGOT, amount: 2}}]}
+    29: {free: [{shards: 50}], premium: [{shards: 200}]}
+    30: {free: [{keys: {crate: amethyst, amount: 2}}, {money: 25000}], premium: [{keys: {crate: amethyst, amount: 5}}, {money: 75000}, {item: {material: NETHERITE_INGOT, amount: 4, name: '&b&lSeason Champion Ingot', glow: true}}]}
+
+# Christmas features (HXSMP HxCore: AdventCalendar, ElfSeller, Christmas, DrillClaim). Each has its own switch and window
+# (MM-DD, inclusive, may wrap the new year), in the timezone below.
+reputation:
+  # Seconds between two vouches/reports by the same player.
+  cooldown-seconds: 60
+  broadcast-enabled: false
+  broadcast-interval-minutes: 45
+  broadcast-message: '<gold>[Community]</gold> <yellow>Vouch players or check their credibility with <green>/vouch \<player></green>. View ratings with <green>/vouches \<player></green>.'
+
+# /wordle (/word, /words). HxCore's defaults. The first game each day is the shared daily word; after it players can
+# play more games with random words until their Wordle earnings for the day reach daily-cap (0 = no cap).
+wordle:
+  # Money for solving in 1, 2, 3, 4, 5, 6 guesses.
+  rewards: [3000, 2000, 1500, 1000, 700, 400]
+  daily-cap: 15000
+  # true = guesses must be in modules/wordle/words.txt (it's small, so real words could be refused)
+  only-real-words: false
+  # Day boundary for the daily word and the cap, e.g. Europe/London. Empty = the server's time zone.
+  timezone: ''
+
+# Chat games (BlockvilleCore's, with HxCore's timings, reward range, words and riddles).
+chatgames:
+  enabled: true
+  every-minutes: 7
+  # The first round after a start/reload; then one every every-minutes.
+  offset-minutes: 4
+  min-players: 1
+  answer-seconds: 60
+  # Random reward in this range for each win.
+  reward-min: 250
+  reward-max: 1000
+  # Largest number in math and variable rounds.
+  number-max: 50
+  # Answers faster than this (ms after the round starts) are ignored: no person reads and types that fast.
+  min-answer-ms: 700
+  # Empty = all: unscramble, unreverse, reaction, fillout, random_string, math, variable, trivia
+  enabled-types: []
+  sound: entity.player.levelup
+  win-sound: ui.toast.challenge_complete
+  words: [diamond, netherite, creeper, skeleton, pumpkin, enderman, obsidian, crystal, totem, elytra, beacon, villager,
+          zombie, spider, emerald, redstone, trident, shulker, anvil, potion, cobweb, lantern, phantom, warden, blaze,
+          ghast, piglin, wither, dragon, pickaxe, shield, arrow, cauldron, spawner, witch, scythe, candle, gravestone]
+  # Trivia rounds. Empty = HxCore's riddles plus some of BlockvilleCore's trivia (built in).
+  trivia:
+    - { q: 'I explode when you get too close and I hiss before I do. What am I?', a: 'creeper' }
+    - { q: 'I''m green, I''m ugly and I''ll trade you anything for emeralds. What am I?', a: 'villager' }
+    - { q: 'Hold me in your hand when you''re about to die and I''ll save you. What am I?', a: 'totem' }
+    - { q: 'I''m the strongest material in the game and I come from ancient debris. What am I?', a: 'netherite' }
+    - { q: 'Look me in the eyes and I''ll come for you. What mob am I?', a: 'enderman' }
+    - { q: 'I let you fly but only if you''re falling first. What am I?', a: 'elytra' }
+    - { q: 'I''m orange, I grow on the ground and I get carved at Halloween. What am I?', a: 'pumpkin' }
+    - { q: 'I cry fireballs in the Nether. What am I?', a: 'ghast' }
+    - { q: 'I''m the dark block you get when water flows onto a lava source. What am I?', a: 'obsidian' }
+    - { q: 'I live in a deep dark city and I''m blind. What am I?', a: 'warden' }
+    - { q: 'I love gold and I live in the Nether. What am I?', a: 'piglin' }
+    - { q: 'Put me on a pyramid of iron or diamond blocks and I''ll give you powers. What am I?', a: 'beacon' }
+# ---- group K (integration/group-k.md) ----
+worldrules:
+  # The whole spawn (island + clouds). Inside it nether portals don't light or work, and anyone below fall-y inside
+  # its x/z area is sent back to spawn.
+  spawn:
+    world: world
+    min: [-98, -64, -48]
+    max: [88, 319, 255]
+    fall-y: 84
+    block-nether-portals: true
+    # /worldrules spawn close|open. While closed, players without genscore.spawn.bypassclosed are random-teleported to
+    # rtp.zone-destination when they enter the box, and teleports into it (/spawn, homes, tpa) are refused.
+    closed-message: '&c&lSPAWN &8» &7Spawn is &cclosed &7right now.'
+  end-lock:
+    enabled: true
+    world: world_the_end
+    radius: 900                 # blocks from 0,0 that count as the dragon island
+    prevent-dragon: true
+    message: '&5&lTHE END &8» &7The dragon island is &cclosed&7. Use &d/rtp end &7to visit the outer islands.'
+
+maintenance:
+  clear-drops:
+    enabled: true
+    every-minutes: 5
+    min-age-seconds: 60
+    xp-orbs: true
+    arrows: true                # arrows stuck in blocks only; tridents are never touched
+    warning-seconds: [60, 30, 10]
+    skip-worlds: []
+    warning: '&c&lCLEAR LAG &8» &7Items on the ground will be removed in &c{time}&7!'
+    done: '&a&lCLEAR LAG &8» &7Removed &a{count} &7items from the ground.'
+  reboot:
+    enabled: true
+    time: '06:00'
+    zone: Europe/London
+    warning-seconds: [900, 600, 300, 120, 60, 30, 10, 5, 4, 3, 2, 1]
+    warning: '&4&lRESTART &8» &7The server restarts in &c{time} &7- it''ll be back in under a minute!'
+  mob-cap:
+    enabled: true
+    max-per-chunk: 40
+    trim-on-load: true          # remove the extra when a chunk loads with more
+    reasons: [NATURAL, SPAWNER, BREEDING, EGG, DISPENSE_EGG, SPAWNER_EGG, TRIAL_SPAWNER, PATROL, JOCKEY, MOUNT, REINFORCEMENTS]
+    exclude: [VILLAGER, WANDERING_TRADER, IRON_GOLEM, ENDER_DRAGON, WITHER, ELDER_GUARDIAN, WARDEN, SHULKER, ALLAY, SNIFFER]
+  bedrock-fly-fix: true         # only does anything when Floodgate is installed
+
+sit:
+  enabled: true
+  require-solid-ground: true
+  prevent-sitting-while-sneaking: true
+  seat-y-offset: 0.0            # raise/lower the seat if players sink into or float above blocks (needs an in-game look)
+  right-click:
+    enabled: true
+    allowed-block-types: [STAIRS, SLAB, CARPET]   # bottom stairs and bottom slabs only
+    require-empty-hand: false
+  messages:
+    already-sitting: '&eYou are already sitting. Use &f/stand&e to get up.'
+    sat-down: '&aYou sat down.'
+    stood-up: '&eYou stood up.'
+    not-sitting: '&cYou are not sitting.'
+    disabled: '&cSitting is currently disabled.'
+    cant-sit-here: '&cYou can''t sit here.'
+# ---- group L (integration/group-l.md) ----
+sus:
+  prefix: '<red><bold>SUS</bold> <dark_gray>» '
+  alert-cooldown-seconds: 60    # one ping per player per check in this time (the list still counts them all)
+  hold-millis: 2000             # how long a rate must stay over its limit
+  checks: { autoclicker: true, autocrystal: true, autototem: true, nuker: true }
+  max-cps: 25                   # left clicks per second (not mining), held for hold-millis
+  max-crystals-per-second: 12   # end crystals broken per second, held
+  totem-min-ms: 120             # off-hand totem refilled faster than this after a pop (minus ping) = suspicious
+  totem-flags-needed: 3         # that many suspicious refills ...
+  totem-window-minutes: 10      # ... within this time = one flag
+  max-blocks-broken-per-second: 22   # hard blocks, held
+  nuker-min-hardness: 0.5       # blocks softer than this (grass, flowers, crops) are not counted
+
+staffmode:
+  # Owner only: accounts (UUIDs) whose alt lookup shows a plain result unless the viewer has genscore.hiddenalts.bypass.
+  hidden-alts: []
+
+modules:
+  plots: true
+  wipe: true
+  lagwatch: true
+  antihack: true
+  settings: true
+  trade: false        # player trading is after launch
+  mail: true
+  vote: true
+  polls: true
+  leaderboards: true
+  crates: true
+  vouchers: true
+  daily: true
+  kits: true
+  vaults: true
+  announcements: true
+  economy: true
+  teleport: true
+  essentials: true
+  chat: true
+  staff: true
+  info: true
+  store: true
+  ranks: true
+  kitalerts: true
+  shards: true
+  keycrates: true
+  seasonpass: false   # seasons are after launch
+  reputation: true
+  wordle: true
+  chatgames: true
+  worldrules: true
+  maintenance: true
+  sit: true
+  sus: true
+  staffmode: true
+  cosmetics: true

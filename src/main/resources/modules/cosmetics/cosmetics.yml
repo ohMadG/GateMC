@@ -1,0 +1,219 @@
+# GensCore cosmetics (/cosmetics, /wardrobe, /cos). Reload with /cosmetics reload.
+#
+# Ownership: a player owns a cosmetic when they have its permission (store ranks, through LuckPerms) or a stored
+# unlock (crate rewards: /cosmetics give <player> <category> <id>, or CosmeticsModule.grant from code).
+# The permission defaults to genscore.cosmetics.<category>.<id>; set "permission:" to use another one, or
+# "free: true" to give it to everyone. One cosmetic is active per category.
+#
+# Text uses & colour codes. Ids: a-z, 0-9, _ and - (up to 32).
+
+settings:
+  # Shown on a locked cosmetic in the menu.
+  locked-hint: "&7Unlock it on the store or from crates."
+  trails:
+    # How often each player's trail is drawn (2-20 ticks). Drawn only while moving, on the player's own thread.
+    interval-ticks: 3
+    # Blocks moved before the next puff (stops standing-still spam).
+    min-move: 0.2
+    # Never draw a trail for an invisible player (would give away their position in PvP).
+    hide-when-invisible: true
+  tool-skins:
+    enabled: true
+    # How often other players are re-sent the skinned look (5-100 ticks). The server re-sends the plain tool when it
+    # takes damage, so lower = less flicker in fights, higher = fewer packets.
+    refresh-ticks: 10
+
+# Kill ranks: total player kills, shown above heads with the kill-rank placeholder. Highest reached tier wins.
+kill-ranks:
+  # Kills where killer and victim connect from the same IP address do not count (alt farming).
+  same-ip-kills-count: false
+  # The same killer -> victim pair counts once per this many minutes (0 = always counts).
+  same-victim-cooldown-minutes: 10
+  tiers:
+    - { kills: 0,   display: '&7⚔ Rookie' }
+    - { kills: 5,   display: '&f⚔ Fighter' }
+    - { kills: 15,  display: '&a⚔ Warrior' }
+    - { kills: 35,  display: '&b⚔ Gladiator' }
+    - { kills: 75,  display: '&d⚔ Champion' }
+    - { kills: 150, display: '&6⚔ Warlord' }
+    - { kills: 300, display: '&c&l⚔ Slayer' }
+    - { kills: 600, display: '&4&l⚔ IMMORTAL' }
+
+# /homeicon (permission genscore.homeicon, for paid ranks).
+home-icons:
+  max-per-player: 32
+  # Also offer "use the item in your hand" (only its type is stored, never the item).
+  allow-held-item: true
+  choices: [RED_BED, CHEST, ENDER_CHEST, CRAFTING_TABLE, FURNACE, ANVIL, ENCHANTING_TABLE, BEACON, DIAMOND, EMERALD,
+            GOLD_INGOT, IRON_INGOT, NETHERITE_INGOT, DIAMOND_SWORD, DIAMOND_PICKAXE, BOW, SHIELD, TOTEM_OF_UNDYING,
+            WHEAT, OAK_SAPLING, CACTUS, SUGAR_CANE, SPAWNER, OBSIDIAN, GRASS_BLOCK, SAND, NETHERRACK, END_STONE,
+            OAK_BOAT, MINECART, COMPASS, CLOCK, MAP, BOOK, CAMPFIRE, LANTERN, SKELETON_SKULL, DRAGON_HEAD,
+            HEART_OF_THE_SEA, NETHER_STAR, ELYTRA, TRIDENT, FISHING_ROD, CAKE, BELL]
+
+cosmetics:
+
+  # ------------------------------------------------------------------ kill effects
+  # Drawn where the victim died when the owner gets a player kill. Particles, a sound and, if lightning: true, a
+  # lightning flash that does no damage and lights no fire.
+  # effect: particle (a Minecraft particle; DUST / DUST_COLOR_TRANSITION take colors: and size:), count (1-60),
+  #         spread (0-3), speed (0-1), offset-y, sound (a sound key), volume, pitch, lightning
+  kill-effects:
+    blood:
+      name: "&cBlood Burst"
+      icon: REDSTONE
+      description: ["A spray of red where they fell."]
+      effect: { particle: DUST, colors: ["#8a0303", "#d01010"], size: 1.4, count: 40, spread: 0.5, offset-y: 1.0,
+                sound: entity.player.hurt, pitch: 0.7 }
+    hearts:
+      name: "&dHeartbreaker"
+      icon: PINK_DYE
+      description: ["Leave them some love."]
+      effect: { particle: HEART, count: 12, spread: 0.6, offset-y: 1.2, sound: entity.experience_orb.pickup }
+    souls:
+      name: "&3Soul Harvest"
+      icon: SOUL_LANTERN
+      description: ["Their soul is yours."]
+      effect: { particle: SOUL, count: 25, spread: 0.4, speed: 0.05, offset-y: 0.8, sound: particle.soul_escape, volume: 1.5 }
+    thunder:
+      name: "&eThunderstruck"
+      icon: LIGHTNING_ROD
+      description: ["A lightning flash (harmless)."]
+      effect: { particle: ELECTRIC_SPARK, count: 30, spread: 0.6, offset-y: 1.0, lightning: true }
+    totem:
+      name: "&6Golden Farewell"
+      icon: TOTEM_OF_UNDYING
+      description: ["A burst of totem sparks."]
+      effect: { particle: TOTEM_OF_UNDYING, count: 50, spread: 0.3, speed: 0.4, offset-y: 1.0, sound: item.totem.use, volume: 0.6 }
+
+  # ------------------------------------------------------------------ explosive kills
+  # A blast where the victim died: particles and sound only. Nothing is ever really exploded (no block damage,
+  # no knockback, no item loss).
+  explosive-kills:
+    blast:
+      name: "&cTNT Blast"
+      icon: TNT
+      description: ["Boom. Harmless, but loud."]
+      effect: { particle: EXPLOSION_EMITTER, count: 1, spread: 0, offset-y: 0.5, sound: entity.generic.explode }
+    firework:
+      name: "&bFirework Finale"
+      icon: FIREWORK_ROCKET
+      description: ["A firework show for your victim."]
+      effect: { particle: FIREWORK, count: 60, spread: 0.2, speed: 0.25, offset-y: 1.0, sound: entity.firework_rocket.blast }
+    smoke:
+      name: "&8Smoke Bomb"
+      icon: GUNPOWDER
+      description: ["Gone in a puff of smoke."]
+      effect: { particle: LARGE_SMOKE, count: 40, spread: 0.6, speed: 0.05, offset-y: 0.8, sound: entity.generic.explode, pitch: 1.6, volume: 0.6 }
+
+  # ------------------------------------------------------------------ join and leave messages
+  # From BlockvilleCore's joinmessages.yml / leavemessages.yml. {player} is the player's name.
+  join-messages:
+    stylish:
+      name: "&aStylish Entrance"
+      icon: LIME_DYE
+      description: ["Arrive with a touch of class."]
+      message: "&8[&a+&8] &e{player} &7joined with style."
+    royal:
+      name: "&6Royal Arrival"
+      icon: GOLDEN_HELMET
+      description: ["Announce yourself like royalty."]
+      message: "&8[&6✦&8] &6{player} &7has graced the server with their presence."
+    shadow:
+      name: "&5Shadow Step"
+      icon: ENDER_PEARL
+      description: ["Slip in unnoticed... almost."]
+      message: "&8[&5+&8] &5{player} &7slipped in from the shadows..."
+    firework:
+      name: "&cFirework Burst"
+      icon: FIREWORK_ROCKET
+      description: ["Make an entrance."]
+      message: "&8[&c✹&8] &c{player} &7burst onto the server!"
+  leave-messages:
+    graceful:
+      name: "&aGraceful Exit"
+      icon: LIME_DYE
+      description: ["Depart with a touch of class."]
+      message: "&8[&c-&8] &e{player} &7left with grace."
+    royal:
+      name: "&6Royal Departure"
+      icon: GOLDEN_HELMET
+      description: ["Leave like royalty."]
+      message: "&8[&6✦&8] &6{player} &7has departed the kingdom."
+    shadow:
+      name: "&5Vanished"
+      icon: ENDER_PEARL
+      description: ["Fade into the dark."]
+      message: "&8[&5-&8] &5{player} &7vanished into the shadows..."
+    firework:
+      name: "&cBlast Off"
+      icon: FIREWORK_ROCKET
+      description: ["Leave with a bang."]
+      message: "&8[&c✹&8] &c{player} &7blasted off the server!"
+
+  # ------------------------------------------------------------------ name colours
+  # color: a MiniMessage opening tag. Used by the chat module and the coloured-name placeholder.
+  name-colors:
+    red:     { name: "&cRed",     icon: RED_DYE,        color: "<red>" }
+    green:   { name: "&aGreen",   icon: LIME_DYE,       color: "<green>" }
+    aqua:    { name: "&bAqua",    icon: LIGHT_BLUE_DYE, color: "<aqua>" }
+    gold:    { name: "&6Gold",    icon: ORANGE_DYE,     color: "<gold>" }
+    pink:    { name: "&dPink",    icon: PINK_DYE,       color: "<light_purple>" }
+    white:   { name: "&fWhite",   icon: WHITE_DYE,      color: "<white>" }
+    sunset:  { name: "&6S&eu&cn&4s&ce&et", icon: SUNFLOWER,  color: "<gradient:#ff7e00:#ff2f55>" }
+    ocean:   { name: "&9O&bc&3e&ba&9n",    icon: HEART_OF_THE_SEA, color: "<gradient:#1e6dff:#3ee0ff>" }
+    forest:  { name: "&2F&ao&2r&ae&2s&at", icon: OAK_SAPLING, color: "<gradient:#1b7a1b:#7be36b>" }
+    rainbow: { name: "&cR&6a&ei&an&bb&9o&dw", icon: PRISMARINE_CRYSTALS, color: "<rainbow>" }
+
+  # ------------------------------------------------------------------ trails
+  # Drawn behind the player while walking. Small caps: count 1-6, spread 0-0.5, speed 0-0.1, no sound.
+  trails:
+    flame:
+      name: "&6Flame Trail"
+      icon: BLAZE_POWDER
+      description: ["Leave fire in your wake."]
+      effect: { particle: FLAME, count: 2, spread: 0.08, offset-y: 0.1 }
+    hearts:
+      name: "&dHeart Trail"
+      icon: RED_DYE
+      description: ["Leave a little love behind you."]
+      effect: { particle: HEART, count: 1, spread: 0.1, offset-y: 0.3 }
+    sparkle:
+      name: "&eSparkle Trail"
+      icon: GLOWSTONE_DUST
+      description: ["Golden sparkles at your heels."]
+      effect: { particle: DUST, colors: ["#ffd84a", "#fff6c8"], size: 0.9, count: 2, spread: 0.12, offset-y: 0.15 }
+    soul:
+      name: "&3Soul Trail"
+      icon: SOUL_TORCH
+      description: ["Blue flames follow you."]
+      effect: { particle: SOUL_FIRE_FLAME, count: 2, spread: 0.08, offset-y: 0.1 }
+    snow:
+      name: "&fFrost Trail"
+      icon: SNOWBALL
+      description: ["Snowflakes in your footsteps."]
+      effect: { particle: SNOWFLAKE, count: 2, spread: 0.1, offset-y: 0.15 }
+    cherry:
+      name: "&dBlossom Trail"
+      icon: CHERRY_SAPLING
+      description: ["Petals drift behind you."]
+      effect: { particle: CHERRY_LEAVES, count: 2, spread: 0.2, offset-y: 0.6 }
+
+  # ------------------------------------------------------------------ tool skins
+  # Other players see the skin on the held tool (one of materials:). The real item is never changed: it keeps its
+  # type, enchantments and value, and a dropped, traded or sold tool is the plain original. The owner sees their own
+  # tool unchanged (no packet library on this server).
+  # item-model: a model from the server resource pack (namespace:path), and/or custom-model-data: a number the pack
+  # uses. Without the pack, viewers see a missing-texture model, so these examples are switched off until the
+  # pack has the models. Keep skins to the same tier of tool so they never disguise what someone is holding.
+  tool-skins: {}
+  #  frost_sword:
+  #    name: "&bFrostbite Blade"
+  #    icon: DIAMOND_SWORD
+  #    description: ["An icy look for your sword."]
+  #    materials: [DIAMOND_SWORD, NETHERITE_SWORD]
+  #    item-model: "hxsmp:skins/frost_sword"
+  #  molten_pick:
+  #    name: "&6Molten Pickaxe"
+  #    icon: NETHERITE_PICKAXE
+  #    materials: [DIAMOND_PICKAXE, NETHERITE_PICKAXE]
+  #    custom-model-data: 1001

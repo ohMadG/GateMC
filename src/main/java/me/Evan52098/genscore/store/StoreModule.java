@@ -1,0 +1,440 @@
+package me.Evan52098.genscore.store;
+
+import me.Evan52098.genscore.GensCore;
+import me.Evan52098.genscore.info.Text;
+import me.Evan52098.genscore.leaderboards.LeaderboardsModule;
+import me.Evan52098.genscore.module.GensModule;
+import me.Evan52098.genscore.scheduler.Tasks;
+import me.Evan52098.genscore.util.Cooldowns;
+import me.Evan52098.genscore.util.Money;
+import me.Evan52098.genscore.util.Msg;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
+import revxrsal.commands.annotation.Command;
+import revxrsal.commands.annotation.Description;
+import revxrsal.commands.annotation.Named;
+import revxrsal.commands.annotation.Optional;
+import revxrsal.commands.annotation.Subcommand;
+import revxrsal.commands.bukkit.actor.BukkitCommandActor;
+import revxrsal.commands.bukkit.annotation.CommandPermission;
+
+import java.time.Instant;
+import java.time.YearMonth;
+import java.util.Map;
+import java.util.OptionalLong;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.regex.Pattern;
+
+/**
+ * The Tebex store side of HxCore ({@code purchase-announce}, {@code store-popup}, the spenders leaderboard, and the
+ * {@code SpendGoal}/{@code StoreParty}/{@code TopSpender}/{@code StorePayments} classes, designed fresh here):
+ * <ul>
+ *   <li>{@code /store} (aliases /buy, /tebex): the store link.</li>
+ *   <li>{@code /storeadmin purchase <player> <item>}: what a Tebex package runs; broadcasts a clickable store line.</li>
+ *   <li>Top spenders: completed Tebex payments, read in the background with the secret key from the Tebex plugin's
+ *       own config, kept in {@code pvp_store_payments}, and shown as the {@code spenders} leaderboard.</li>
+ *   <li>Community goal ({@code /goal}): this month's completed payments against a target, with a progress bar; when
+ *       the target is reached, everyone online gets the configured reward, once per month.</li>
+ *   <li>Store party ({@code /storeadmin party <player> [transaction]}): run by a Tebex package; after a short
+ *       countdown everyone online (one account per IP) gets the party reward. With a transaction id it runs only
+ *       once per transaction, even if Tebex sends the command twice.</li>
+ *   <li>Store pop-up zones ({@link StorePopup}).</li>
+ * </ul>
+ */
+public final class StoreModule implements GensModule {
+
+    private static final Pattern PLAYER_NAME = Pattern.compile("[A-Za-z0-9_.\\-]{1,32}");
+    private static final Pattern TRANSACTION = Pattern.compile("[A-Za-z0-9_\\-]{1,64}");
+
+    private GensCore plugin;
+    private volatile StoreSettings settings;
+    private StorePayments payments;
+    private TebexClient tebex;
+    private StoreRewards rewards;
+    private StorePopup popup;
+    private final AtomicBoolean syncing = new AtomicBoolean();
+    private final AtomicBoolean syncSoon = new AtomicBoolean();
+    private final Cooldowns cooldowns = new Cooldowns();
+
+    // Status, written by the sync thread and read by commands.
+    private volatile long lastSyncAt;
+    private volatile String lastSyncResult = "not run yet";
+    private volatile long monthTotalCents;
+    private volatile YearMonth monthShown = YearMonth.now();
+
+    @Override
+    public String id() {
+        return "store";
+    }
+
+    @Override
+    public void enable(GensCore plugin) throws Exception {
+        this.plugin = plugin;
+        this.settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
+        this.payments = new StorePayments(plugin.database());
+        payments.migrate(plugin.getLogger());
+        this.tebex = new TebexClient(plugin.getDataFolder().getParentFile());
+        this.rewards = new StoreRewards(plugin.modules(), plugin.getLogger());
+        this.popup = new StorePopup(() -> settings, this::storeLine);
+        Bukkit.getPluginManager().registerEvents(popup, plugin);
+        plugin.commands().register(this, new Admin());
+        registerBoard();
+        warnBadUrl();
+        // First sync shortly after start, then every refresh-minutes. The period is read at enable; reload changes the
+        // rest of the settings at once and the period after a restart.
+        Tasks.async.timer(t -> sync(null), 20, (long) settings.refreshMinutes() * 60, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void reload() {
+        settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
+        popup.forgetAll();
+        warnBadUrl();
+    }
+
+    private void warnBadUrl() {
+        if (!settings.url().isEmpty() && !Text.isWebLink(settings.url())) {
+            plugin.getLogger().warning("[store] store.url is not an http(s) link; it will not be clickable.");
+        }
+    }
+
+    private void registerBoard() {
+        LeaderboardsModule boards = plugin.modules().get(LeaderboardsModule.class);
+        if (boards == null || !settings.topEnabled()) {
+            return;
+        }
+        boards.register(new LeaderboardsModule.Board("spenders", "Top Spenders", "Spent", Material.DIAMOND,
+                (db, limit) -> db.sync(c -> payments.top(c, limit, settings.topExclude())),
+                cents -> settings.formatMoney(cents), null));
+    }
+
+    // ------------------------------------------------------------------ links
+
+    /** The clickable store link (HxCore's {store}). */
+    Component storeLink() {
+        StoreSettings s = settings;
+        return Text.link(s.linkLabel(), s.url(), "&7Click to open the store");
+    }
+
+    /** The first store message line with {store} filled in (used by the pop-up). */
+    Component storeLine() {
+        StoreSettings s = settings;
+        String first = s.storeMessage().isEmpty() ? "{store}" : s.storeMessage().get(0);
+        return Text.replace(Text.legacy(first), Map.of("{store}", storeLink()));
+    }
+
+    @Command({"store", "buy", "tebex"})
+    @CommandPermission("genscore.store")
+    @Description("Link to the server store")
+    public void store(BukkitCommandActor actor) {
+        StoreSettings s = settings;
+        if (s.url().isEmpty()) {
+            actor.sender().sendMessage(Msg.bad("The store link isn't set up yet."));
+            return;
+        }
+        Component link = storeLink();
+        for (String line : s.storeMessage()) {
+            actor.sender().sendMessage(Text.replace(Text.legacy(line), Map.of("{store}", link)));
+        }
+    }
+
+    @Command({"goal", "spendgoal", "storegoal"})
+    @CommandPermission("genscore.store")
+    @Description("This month's community store goal")
+    public void goal(BukkitCommandActor actor) {
+        StoreSettings.Goal g = settings.goal();
+        if (!g.enabled()) {
+            actor.sender().sendMessage(Msg.neutral("There is no community goal right now."));
+            return;
+        }
+        // Cached numbers only: no database work, so no rate limit needed.
+        actor.sender().sendMessage(goalLine());
+        actor.sender().sendMessage(Text.replace(Text.legacy("&7Every store purchase counts: {store}"), Map.of("{store}", storeLink())));
+    }
+
+    Component goalLine() {
+        StoreSettings s = settings;
+        StoreSettings.Goal g = s.goal();
+        long current = YearMonth.now(g.zone()).equals(monthShown) ? monthTotalCents : 0;
+        int percent = (int) Math.min(100, g.targetCents() <= 0 ? 0 : current * 100 / g.targetCents());
+        int filled = (int) Math.min(g.barLength(), g.targetCents() <= 0 ? 0 : current * g.barLength() / g.targetCents());
+        String bar = "&a" + "|".repeat(filled) + "&7" + "|".repeat(g.barLength() - filled);
+        return Text.legacy(g.line()
+                .replace("{current}", s.formatMoney(current))
+                .replace("{target}", s.formatMoney(g.targetCents()))
+                .replace("{percent}", String.valueOf(percent))
+                .replace("{bar}", bar));
+    }
+
+    // ------------------------------------------------------------------ sync
+
+    /**
+     * Pulls new payments from Tebex into pvp_store_payments, then refreshes the month total and checks the goal.
+     * Single-flight: a second call while one runs does nothing (checklist 3). Async thread only.
+     */
+    private void sync(@Nullable CommandSender reportTo) {
+        if (!syncing.compareAndSet(false, true)) {
+            if (reportTo != null) {
+                Tasks.forSender(reportTo, () -> reportTo.sendMessage(Msg.neutral("A store sync is already running.")));
+            }
+            return;
+        }
+        String result;
+        try {
+            result = pull();
+        } catch (Exception e) {
+            result = "failed: " + e.getClass().getSimpleName();
+            plugin.getLogger().log(Level.WARNING, "[store] Store sync failed", e);
+        } finally {
+            syncing.set(false);
+        }
+        lastSyncAt = System.currentTimeMillis();
+        lastSyncResult = result;
+        try {
+            refreshGoal();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[store] Could not update the community goal", e);
+        }
+        if (reportTo != null) {
+            String r = result;
+            Tasks.forSender(reportTo, () -> reportTo.sendMessage(Msg.neutral("Store sync: " + Msg.white(r) + ".")));
+        }
+    }
+
+    private String pull() throws Exception {
+        StoreSettings s = settings;
+        if (!s.tebexEnabled()) {
+            return "Tebex reading is off";
+        }
+        String key;
+        try {
+            key = tebex.readKey(s.tebexConfigFile(), s.tebexKeyPaths());
+        } catch (TebexClient.TebexException e) {
+            plugin.getLogger().warning("[store] " + e.getMessage());
+            return e.getMessage();
+        }
+        if (key == null) {
+            return "no Tebex secret key found in plugins/" + s.tebexConfigFile();
+        }
+        // A full walk until one has reached the oldest page; after that only new pages plus a few to catch refunds.
+        boolean complete = payments.has("sync", "complete");
+        int added = 0;
+        int pages = 0;
+        try {
+            for (int page = 1; page <= s.maxPages(); page++) {
+                TebexClient.Page p = tebex.fetch(key, page);
+                pages++;
+                if (p.payments().isEmpty()) {
+                    payments.claim("sync", "complete");
+                    break;
+                }
+                int fresh = payments.upsert(p.payments());
+                added += fresh;
+                if (page >= p.lastPage()) {
+                    payments.claim("sync", "complete");
+                    break;
+                }
+                if (complete && fresh == 0 && page >= s.recheckPages()) {
+                    break;
+                }
+                Thread.sleep(300); // stay well under the Tebex rate limit
+            }
+        } catch (TebexClient.TebexException e) {
+            plugin.getLogger().warning("[store] " + e.getMessage());
+            return e.getMessage() + " (after " + pages + " page(s), " + added + " new)";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "interrupted";
+        } finally {
+            key = null; // drop the only reference as soon as we're done
+        }
+        if (added > 0) {
+            plugin.getLogger().info("[store] Read " + added + " new Tebex payment(s).");
+        }
+        return "ok, " + pages + " page(s), " + added + " new, " + payments.count() + " stored";
+    }
+
+    /** Recomputes this month's total and pays the goal reward once if it was just reached. Database thread. */
+    private void refreshGoal() throws Exception {
+        StoreSettings s = settings;
+        StoreSettings.Goal g = s.goal();
+        YearMonth month = YearMonth.now(g.zone());
+        long total = payments.monthTotal(month, g.zone());
+        monthShown = month;
+        monthTotalCents = total;
+        if (!g.enabled() || total < g.targetCents()) {
+            return;
+        }
+        // Single winner per month (checklist 2); the marker is written before the reward is given, so a crash can lose
+        // the reward but never pay it twice (checklist 1, 7).
+        if (!payments.claim("goal", month.toString())) {
+            return;
+        }
+        plugin.getLogger().info("[store] Community goal for " + month + " reached (" + s.formatMoney(total) + "); giving rewards.");
+        broadcast(Text.legacy(g.reachedBroadcast().replace("{target}", s.formatMoney(g.targetCents()))
+                .replace("{current}", s.formatMoney(total))));
+        if (!g.reward().isEmpty()) {
+            rewards.give(g.reward(), "store goal " + month, false, null);
+        }
+    }
+
+    /** A sync about a minute from now, so a purchase shows up in the goal and top list quickly. Debounced. */
+    private void syncSoon() {
+        if (settings.tebexEnabled() && syncSoon.compareAndSet(false, true)) {
+            Tasks.async.later(() -> {
+                syncSoon.set(false);
+                sync(null);
+            }, 60, TimeUnit.SECONDS);
+        }
+    }
+
+    private static void broadcast(Component line) {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            Tasks.onEntity(p, () -> p.sendMessage(line));
+        }
+        Bukkit.getConsoleSender().sendMessage(line);
+    }
+
+    // ------------------------------------------------------------------ admin
+
+    /** /storeadmin: what Tebex packages run (as console), plus status and goal adjustments for staff. */
+    @Command("storeadmin")
+    @CommandPermission("genscore.store.admin")
+    public final class Admin {
+
+        @Subcommand("purchase")
+        @Description("Announce a store purchase (run by Tebex)")
+        public void purchase(BukkitCommandActor actor, @Named("player") String player, @Named("item") String item) {
+            String name = Text.stripCodes(player);
+            if (!PLAYER_NAME.matcher(name).matches()) {
+                actor.sender().sendMessage(Msg.bad("Invalid player name."));
+                return;
+            }
+            String what = item.length() > 100 ? item.substring(0, 100) : item;
+            StoreSettings s = settings;
+            Component line = Text.legacy(s.purchaseFormat().replace("{player}", name).replace("{item}", what));
+            if (Text.isWebLink(s.url())) {
+                line = line.clickEvent(ClickEvent.openUrl(s.url().trim())).hoverEvent(HoverEvent.showText(Text.legacy(s.purchaseHover())));
+            }
+            broadcast(line);
+            plugin.getLogger().info("[store] Purchase announced: " + name + " bought " + what);
+            syncSoon();
+        }
+
+        @Subcommand("party")
+        @Description("Start a store party (run by Tebex)")
+        public void party(BukkitCommandActor actor, @Named("player") String player, @Named("transaction") @Optional @Nullable String transaction) {
+            StoreSettings.Party p = settings.party();
+            CommandSender sender = actor.sender();
+            if (!p.enabled()) {
+                sender.sendMessage(Msg.bad("Store parties are off (store.party.enabled)."));
+                return;
+            }
+            String name = Text.stripCodes(player);
+            if (!PLAYER_NAME.matcher(name).matches()) {
+                sender.sendMessage(Msg.bad("Invalid player name."));
+                return;
+            }
+            if (transaction != null && !TRANSACTION.matcher(transaction).matches()) {
+                sender.sendMessage(Msg.bad("Invalid transaction id."));
+                return;
+            }
+            Tasks.async.run(() -> {
+                try {
+                    // One party per transaction, however often Tebex runs the command (checklist 2).
+                    if (transaction != null && !payments.claim("party", transaction)) {
+                        Tasks.forSender(sender, () -> sender.sendMessage(Msg.bad("That transaction already had its party.")));
+                        return;
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "[store] Could not record the party", e);
+                    Tasks.forSender(sender, () -> sender.sendMessage(Msg.bad("Could not start the party (database error).")));
+                    return;
+                }
+                startParty(name, p);
+            });
+        }
+
+        @Subcommand("goal add")
+        @Description("Add money to this month's community goal (e.g. a payment made outside Tebex)")
+        public void goalAdd(BukkitCommandActor actor, @Named("amount") String amount) {
+            adjustGoal(actor, amount, 1);
+        }
+
+        @Subcommand("goal remove")
+        @Description("Take money off this month's community goal")
+        public void goalRemove(BukkitCommandActor actor, @Named("amount") String amount) {
+            adjustGoal(actor, amount, -1);
+        }
+
+        @Subcommand("sync")
+        @Description("Read new payments from Tebex now")
+        public void syncNow(BukkitCommandActor actor) {
+            CommandSender sender = actor.sender();
+            // Each sync calls the Tebex API, so it is rate limited (checklist 10).
+            if (sender instanceof Player pl && !cooldowns.tryStart(pl.getUniqueId(), "sync", 30_000)) {
+                sender.sendMessage(Msg.bad("Please wait before syncing again."));
+                return;
+            }
+            sender.sendMessage(Msg.neutral("Reading payments from Tebex..."));
+            Tasks.async.run(() -> sync(sender));
+        }
+
+        @Subcommand("status")
+        @Description("Store sync status")
+        public void status(BukkitCommandActor actor) {
+            CommandSender sender = actor.sender();
+            sender.sendMessage(Msg.neutral("Last sync: " + Msg.white(lastSyncAt == 0 ? "never" : Instant.ofEpochMilli(lastSyncAt).toString())
+                    + ", result: " + Msg.white(lastSyncResult) + "."));
+            sender.sendMessage(goalLine());
+        }
+    }
+
+    private void adjustGoal(BukkitCommandActor actor, String amount, int sign) {
+        CommandSender sender = actor.sender();
+        OptionalLong cents = Money.parse(amount); // refuses NaN, zero, negatives, overflow (checklist 8)
+        if (cents.isEmpty() || cents.getAsLong() > 100_000_000L) {
+            sender.sendMessage(Msg.bad("Invalid amount."));
+            return;
+        }
+        long delta = sign * cents.getAsLong();
+        YearMonth month = YearMonth.now(settings.goal().zone());
+        String by = sender.getName();
+        Tasks.async.run(() -> {
+            try {
+                payments.adjust(month, delta, by);
+                plugin.getLogger().info("[store] " + by + " adjusted the " + month + " goal by " + delta + " cents.");
+                refreshGoal();
+                Tasks.forSender(sender, () -> {
+                    sender.sendMessage(Msg.good("Goal adjusted."));
+                    sender.sendMessage(goalLine());
+                });
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "[store] Could not adjust the goal", e);
+                Tasks.forSender(sender, () -> sender.sendMessage(Msg.bad("Could not adjust the goal (database error).")));
+            }
+        });
+    }
+
+    private void startParty(String buyer, StoreSettings.Party p) {
+        plugin.getLogger().info("[store] Store party started by " + buyer + ".");
+        broadcast(Text.legacy(p.startBroadcast().replace("{player}", buyer).replace("{seconds}", String.valueOf(p.countdownSeconds()))));
+        Runnable go = () -> {
+            rewards.give(p.reward(), "store party (" + buyer + ")", p.onePerIp(), null);
+            broadcast(Text.legacy(p.doneBroadcast().replace("{player}", buyer)));
+        };
+        if (p.countdownSeconds() <= 0) {
+            Tasks.global.run(go);
+        } else {
+            Tasks.global.later(go, p.countdownSeconds() * 20L);
+        }
+    }
+}
