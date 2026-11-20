@@ -27,27 +27,51 @@ messages:
   bad-color: '<#b90000>'
   neutral-color: '<#e0b000>'
 
-# Plots (gens roadmap phase 1). One plot per online player, built from one template on join and removed after they
-# leave. Plot blocks are never saved; the owner's plot data (belt length, lock level, shield) is.
+# Plots (gens roadmap phase 1). Every online player gets a factory on a shared platform: a plaza in the middle with
+# four roads running out of it, and factory lots on both sides of every road, all facing their road. Players walk the
+# roads to reach each other's factories (raiding, phase 3). When a platform is full the next one opens.
+#
+#              F | F
+#              F | F
+#              F | F
+#     F F F  +-------+  F F F
+#     -----  | plaza |  -----        F = factory lot, | and - = roads
+#     F F F  +-------+  F F F
+#              F | F
+#              F | F
+#              F | F
+#
+# Factories are built from one template on join and removed after their owner leaves. Factory blocks are never saved;
+# the owner's data (belt length, lock level, shield) is. The platform floor, roads and hub stay.
 #
 # The world must exist at start-up: Folia cannot create worlds while running. Use the main world (level-name) and
 # make it void before it is first generated, in server.properties:
 #   level-type=minecraft:flat
 #   generator-settings={"layers":[{"block":"minecraft:air","height":1}],"biome":"minecraft:the_void"}
-# Build the spawn lobby near 0,0; plots start at the grid origin, well away from it.
 plots:
   world: world
-  size: 25                   # plots are size x size blocks (restart to change)
-  grid:                      # restart to change. Folia: keep spacing a multiple of 256 so each plot is its own region
-    origin-x: 1088           # lowest corner of slot 0; a multiple of 16, a few chunks into a 256-block section
-    origin-z: 1088
-    floor-y: 64              # the template's bottom layer is placed at this height
-    spacing: 1024            # distance between slots
-    columns: 32              # slots per row
-    max-slots: 512           # most plots at once (one per online player, plus plots waiting to be removed)
+  size: 25                   # factories are size x size blocks (restart to change)
+  layout:                    # restart to change
+    origin-x: 1152           # centre of platform 0. Folia: about 128 blocks into a 256-block section (1024 + 128)
+    origin-z: 1152
+    floor-y: 64              # factories are built from this height; the platform floor is one block below
+    lots-per-side: 3         # factory lots on each side of each road: 4 roads x 2 sides x 3 = 24 per platform
+    road-width: 7            # an odd number
+    lot-gap: 3               # blocks between neighbouring lots along a road
+    platform-spacing: 1024   # between platform centres. Folia: a multiple of 256, so each platform is its own region
+    platform-columns: 8      # platforms per row
+    max-platforms: 16        # 16 x 24 = 384 factories at most
+  platform:                  # what new or rebuilt platforms are made of (/plotadmin platform rebuild)
+    plaza-block: polished_andesite
+    road-block: gray_concrete
+    lot-block: smooth_stone  # under every lot, so an empty lot still has a floor
+    hub-file: hub.nbt        # optional build on the plaza; make it with /plotadmin template save hub. A "spawn" marker in
+                             # it is where players with nowhere else to go arrive.
+  set-world-spawn: true      # once platform 0 exists, move the world spawn to its hub so new players never fall
   template:
-    file: template.nbt       # in plugins/GensCore/modules/plots/. Make it in game with /plotadmin template pos1|pos2|save
-    fallback-floor: grass_block   # used while there is no template file
+    file: template.nbt       # in plugins/GensCore/modules/plots/. Make it with /plotadmin template pos1|pos2|save factory.
+                             # Build it with its front (gate side) facing south (+Z); each lot turns it to face its road.
+    fallback-floor: grass_block   # used while there is no template file (its front edge is yellow concrete)
     fallback-border: stone_bricks
     # Marker blocks in the template mark places instead of being built as-is; each is replaced with replace-with.
     # "spawn" is where players arrive. "belt" and "pad" are read by the belt and gens phases.
@@ -66,7 +90,8 @@ plots:
   # disconnect timer and /logout.
   remove-delay-seconds: 0
   teleport-on-join: true
-  spawn-yaw: 0
+  spawn-yaw: 180             # which way players face on arrival, in the template's frame (180 = north, into a
+                             # factory whose front faces south). Turned with each lot.
   void-y: 0                  # a player below this height in the plot world is sent back to their plot
   protect-world: true        # only genscore.plots.build may break or place blocks in the plot world
   defaults:

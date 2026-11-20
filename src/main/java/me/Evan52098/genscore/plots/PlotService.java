@@ -76,12 +76,83 @@ public final class PlotService {
         return plot != null && plot.slot() == slot ? plot : null;
     }
 
-    /** Where a player arrives on the plot. */
+    /** Where a player arrives on the plot, turned with the factory to face the way the template says. */
     public Location spawnOf(Plot plot) {
-        Location min = grid.minCorner(world, plot.slot());
-        Location spawn = min.add(template.get().spawnOffset(grid.size()));
-        spawn.setYaw(live.get().spawnYaw());
+        PlotSettings.Lot lot = grid.lot(plot.slot());
+        Location spawn = grid.minCorner(world, plot.slot()).add(template.get().spawnOffset(lot.rotation()));
+        spawn.setYaw(PlotTemplate.turnYaw(live.get().spawnYaw(), lot.rotation()));
         return spawn;
+    }
+
+    /** The hub spawn of the first platform, once it is built; null before that. */
+    public @Nullable Location hubSpawn() {
+        CompletableFuture<Void> first = platforms.get(0);
+        return first != null && first.isDone() && !first.isCompletedExceptionally() ? builder.hubSpawn(world, 0) : null;
+    }
+
+    // ------------------------------------------------------------------ platforms
+
+    /** Platform number -> its build (completed once built). Built platforms are listed in gens_platforms. */
+    private final Map<Integer, CompletableFuture<Void>> platforms = new ConcurrentHashMap<>();
+
+    /** Builds the platform the first time a lot on it is needed. Completes when it exists. */
+    CompletableFuture<Void> ensurePlatform(int platform) {
+        CompletableFuture<Void> build = platforms.computeIfAbsent(platform, p -> {
+            log.info("Building platform " + p + " (" + grid.perPlatform() + " factory lots).");
+            return builder.buildPlatform(world, p).thenCompose(v -> db.asyncRun(c -> {
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO gens_platforms (id, built_at) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET built_at = excluded.built_at")) {
+                    ps.setInt(1, p);
+                    ps.setLong(2, System.currentTimeMillis());
+                    ps.executeUpdate();
+                }
+            }));
+        });
+        return build.whenComplete((v, error) -> {
+            if (error != null) {
+                log.log(Level.SEVERE, "Could not build platform " + platform + "; it will be tried again", error);
+                platforms.remove(platform, build);
+            }
+        });
+    }
+
+    /** Admin: builds the platform floor and hub again (blocks on the lots are not touched). */
+    CompletableFuture<Void> rebuildPlatform(int platform) {
+        platforms.remove(platform);
+        return ensurePlatform(platform);
+    }
+
+    /** Admin: clears the plaza and builds the current hub template there again. */
+    CompletableFuture<Void> rebuildHub(int platform) {
+        return builder.rebuildHub(world, platform);
+    }
+
+    CompletableFuture<PlotBuilder.Check> verifyFactory(int slot) {
+        return builder.verifyFactory(world, slot);
+    }
+
+    CompletableFuture<PlotBuilder.Check> verifyPlatform(int platform) {
+        return builder.verifyPlatform(world, platform);
+    }
+
+    List<Integer> builtPlatformIds() {
+        List<Integer> out = new ArrayList<>();
+        platforms.forEach((id, f) -> {
+            if (f.isDone() && !f.isCompletedExceptionally()) {
+                out.add(id);
+            }
+        });
+        return out;
+    }
+
+    int builtPlatforms() {
+        int n = 0;
+        for (CompletableFuture<Void> f : platforms.values()) {
+            if (f.isDone() && !f.isCompletedExceptionally()) {
+                n++;
+            }
+        }
+        return n;
     }
 
     public World world() {
@@ -149,8 +220,8 @@ public final class PlotService {
                 return CompletableFuture.failedFuture(new IllegalStateException("Your plot is busy, try again."));
             }
         }
-        // Row first, then blocks: a crash after this point leaves a row, and start-up clears the slot.
-        db.asyncRun(c -> {
+        // Platform, then row, then blocks: a crash after the row is written leaves it, and start-up clears the slot.
+        ensurePlatform(grid.platformOf(slot)).thenCompose(p -> db.asyncRun(c -> {
                     try (PreparedStatement ps = c.prepareStatement(
                             "INSERT INTO gens_slots (slot, owner, since) VALUES (?, ?, ?) "
                                     + "ON CONFLICT (slot) DO UPDATE SET owner = excluded.owner, since = excluded.since")) {
@@ -159,7 +230,7 @@ public final class PlotService {
                         ps.setLong(3, System.currentTimeMillis());
                         ps.executeUpdate();
                     }
-                })
+                }))
                 .thenCompose(v -> builder.paste(world, slot))
                 .whenComplete((v, error) -> {
                     if (error != null) {
@@ -247,7 +318,20 @@ public final class PlotService {
      * Start-up: every slot with a row may still hold blocks from before a crash or stop. Marks them out of use and
      * clears them in the background. Runs on the enabling thread (database access is allowed there).
      */
-    int recover() throws SQLException {
+    int recover(Runnable firstPlatformReady) throws SQLException {
+        List<Integer> built = db.sync(c -> {
+            List<Integer> out = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement("SELECT id FROM gens_platforms");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(rs.getInt(1));
+                }
+            }
+            return out;
+        });
+        for (int id : built) {
+            platforms.put(id, CompletableFuture.completedFuture(null));
+        }
         List<SlotRow> rows = db.sync(c -> {
             List<SlotRow> out = new ArrayList<>();
             try (PreparedStatement ps = c.prepareStatement("SELECT slot, owner FROM gens_slots");
@@ -260,19 +344,19 @@ public final class PlotService {
         });
         for (SlotRow row : rows) {
             if (row.slot() >= slots.capacity()) {
-                log.warning("gens_slots has slot " + row.slot() + ", beyond plots.grid.max-slots; clearing it anyway.");
+                log.warning("gens_slots has slot " + row.slot() + ", beyond plots.layout.max-platforms; clearing it anyway.");
             }
             slots.markClearing(row.slot()); // out of use from now on
         }
         // Folia: chunk loads and region tasks started while plugins enable never run (tested: slots stayed "clearing"
         // forever). Start the clears from the first global tick, once the regions are running.
-        if (!rows.isEmpty()) {
-            Tasks.global.later(() -> {
-                for (SlotRow row : rows) {
-                    teardown(row.slot());
-                }
-            }, 20);
-        }
+        // The first platform is built straight away (not on the first join) so the hub exists for spawning players.
+        Tasks.global.later(() -> {
+            ensurePlatform(0).thenRun(firstPlatformReady);
+            for (SlotRow row : rows) {
+                teardown(row.slot());
+            }
+        }, 20);
         return rows.size();
     }
 

@@ -101,7 +101,7 @@ public final class PlotCommands {
             GensPlayer gens = module.gensPlayer(id);
             Plot plot = service().plotOf(id);
             String plotLine = plot == null ? "none loaded"
-                    : "slot " + plot.slot() + " (" + plot.state().name().toLowerCase() + ") at " + service().grid().minX(plot.slot())
+                    : "slot " + plot.slot() + " on platform " + service().grid().platformOf(plot.slot()) + " (" + plot.state().name().toLowerCase() + ") at " + service().grid().minX(plot.slot())
                     + ", " + service().grid().floorY() + ", " + service().grid().minZ(plot.slot());
             sendInfo(sender, online.getName() + " (online)", plotLine,
                     data == null ? null : new long[]{data.beltLength(), data.lockLevel(), data.shieldUntil()},
@@ -238,7 +238,8 @@ public final class PlotCommands {
         actor.sender().sendMessage(Msg.neutral("Plot slots: " + Msg.white(String.valueOf(c.used())) + " used, "
                 + Msg.white(String.valueOf(c.clearing())) + " clearing, " + Msg.white(String.valueOf(c.free())) + " free; "
                 + Msg.white(String.valueOf(service().loadedCount())) + " plots loaded. Template: "
-                + Msg.white(Msg.escape(module.template().source())) + ", " + Msg.white(String.valueOf(service().queuedJobs())) + " builds/clears queued."));
+                + Msg.white(Msg.escape(module.template().source())) + ", " + Msg.white(String.valueOf(service().queuedJobs())) + " builds/clears queued, "
+                + Msg.white(String.valueOf(service().builtPlatforms())) + " platform(s) built."));
     }
 
     // ------------------------------------------------------------------ admin: stress test (phase 1 gate)
@@ -310,6 +311,102 @@ public final class PlotCommands {
                 });
     }
 
+    @Command("plotadmin verify")
+    @CommandPermission(PlotsModule.ADMIN)
+    @Description("Check every loaded factory against its template and every built platform's floor")
+    public void verify(BukkitCommandActor actor) {
+        CommandSender sender = actor.sender();
+        List<CompletableFuture<String>> checks = new ArrayList<>();
+        for (Plot plot : service().loaded()) {
+            if (!plot.isReady()) {
+                continue;
+            }
+            int slot = plot.slot();
+            String rotation = service().grid().lot(slot).rotation().name().toLowerCase();
+            checks.add(service().verifyFactory(slot).handle((c, e) -> e != null ? "factory " + slot + " ERROR " + rootMessage(e)
+                    : c.wrong() > 0 || !c.frontOnRoad() ? "factory " + slot + " (" + rotation + ") " + c.wrong() + "/" + c.checked()
+                    + " blocks wrong, front on road: " + c.frontOnRoad() : null));
+        }
+        for (int id : service().builtPlatformIds()) {
+            checks.add(service().verifyPlatform(id).handle((c, e) -> e != null ? "platform " + id + " ERROR " + rootMessage(e)
+                    : c.wrong() > 0 ? "platform " + id + " floor " + c.wrong() + "/" + c.checked() + " blocks wrong" : null));
+        }
+        int total = checks.size();
+        CompletableFuture.allOf(checks.toArray(CompletableFuture[]::new)).whenComplete((v, e) -> {
+            List<String> problems = new ArrayList<>();
+            for (CompletableFuture<String> c : checks) {
+                String r = c.getNow("not finished");
+                if (r != null) {
+                    problems.add(r);
+                }
+            }
+            Tasks.forSender(sender, () -> {
+                if (problems.isEmpty()) {
+                    sender.sendMessage(Msg.good("Verify PASSED: " + total + " factories and platforms match, every factory front is on a road."));
+                } else {
+                    sender.sendMessage(Msg.bad("Verify FAILED (" + problems.size() + " of " + total + "):"));
+                    problems.stream().limit(15).forEach(line -> sender.sendMessage(Msg.parse("<gray>" + Msg.escape(line))));
+                }
+            });
+        });
+    }
+
+    /** Made-up owners of factories built with /plotadmin dummy; they stay until /plotadmin dummy clear or a restart. */
+    private final Set<UUID> dummies = ConcurrentHashMap.newKeySet();
+
+    @Command("plotadmin dummy")
+    @CommandPermission(PlotsModule.ADMIN)
+    @Description("Build factories for made-up owners and keep them (test servers), or 'clear' to remove them")
+    public void dummy(BukkitCommandActor actor, @Named("count|clear") String arg) {
+        CommandSender sender = actor.sender();
+        if (arg.equalsIgnoreCase("clear")) {
+            List<CompletableFuture<Void>> removals = new ArrayList<>();
+            for (UUID owner : List.copyOf(dummies)) {
+                Plot plot = service().plotOf(owner);
+                if (plot != null) {
+                    removals.add(service().remove(plot, plot.removalToken()));
+                }
+                dummies.remove(owner);
+            }
+            sender.sendMessage(Msg.neutral("Removing " + Msg.white(String.valueOf(removals.size())) + " dummy factories..."));
+            CompletableFuture.allOf(removals.toArray(CompletableFuture[]::new)).whenComplete((v, e) -> Tasks.forSender(sender, () ->
+                    sender.sendMessage(e == null ? Msg.good("Dummy factories removed.") : Msg.bad("Some removals failed; see the log."))));
+            return;
+        }
+        int count;
+        try {
+            count = Integer.parseInt(arg);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(Msg.bad("Give a number, or " + Msg.white("clear") + "."));
+            return;
+        }
+        if (count < 1 || count > STRESS_MAX) {
+            sender.sendMessage(Msg.bad("Count must be 1 to " + STRESS_MAX + "."));
+            return;
+        }
+        List<CompletableFuture<Plot>> builds = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            UUID owner = UUID.randomUUID();
+            dummies.add(owner);
+            builds.add(service().create(owner));
+        }
+        sender.sendMessage(Msg.neutral("Building " + Msg.white(String.valueOf(count)) + " dummy factories..."));
+        CompletableFuture.allOf(builds.toArray(CompletableFuture[]::new)).whenComplete((v, e) -> {
+            StringBuilder slotsText = new StringBuilder();
+            for (CompletableFuture<Plot> b : builds) {
+                Plot p = b.getNow(null);
+                if (p != null) {
+                    PlotSettings.Lot lot = service().grid().lot(p.slot());
+                    slotsText.append(slotsText.isEmpty() ? "" : "; ").append(p.slot()).append("@").append(lot.minX()).append(",")
+                            .append(lot.minZ()).append(" ").append(lot.rotation().name().toLowerCase());
+                }
+            }
+            Tasks.forSender(sender, () -> sender.sendMessage(e == null
+                    ? Msg.good("Built " + count + " dummy factories: " + Msg.escape(slotsText.toString()))
+                    : Msg.bad("Some dummy builds failed: " + Msg.escape(rootMessage(e)))));
+        });
+    }
+
     /** Polls (async, every half second, up to 60 s) until none of the owners hold a slot. */
     private CompletableFuture<Void> waitForClears(Set<UUID> owners, int attempt) {
         if (service().heldBy(owners) == 0 || attempt >= 120) {
@@ -345,27 +442,37 @@ public final class PlotCommands {
 
     @Command("plotadmin template save")
     @CommandPermission(PlotsModule.ADMIN)
-    @Description("Save the blocks between the two corners as the plot template")
-    public void saveTemplate(BukkitCommandActor actor) {
+    @Description("Save the blocks between the two corners as the factory template (front facing south) or the hub")
+    public void saveTemplate(BukkitCommandActor actor, @Named("which") @Default("factory") String which) {
         Player player = actor.requirePlayer();
+        boolean isHub = which.equalsIgnoreCase("hub");
+        if (!isHub && !which.equalsIgnoreCase("factory")) {
+            player.sendMessage(Msg.bad("Use " + Msg.white("factory") + " or " + Msg.white("hub") + "."));
+            return;
+        }
         Location[] c = corners.get(player.getUniqueId());
         if (c == null || c[0] == null || c[1] == null || !c[0].getWorld().equals(c[1].getWorld())) {
             player.sendMessage(Msg.bad("Set both corners in one world first: " + Msg.white("/plotadmin template pos1") + " and "
                     + Msg.white("pos2") + "."));
             return;
         }
-        int size = service().grid().size();
+        PlotSettings.Grid grid = module.grid();
         int dx = Math.abs(c[0].getBlockX() - c[1].getBlockX()) + 1;
         int dz = Math.abs(c[0].getBlockZ() - c[1].getBlockZ()) + 1;
-        if (dx != size || dz != size) {
-            player.sendMessage(Msg.bad("The area is " + dx + "x" + dz + "; plots are " + size + "x" + size + "."));
+        int plaza = grid.plazaHalf() * 2 + 1;
+        if (!isHub && (dx != grid.size() || dz != grid.size())) {
+            player.sendMessage(Msg.bad("The area is " + dx + "x" + dz + "; factories are " + grid.size() + "x" + grid.size() + "."));
+            return;
+        }
+        if (isHub && (dx > plaza || dz > plaza)) {
+            player.sendMessage(Msg.bad("The area is " + dx + "x" + dz + "; the hub must fit the " + plaza + "x" + plaza + " plaza."));
             return;
         }
         Location lo = new Location(c[0].getWorld(), Math.min(c[0].getX(), c[1].getX()), Math.min(c[0].getY(), c[1].getY()),
                 Math.min(c[0].getZ(), c[1].getZ()));
         Location hi = new Location(c[0].getWorld(), Math.max(c[0].getX(), c[1].getX()), Math.max(c[0].getY(), c[1].getY()),
                 Math.max(c[0].getZ(), c[1].getZ()));
-        File file = module.templateFile();
+        File file = isHub ? module.hubFile() : module.templateFile();
         // Reading blocks must happen on the region that owns them.
         Tasks.region.run(lo, () -> {
             Structure structure;
@@ -373,7 +480,7 @@ public final class PlotCommands {
                 structure = Bukkit.getStructureManager().createStructure();
                 structure.fill(lo, new org.bukkit.util.BlockVector(dx, hi.getBlockY() - lo.getBlockY() + 1, dz), false);
             } catch (RuntimeException e) {
-                Tasks.entity.run(player, () -> player.sendMessage(Msg.bad("Could not read the area (stand inside it and keep it small): "
+                Tasks.entity.run(player, () -> player.sendMessage(Msg.bad("Could not read the area (stand inside it): "
                         + Msg.escape(String.valueOf(e.getMessage())))));
                 return;
             }
@@ -386,15 +493,16 @@ public final class PlotCommands {
                                 StandardCopyOption.REPLACE_EXISTING);
                     }
                     Bukkit.getStructureManager().saveStructure(file, structure);
-                    module.reloadTemplate();
+                    module.reloadTemplates();
                     result = null;
                 } catch (IOException | RuntimeException e) {
                     result = String.valueOf(e.getMessage());
                 }
                 String error = result;
                 Tasks.entity.run(player, () -> player.sendMessage(error == null
-                        ? Msg.good("Saved the plot template (" + Msg.white(file.getName()) + "). New plots use it; "
-                        + Msg.white("/plotadmin reset") + " rebuilds an existing one.")
+                        ? Msg.good("Saved the " + which.toLowerCase() + " template (" + Msg.white(file.getName()) + "). "
+                        + (isHub ? Msg.white("/plotadmin platform hub <number>") + " puts it on a built platform."
+                        : "New factories use it; " + Msg.white("/plotadmin reset") + " rebuilds an existing one."))
                         : Msg.bad("Could not save the template: " + Msg.escape(error))));
             });
         });
@@ -402,14 +510,58 @@ public final class PlotCommands {
 
     @Command("plotadmin template reload")
     @CommandPermission(PlotsModule.ADMIN)
-    @Description("Reload the plot template file")
+    @Description("Reload the factory and hub template files")
     public void reloadTemplate(BukkitCommandActor actor) {
         CommandSender sender = actor.sender();
         Tasks.async.run(() -> {
-            module.reloadTemplate();
-            Tasks.forSender(sender, () -> sender.sendMessage(Msg.good("Plot template reloaded: " + Msg.white(Msg.escape(module.template().source()))
-                    + ", markers " + Msg.white(Msg.escape(String.valueOf(module.template().markers().keySet()))) + ".")));
+            module.reloadTemplates();
+            Tasks.forSender(sender, () -> sender.sendMessage(Msg.good("Templates reloaded. Factory: "
+                    + Msg.white(Msg.escape(module.template().source())) + " (markers "
+                    + Msg.white(Msg.escape(String.valueOf(module.template().markers().keySet()))) + "), hub: "
+                    + Msg.white(Msg.escape(module.hub().source())) + ".")));
         });
+    }
+
+    // ------------------------------------------------------------------ admin: platforms
+
+    @Command("plotadmin platform tp")
+    @CommandPermission(PlotsModule.ADMIN)
+    @Description("Go to the hub of a platform")
+    public void platformTp(BukkitCommandActor actor, @Named("number") @Default("0") int number) {
+        Player player = actor.requirePlayer();
+        PlotSettings.Grid grid = module.grid();
+        if (number < 0 || number >= grid.maxPlatforms()) {
+            player.sendMessage(Msg.bad("Platforms are numbered 0 to " + (grid.maxPlatforms() - 1) + "."));
+            return;
+        }
+        player.teleportAsync(new Location(service().world(), grid.centerX(number) + 0.5, grid.floorY(), grid.centerZ(number) + 0.5),
+                PlayerTeleportEvent.TeleportCause.COMMAND);
+    }
+
+    @Command("plotadmin platform rebuild")
+    @CommandPermission(PlotsModule.ADMIN)
+    @Description("Build a platform's floor, roads and hub again (factories on it are not touched)")
+    public void platformRebuild(BukkitCommandActor actor, @Named("number") @Default("0") int number) {
+        runPlatformJob(actor.sender(), number, "Rebuilt platform ", () -> service().rebuildPlatform(number));
+    }
+
+    @Command("plotadmin platform hub")
+    @CommandPermission(PlotsModule.ADMIN)
+    @Description("Clear a platform's plaza and build the current hub template on it")
+    public void platformHub(BukkitCommandActor actor, @Named("number") @Default("0") int number) {
+        runPlatformJob(actor.sender(), number, "Rebuilt the hub on platform ", () -> service().rebuildHub(number));
+    }
+
+    private void runPlatformJob(CommandSender sender, int number, String done,
+                                java.util.function.Supplier<CompletableFuture<Void>> job) {
+        if (number < 0 || number >= module.grid().maxPlatforms()) {
+            sender.sendMessage(Msg.bad("Platforms are numbered 0 to " + (module.grid().maxPlatforms() - 1) + "."));
+            return;
+        }
+        sender.sendMessage(Msg.neutral("Working on platform " + Msg.white(String.valueOf(number)) + "..."));
+        job.get().whenComplete((v, error) -> Tasks.forSender(sender, () -> sender.sendMessage(error == null
+                ? Msg.good(done + Msg.white(String.valueOf(number)) + ".")
+                : Msg.bad("That did not finish: " + Msg.escape(rootMessage(error))))));
     }
 
     private static String rootMessage(Throwable error) {

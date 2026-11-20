@@ -32,9 +32,11 @@ general modules, drops the HCF and survival ones, and adds the gens modules phas
 
 ## Folia design for gens
 
-- **One plot, one region.** Slots are `plots.grid.spacing` (1024) apart, and each plot sits inside one 256-block region
-  section, so every plot ticks on its own region thread. Belt simulation (Phase 2) runs as a region task on the
-  plot's region, never as one global loop over every plot.
+- **One platform, one region.** Factories share a platform so players can walk to each other's bases, which means a
+  platform's 24 factories tick on one region thread (like a normal server with 24 players). Platforms are
+  `plots.layout.platform-spacing` (1024) apart and each fits inside one 256-block region section, so separate
+  platforms tick in parallel. Belt simulation (Phase 2) runs as a region task on the platform's region, never as one
+  global loop over every factory.
 - **Block work on the owning region.** `PlotBuilder` loads the plot's chunks (`getChunkAtAsync`), holds them with a
   plugin chunk ticket, and places or clears blocks in slices on `Tasks.region`.
 - **Bounded concurrency.** At most `plots.build.max-concurrent` builds and clears run at once. Loading a plot's chunks
@@ -43,8 +45,20 @@ general modules, drops the HCF and survival ones, and adds the gens modules phas
   (tested). Start-up work is deferred to the first global tick.
 - **Cross-plot actions** (a raider on another player's plot, Phase 3) touch two players on two threads. Copy what is
   needed on each player's thread and decide shared outcomes with one database change (`UPDATE ... WHERE state = ...`).
-- **Pre-generate the grid area** before launch (e.g. Chunky, which supports Folia) so building a plot loads chunks
+- **Shared chunks are counted.** Neighbouring lots share chunks, and the server keeps one plugin chunk ticket per
+  chunk, so `PlotBuilder` counts holds per chunk and only drops the ticket when the last holder lets go.
+- **Console commands cannot read blocks.** On Folia `/execute if block` from the console fails (the console does not
+  own the region); `/plotadmin verify` checks builds on each region's own thread instead.
+- **Pre-generate the platform area** before launch (e.g. Chunky, which supports Folia) so building a plot loads chunks
   instead of generating them.
+
+## The platform
+
+Every online player gets a factory on a shared platform: a 61x61 plaza in the middle (spawn, sell point, the Phase 4
+conveyor shop), four 7-wide roads running out of it, and 3 factory lots on each side of every road, so 24 factories
+per platform, 229 blocks across. Each 25x25 factory is the template turned so its front faces its road (templates are
+built facing south). Lots fill from the plaza outwards; when a platform is full the next one is built, 1024 blocks
+away. The platform floor, roads and an optional hub build (`hub.nbt`) stay in the world; factories come and go.
 
 ## Modules
 
@@ -102,22 +116,28 @@ Done:
 - [x] Config loader with a reload command (`/gensadmin reload`)
 - [x] Database schema with migrations (`plots v1`)
 - [x] Player data loaded off the main thread at login, cached, saved on change, on quit and on a timer
-- [x] Void world with a numbered slot grid, and an allocator that hands out and frees slots
+- [x] Void world with shared platforms (plaza, four roads, 24 factory lots each), and an allocator that hands out and frees lots
+- [x] Factories turned to face their road; extra platforms built when one fills
 - [x] Plot paste from the template and plot clear, both spread across ticks
 - [x] Plot lifecycle: create on join, save and remove on quit, crash recovery on start-up
 - [x] `/plot` to go to your own plot; falling into the void returns you to it
-- [x] Admin: `/plotadmin info|save|reset|tp|slots|stress|template pos1|pos2|save|reload`
+- [x] Admin: `/plotadmin info|save|reset|tp|slots|stress|verify|dummy|template pos1|pos2|save [factory|hub]|reload`,
+  `/plotadmin platform tp|rebuild|hub <number>`
 
 Tested on the local Folia 26.3 server (console only, no player has joined yet):
 
-- `plotadmin stress 50` (50 simulated joins and quits, half quitting mid-build): PASSED, 0 orphaned slots, 0 leftover rows.
+- `plotadmin stress 50` (50 simulated joins and quits, half quitting mid-build): PASSED, 0 orphaned slots, 0 leftover rows,
+  also when it spills onto a new platform.
+- `plotadmin dummy 30` then `plotadmin verify`: every block of 30 factories on 2 platforms matched the template in all
+  four rotations, every factory front was on a road, and both platform floors were complete.
 - Stopping the server with 200 plots built, then starting it again: the leftover slots were cleared and freed.
 - `gensadmin reload`, `plotadmin slots`, and a clean stop afterwards with no errors.
 
 Not tested yet:
 
 - A real player joining, getting a plot, relogging and finding it restored (the first half of the Phase 1 gate).
-- `/plotadmin template save` with a hand-built template, and the spawn, belt and pad markers.
+- `/plotadmin template save` with a hand-built factory or hub template, and the spawn, belt and pad markers.
+- How the platform looks and feels in game (nobody has walked it yet).
 - PostgreSQL (the test server uses SQLite).
 
 ## Phase 0 decisions still open

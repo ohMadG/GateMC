@@ -47,6 +47,7 @@ public final class PlotsModule implements GensModule, Listener {
     private PlotSettings.Grid grid;
     private volatile PlotSettings.Live live;
     private volatile PlotTemplate template;
+    private volatile PlotTemplate hub;
     private PlotService service;
     private PlayerSection<PlotData> plotSection;
     private final Set<UUID> rescuing = ConcurrentHashMap.newKeySet();
@@ -63,7 +64,8 @@ public final class PlotsModule implements GensModule, Listener {
                 "CREATE TABLE IF NOT EXISTS gens_players (uuid TEXT PRIMARY KEY, rebirths INTEGER NOT NULL DEFAULT 0);"
                         + "CREATE TABLE IF NOT EXISTS gens_plots (uuid TEXT PRIMARY KEY, belt_length INTEGER NOT NULL, "
                         + "lock_level INTEGER NOT NULL DEFAULT 0, shield_until BIGINT NOT NULL DEFAULT 0);"
-                        + "CREATE TABLE IF NOT EXISTS gens_slots (slot INTEGER PRIMARY KEY, owner TEXT NOT NULL, since BIGINT NOT NULL)");
+                        + "CREATE TABLE IF NOT EXISTS gens_slots (slot INTEGER PRIMARY KEY, owner TEXT NOT NULL, since BIGINT NOT NULL)",
+                "CREATE TABLE IF NOT EXISTS gens_platforms (id INTEGER PRIMARY KEY, built_at BIGINT NOT NULL)");
 
         ConfigurationSection root = config();
         grid = PlotSettings.grid(root);
@@ -74,11 +76,11 @@ public final class PlotsModule implements GensModule, Listener {
             throw new IllegalStateException("plots.world '" + grid.worldName() + "' is not loaded. Folia cannot create worlds "
                     + "while running: use a world the server loads at start-up (normally level-name in server.properties).");
         }
-        template = PlotTemplate.load(templateFile(), grid.size(), live, plugin.getLogger());
+        reloadTemplates();
 
-        PlotBuilder builder = new PlotBuilder(plugin, grid, () -> live, () -> template);
+        PlotBuilder builder = new PlotBuilder(plugin, grid, () -> live, () -> template, () -> hub);
         service = new PlotService(plugin.database(), plugin.getLogger(), world, grid, () -> live, () -> template, builder);
-        int recovered = service.recover();
+        int recovered = service.recover(this::firstPlatformReady);
         if (recovered > 0) {
             plugin.getLogger().info("Clearing " + recovered + " plot slot(s) left from the last run.");
         }
@@ -88,8 +90,9 @@ public final class PlotsModule implements GensModule, Listener {
         plugin.playerData().register(GensPlayer.SECTION);
         plugin.commands().register(new PlotCommands(this));
         Bukkit.getPluginManager().registerEvents(this, plugin);
-        plugin.getLogger().info("Plots: world " + world.getName() + ", " + grid.maxSlots() + " slots, " + grid.size() + "x"
-                + grid.size() + ", spacing " + grid.spacing() + ", template " + template.source() + ".");
+        plugin.getLogger().info("Plots: world " + world.getName() + ", platforms of " + grid.perPlatform() + " factories ("
+                + (2 * grid.reach() + 1) + " blocks across), up to " + grid.maxPlatforms() + " platforms, factory template "
+                + template.source() + ", hub " + hub.source() + ".");
     }
 
     @Override
@@ -108,11 +111,21 @@ public final class PlotsModule implements GensModule, Listener {
             plugin.getLogger().warning("plots: world, size and grid changes take effect after a restart.");
         }
         live = PlotSettings.live(root, plugin.getLogger());
-        reloadTemplate();
+        reloadTemplates();
     }
 
-    void reloadTemplate() {
-        template = PlotTemplate.load(templateFile(), grid.size(), live, plugin.getLogger());
+    /** Rereads the factory template and the hub template (either falls back when its file is missing). */
+    void reloadTemplates() {
+        PlotTemplate factory = PlotTemplate.load(templateFile(), grid.size(), live.markers(), "factory template", plugin.getLogger());
+        if (factory == null) {
+            plugin.getLogger().info("No factory template at " + templateFile().getPath() + "; using a plain " + grid.size() + "x"
+                    + grid.size() + " floor with a yellow front edge.");
+            factory = PlotTemplate.fallbackFactory(grid.size(), live);
+        }
+        int plazaWidth = grid.plazaHalf() * 2 + 1;
+        PlotTemplate hubTemplate = PlotTemplate.load(hubFile(), plazaWidth, live.markers(), "hub template", plugin.getLogger());
+        template = factory;
+        hub = hubTemplate != null ? hubTemplate : PlotTemplate.emptyHub(plazaWidth);
     }
 
     // ------------------------------------------------------------------ accessors
@@ -137,6 +150,18 @@ public final class PlotsModule implements GensModule, Listener {
         return new File(new File(plugin.getDataFolder(), "modules/plots"), live.templateFile());
     }
 
+    File hubFile() {
+        return new File(new File(plugin.getDataFolder(), "modules/plots"), live.platform().hubFile());
+    }
+
+    PlotTemplate hub() {
+        return hub;
+    }
+
+    PlotSettings.Grid grid() {
+        return grid;
+    }
+
     /** An online player's lasting plot data, or null if they are not loaded. */
     public @Nullable PlotData data(UUID player) {
         var data = plugin.playerData().get(player);
@@ -148,11 +173,37 @@ public final class PlotsModule implements GensModule, Listener {
         return data == null ? null : data.get(GensPlayer.SECTION);
     }
 
-    /** Where to send someone who has no plot to go to: /setspawn if the teleport module has one, else world spawn. */
+    /**
+     * Where to send someone who has no factory to go to: /setspawn if the teleport module has one, else the first
+     * platform's hub, else the world spawn.
+     */
     Location fallbackSpawn() {
         TeleportModule teleport = plugin.modules().get(TeleportModule.class);
         Location spawn = teleport != null ? teleport.spawnLocation() : null;
+        if (spawn == null) {
+            spawn = service.hubSpawn();
+        }
         return spawn != null ? spawn : service.world().getSpawnLocation();
+    }
+
+    /** The first platform exists: point the world spawn at its hub, so new players appear there instead of the void. */
+    private void firstPlatformReady() {
+        if (!live.setWorldSpawn()) {
+            return;
+        }
+        Location hubSpawn = service.hubSpawn();
+        if (hubSpawn == null) {
+            return;
+        }
+        Tasks.global.run(() -> {
+            try {
+                service.world().setSpawnLocation(hubSpawn);
+                plugin.getLogger().info("World spawn set to the hub at " + hubSpawn.getBlockX() + ", " + hubSpawn.getBlockY() + ", "
+                        + hubSpawn.getBlockZ() + " (plots.set-world-spawn).");
+            } catch (RuntimeException e) {
+                plugin.getLogger().warning("Could not set the world spawn to the hub: " + e.getMessage());
+            }
+        });
     }
 
     // ------------------------------------------------------------------ lifecycle events
