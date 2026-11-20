@@ -69,16 +69,20 @@ plots:
                              # it is where players with nowhere else to go arrive.
   set-world-spawn: true      # once platform 0 exists, move the world spawn to its hub so new players never fall
   template:
+    # Without a template file the built-in fortress is used: walls, corner towers, a 7-wide garage gate, a 61-segment
+    # belt path, gen pads and a gate button. A hand-built template needs the same markers to have a belt and a gate.
     file: template.nbt       # in plugins/GensCore/modules/plots/. Make it with /plotadmin template pos1|pos2|save factory.
                              # Build it with its front (gate side) facing south (+Z); each lot turns it to face its road.
-    fallback-floor: grass_block   # used while there is no template file (its front edge is yellow concrete)
+    fallback-floor: smooth_stone  # the built-in fortress's floor (not grass: grass under blocks turns to dirt)
     fallback-border: stone_bricks
     # Marker blocks in the template mark places instead of being built as-is; each is replaced with replace-with.
     # "spawn" is where players arrive. "belt" and "pad" are read by the belt and gens phases.
     markers:
       spawn: {block: lime_glazed_terracotta, replace-with: 'minecraft:air'}
-      belt: {block: magenta_glazed_terracotta, replace-with: 'minecraft:smooth_stone'}
-      pad: {block: light_blue_glazed_terracotta, replace-with: 'minecraft:polished_andesite'}
+      belt: {block: magenta_glazed_terracotta, replace-with: 'minecraft:smooth_stone_slab[type=bottom]'}
+      pad: {block: light_blue_glazed_terracotta, replace-with: 'minecraft:polished_diorite'}
+      gate: {block: red_glazed_terracotta, replace-with: 'minecraft:air'}          # the doorway the garage door fills
+      gate_button: {block: orange_glazed_terracotta, replace-with: 'minecraft:polished_blackstone_button[face=floor]'}
   build:
     blocks-per-tick: 2000        # template blocks placed per tick while building a plot
     clear-checks-per-tick: 8000  # positions checked per tick while clearing one
@@ -96,6 +100,37 @@ plots:
   protect-world: true        # only genscore.plots.build may break or place blocks in the plot world
   defaults:
     belt-length: 8           # a new player's starting belt length
+
+# Factory (gens roadmap phase 2, plus the gate from phase 3). Reloads with /gensadmin reload.
+factory:
+  gate:
+    close-seconds: 45        # the owner closes the gate; it opens by itself after this. Closed: only the owner gets in.
+    door-block: light_gray_concrete   # the garage door slats
+  belt:
+    start-speed: 0.5         # segments per second; one item per segment, so this is also items sold per second
+    speed-levels:            # each upgrade: new speed and its price
+      - {speed: 0.75, price: 150}
+      - {speed: 1.0, price: 400}
+      - {speed: 1.25, price: 900}
+      - {speed: 1.5, price: 2000}
+      - {speed: 2.0, price: 4500}
+    length-step: 2           # segments added per length upgrade
+    length-base-price: 100   # first length upgrade
+    length-price-growth: 1.3 # each length upgrade costs this much more than the last
+    gen-interval-seconds: 0.5    # the gen makes an item this often (it waits while the start of the belt is full)
+    item-value: 1.0          # an item's base value
+    value-per-segment: 0.10  # each working belt segment adds 10% of the base value to every item sold
+    deposit-every-seconds: 5 # earnings are paid into the balance this often (one ledger line each time)
+    item: raw_gold           # what rides the belt
+  visuals:
+    max-items-drawn: 24      # item entities per belt; the money is worked out from data either way
+    view-distance: 64        # belts are drawn only while a player is this close
+    model-yaw-offset: 0      # turn every belt model by this many degrees if the pack's models face the wrong way
+  resource-pack:             # the conveyor models (build with: python tools/build_pack.py)
+    url: ''                  # where players download target/GensCore-pack.zip from
+    sha1: ''                 # target/GensCore-pack.sha1
+    required: false
+    prompt: 'GensCore needs its resource pack for conveyor belts.'
 
 economy:
   starting-balance: 0
@@ -921,6 +956,7 @@ staffmode:
 
 modules:
   plots: true
+  factory: true
   wipe: true
   lagwatch: true
   antihack: true

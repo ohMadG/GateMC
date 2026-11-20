@@ -1,0 +1,625 @@
+{
+  "credit": "GensCore conveyor belt (tools/build_pack.py)",
+  "texture_size": [
+    16,
+    16
+  ],
+  "textures": {
+    "belt": "genscore:item/conveyor/belt",
+    "steel": "genscore:item/conveyor/steel",
+    "hazard": "genscore:item/conveyor/hazard",
+    "dark": "genscore:item/conveyor/dark",
+    "roller": "genscore:item/conveyor/roller",
+    "particle": "genscore:item/conveyor/steel"
+  },
+  "elements": [
+    {
+      "name": "frame_east",
+      "from": [
+        14,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        10,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            6,
+            2,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            14,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            0,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            14,
+            0,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            14,
+            0,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "frame_south",
+      "from": [
+        0,
+        0,
+        14
+      ],
+      "to": [
+        14,
+        10,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            2,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            6,
+            2,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            0,
+            6,
+            14,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            14,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            0,
+            14,
+            14,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            14,
+            2
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "post_nw",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        2,
+        10,
+        2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            14,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            14,
+            6,
+            16,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            0,
+            6,
+            2,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            0,
+            6,
+            2,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            0,
+            14,
+            2,
+            16
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "rail_e",
+      "from": [
+        14,
+        10,
+        0
+      ],
+      "to": [
+        16,
+        10.5,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            14,
+            0,
+            16,
+            16
+          ],
+          "texture": "#hazard"
+        },
+        "north": {
+          "uv": [
+            0,
+            5.5,
+            2,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "south": {
+          "uv": [
+            14,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "east": {
+          "uv": [
+            0,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "west": {
+          "uv": [
+            0,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        }
+      }
+    },
+    {
+      "name": "rail_s",
+      "from": [
+        0,
+        10,
+        14
+      ],
+      "to": [
+        14,
+        10.5,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            14,
+            14,
+            16
+          ],
+          "texture": "#hazard"
+        },
+        "north": {
+          "uv": [
+            2,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "south": {
+          "uv": [
+            0,
+            5.5,
+            14,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "east": {
+          "uv": [
+            0,
+            5.5,
+            2,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "west": {
+          "uv": [
+            14,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        }
+      }
+    },
+    {
+      "name": "rail_post",
+      "from": [
+        0,
+        10,
+        0
+      ],
+      "to": [
+        2,
+        10.5,
+        2
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "texture": "#hazard"
+        },
+        "north": {
+          "uv": [
+            14,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "south": {
+          "uv": [
+            0,
+            5.5,
+            2,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "east": {
+          "uv": [
+            14,
+            5.5,
+            16,
+            6
+          ],
+          "texture": "#hazard"
+        },
+        "west": {
+          "uv": [
+            0,
+            5.5,
+            2,
+            6
+          ],
+          "texture": "#hazard"
+        }
+      }
+    },
+    {
+      "name": "belt_top",
+      "from": [
+        0,
+        8,
+        0
+      ],
+      "to": [
+        14,
+        9,
+        14
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            2,
+            0,
+            14,
+            16
+          ],
+          "texture": "#belt"
+        }
+      }
+    },
+    {
+      "name": "roller_0",
+      "from": [
+        2,
+        4,
+        1
+      ],
+      "to": [
+        14,
+        8,
+        3
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            2,
+            8,
+            14,
+            12
+          ],
+          "texture": "#roller"
+        },
+        "south": {
+          "uv": [
+            2,
+            8,
+            14,
+            12
+          ],
+          "texture": "#roller"
+        },
+        "up": {
+          "uv": [
+            2,
+            1,
+            14,
+            3
+          ],
+          "texture": "#roller"
+        },
+        "down": {
+          "uv": [
+            2,
+            13,
+            14,
+            15
+          ],
+          "texture": "#roller"
+        }
+      }
+    },
+    {
+      "name": "roller_1",
+      "from": [
+        1,
+        4,
+        2
+      ],
+      "to": [
+        3,
+        8,
+        14
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            2,
+            8,
+            14,
+            12
+          ],
+          "texture": "#roller"
+        },
+        "west": {
+          "uv": [
+            2,
+            8,
+            14,
+            12
+          ],
+          "texture": "#roller"
+        },
+        "up": {
+          "uv": [
+            1,
+            2,
+            3,
+            14
+          ],
+          "texture": "#roller"
+        },
+        "down": {
+          "uv": [
+            1,
+            2,
+            3,
+            14
+          ],
+          "texture": "#roller"
+        }
+      }
+    },
+    {
+      "name": "belt_return",
+      "from": [
+        2,
+        2,
+        2
+      ],
+      "to": [
+        14,
+        3,
+        14
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            2,
+            2,
+            14,
+            14
+          ],
+          "texture": "#dark"
+        },
+        "down": {
+          "uv": [
+            2,
+            2,
+            14,
+            14
+          ],
+          "texture": "#dark"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        225,
+        0
+      ],
+      "scale": [
+        0.625,
+        0.625,
+        0.625
+      ]
+    },
+    "ground": {
+      "translation": [
+        0,
+        3,
+        0
+      ],
+      "scale": [
+        0.25,
+        0.25,
+        0.25
+      ]
+    },
+    "fixed": {
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        75,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        2.5,
+        0
+      ],
+      "scale": [
+        0.375,
+        0.375,
+        0.375
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        45,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    }
+  }
+}

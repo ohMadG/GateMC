@@ -65,7 +65,8 @@ public final class PlotsModule implements GensModule, Listener {
                         + "CREATE TABLE IF NOT EXISTS gens_plots (uuid TEXT PRIMARY KEY, belt_length INTEGER NOT NULL, "
                         + "lock_level INTEGER NOT NULL DEFAULT 0, shield_until BIGINT NOT NULL DEFAULT 0);"
                         + "CREATE TABLE IF NOT EXISTS gens_slots (slot INTEGER PRIMARY KEY, owner TEXT NOT NULL, since BIGINT NOT NULL)",
-                "CREATE TABLE IF NOT EXISTS gens_platforms (id INTEGER PRIMARY KEY, built_at BIGINT NOT NULL)");
+                "CREATE TABLE IF NOT EXISTS gens_platforms (id INTEGER PRIMARY KEY, built_at BIGINT NOT NULL)",
+                "ALTER TABLE gens_plots ADD COLUMN speed_level INTEGER NOT NULL DEFAULT 0");
 
         ConfigurationSection root = config();
         grid = PlotSettings.grid(root);
@@ -160,6 +161,11 @@ public final class PlotsModule implements GensModule, Listener {
 
     PlotSettings.Grid grid() {
         return grid;
+    }
+
+    /** A new player's belt length (plots.defaults.belt-length). */
+    public int defaultBeltLength() {
+        return live.defaultBeltLength();
     }
 
     /** An online player's lasting plot data, or null if they are not loaded. */

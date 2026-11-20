@@ -20,11 +20,22 @@ public final class PlotData {
     private int beltLength;
     private int lockLevel;
     private long shieldUntil;
+    private int speedLevel;
 
-    PlotData(int beltLength, int lockLevel, long shieldUntil) {
+    PlotData(int beltLength, int lockLevel, long shieldUntil, int speedLevel) {
         this.beltLength = beltLength;
         this.lockLevel = lockLevel;
         this.shieldUntil = shieldUntil;
+        this.speedLevel = speedLevel;
+    }
+
+    /** The belt speed upgrade level (0 = the starting speed). */
+    public synchronized int speedLevel() {
+        return speedLevel;
+    }
+
+    public synchronized void setSpeedLevel(int speedLevel) {
+        this.speedLevel = Math.max(0, speedLevel);
     }
 
     public synchronized int beltLength() {
@@ -56,10 +67,11 @@ public final class PlotData {
         beltLength = defaultBeltLength;
         lockLevel = 0;
         shieldUntil = 0;
+        speedLevel = 0;
     }
 
     private synchronized Object[] snapshot() {
-        return new Object[]{beltLength, lockLevel, shieldUntil};
+        return new Object[]{beltLength, lockLevel, shieldUntil, speedLevel};
     }
 
     /** The player-data section for {@code gens_plots}. */
@@ -73,28 +85,30 @@ public final class PlotData {
             @Override
             public PlotData load(Connection c, UUID player) throws SQLException {
                 try (PreparedStatement ps = c.prepareStatement(
-                        "SELECT belt_length, lock_level, shield_until FROM gens_plots WHERE uuid = ?")) {
+                        "SELECT belt_length, lock_level, shield_until, speed_level FROM gens_plots WHERE uuid = ?")) {
                     ps.setString(1, player.toString());
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
-                            return new PlotData(rs.getInt(1), rs.getInt(2), rs.getLong(3));
+                            return new PlotData(rs.getInt(1), rs.getInt(2), rs.getLong(3), rs.getInt(4));
                         }
                     }
                 }
-                return new PlotData(defaultBeltLength.getAsInt(), 0, 0);
+                return new PlotData(defaultBeltLength.getAsInt(), 0, 0, 0);
             }
 
             @Override
             public void save(Connection c, UUID player, PlotData data) throws SQLException {
                 Object[] s = data.snapshot();
                 try (PreparedStatement ps = c.prepareStatement(
-                        "INSERT INTO gens_plots (uuid, belt_length, lock_level, shield_until) VALUES (?, ?, ?, ?) "
+                        "INSERT INTO gens_plots (uuid, belt_length, lock_level, shield_until, speed_level) VALUES (?, ?, ?, ?, ?) "
                                 + "ON CONFLICT (uuid) DO UPDATE SET belt_length = excluded.belt_length, "
-                                + "lock_level = excluded.lock_level, shield_until = excluded.shield_until")) {
+                                + "lock_level = excluded.lock_level, shield_until = excluded.shield_until, "
+                                + "speed_level = excluded.speed_level")) {
                     ps.setString(1, player.toString());
                     ps.setInt(2, (Integer) s[0]);
                     ps.setInt(3, (Integer) s[1]);
                     ps.setLong(4, (Long) s[2]);
+                    ps.setInt(5, (Integer) s[3]);
                     ps.executeUpdate();
                 }
             }

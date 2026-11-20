@@ -13,6 +13,8 @@ libraries:
   - io.github.revxrsal:lamp.bukkit:4.0.0-rc.18
   - io.github.revxrsal:lamp.brigadier:4.0.0-rc.18
 permissions:
+  genscore.belt: {default: true}
+  genscore.factory.bypass: {default: false}
   genscore.plot: {default: true}
   genscore.admin.plots: {default: op}
   genscore.plots.build: {default: op}

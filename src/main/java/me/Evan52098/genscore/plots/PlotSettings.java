@@ -248,7 +248,7 @@ final class PlotSettings {
                 root.getBoolean("protect-world", true),
                 root.getBoolean("set-world-spawn", true),
                 Map.copyOf(markers),
-                material(root.getString("template.fallback-floor"), Material.GRASS_BLOCK),
+                material(root.getString("template.fallback-floor"), Material.SMOOTH_STONE),
                 material(root.getString("template.fallback-border"), Material.STONE_BRICKS),
                 Math.max(1, root.getInt("defaults.belt-length", 8)),
                 new Platform(

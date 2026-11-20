@@ -90,6 +90,51 @@ public final class PlotService {
         return first != null && first.isDone() && !first.isCompletedExceptionally() ? builder.hubSpawn(world, 0) : null;
     }
 
+    // ------------------------------------------------------------------ listeners and views
+
+    private final java.util.List<PlotListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Adds a listener for factories becoming ready and being removed. Factories already built are reported at once. */
+    public void addListener(PlotListener listener) {
+        listeners.add(listener);
+        for (Plot plot : plots.values()) {
+            if (plot.isReady()) {
+                listener.ready(view(plot));
+            }
+        }
+    }
+
+    private void fire(Plot plot, boolean ready) {
+        FactoryView view = view(plot);
+        for (PlotListener l : listeners) {
+            try {
+                if (ready) {
+                    l.ready(view);
+                } else {
+                    l.removing(view);
+                }
+            } catch (RuntimeException e) {
+                log.log(Level.SEVERE, "A plot listener failed", e);
+            }
+        }
+    }
+
+    /** The world-space view of a factory: lot position, rotation and the template's markers turned into place. */
+    public FactoryView view(Plot plot) {
+        PlotSettings.Lot lot = grid.lot(plot.slot());
+        PlotTemplate t = template.get();
+        java.util.Map<String, java.util.List<org.bukkit.util.BlockVector>> markers = new java.util.LinkedHashMap<>();
+        for (String name : t.markers().keySet()) {
+            java.util.List<org.bukkit.util.BlockVector> out = new ArrayList<>();
+            for (org.bukkit.util.BlockVector v : t.marker(name, lot.rotation())) {
+                out.add(new org.bukkit.util.BlockVector(lot.minX() + v.getBlockX(), grid.floorY() + v.getBlockY(), lot.minZ() + v.getBlockZ()));
+            }
+            markers.put(name, java.util.List.copyOf(out));
+        }
+        return new FactoryView(plot.owner(), plot.slot(), grid.platformOf(plot.slot()), world, lot.minX(), grid.floorY(),
+                lot.minZ(), grid.size(), lot.rotation(), java.util.Map.copyOf(markers));
+    }
+
     // ------------------------------------------------------------------ platforms
 
     /** Platform number -> its build (completed once built). Built platforms are listed in gens_platforms. */
@@ -243,6 +288,8 @@ public final class PlotService {
                     long removal = plot.finishBuild();
                     if (removal != Plot.NO_REMOVAL) {
                         remove(plot, removal);
+                    } else {
+                        fire(plot, true);
                     }
                 });
         return plot.built();
@@ -269,6 +316,7 @@ public final class PlotService {
             return CompletableFuture.completedFuture(null);
         }
         plots.remove(plot.owner(), plot);
+        fire(plot, false);
         return teardown(plot.slot());
     }
 
@@ -277,6 +325,7 @@ public final class PlotService {
         if (!plot.beginRebuild()) {
             return CompletableFuture.completedFuture(false);
         }
+        fire(plot, false);
         return builder.clear(world, plot.slot())
                 .thenCompose(v -> builder.paste(world, plot.slot()))
                 .handle((v, error) -> {
@@ -286,6 +335,8 @@ public final class PlotService {
                     long removal = plot.finishRebuild();
                     if (removal != Plot.NO_REMOVAL) {
                         remove(plot, removal);
+                    } else if (error == null) {
+                        fire(plot, true);
                     }
                     return error == null;
                 });

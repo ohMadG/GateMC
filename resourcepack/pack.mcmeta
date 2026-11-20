@@ -1,0 +1,13 @@
+{
+  "pack": {
+    "description": "GensCore: conveyor belts",
+    "min_format": [
+      97,
+      0
+    ],
+    "max_format": [
+      97,
+      1
+    ]
+  }
+}

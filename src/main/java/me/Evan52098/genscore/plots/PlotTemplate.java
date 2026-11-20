@@ -204,19 +204,143 @@ final class PlotTemplate {
                 dims.getBlockY(), file.getName());
     }
 
-    /** The factory used while there is no template file: a floor with a border, the front edge marked in the road block. */
+    /**
+     * The built-in factory used while there is no template file: a walled fortress. Front (gate side) faces south.
+     *
+     * <ul>
+     *   <li>Stone-brick walls 5 high with battlements, and a 3x3 tower at each corner.</li>
+     *   <li>A 7-wide, 4-high gate opening in the middle of the front wall, framed in polished deepslate with a door
+     *       housing above it ("gate" markers; the garage door is drawn by the factory module).</li>
+     *   <li>A belt path snaking across the floor on slabs ("belt" markers, in belt order), gen pads along the back
+     *       ("pad"), a gate button inside next to the gate ("gate_button") and the arrival spot ("spawn").</li>
+     * </ul>
+     */
     static PlotTemplate fallbackFactory(int size, PlotSettings.Live live) {
-        List<TemplateBlock> out = new ArrayList<>();
+        int s = size - 1;
+        Map<Long, TemplateBlock> grid = new java.util.HashMap<>();
+        Map<String, List<BlockVector>> markers = new LinkedHashMap<>();
+        java.util.function.BiConsumer<int[], BlockData> put = (p, d) ->
+                grid.put(((long) p[0] << 40) | ((long) p[1] << 20) | p[2], new TemplateBlock(p[0], p[1], p[2], d));
         BlockData floor = live.fallbackFloor().createBlockData();
-        BlockData border = live.fallbackBorder().createBlockData();
-        BlockData front = Material.YELLOW_CONCRETE.createBlockData(); // shows which way the factory faces (its road)
-        for (int x = 0; x < size; x++) {
-            for (int z = 0; z < size; z++) {
-                boolean edge = x == 0 || z == 0 || x == size - 1 || z == size - 1;
-                out.add(new TemplateBlock(x, 0, z, z == size - 1 ? front : edge ? border : floor));
+        BlockData floorEdge = Material.POLISHED_ANDESITE.createBlockData();
+        BlockData wall = live.fallbackBorder().createBlockData();
+        BlockData wallBase = Material.DEEPSLATE_BRICKS.createBlockData();
+        BlockData cap = Material.CHISELED_STONE_BRICKS.createBlockData();
+        BlockData battlement = Material.STONE_BRICK_WALL.createBlockData();
+        BlockData tower = Material.POLISHED_BLACKSTONE_BRICKS.createBlockData();
+        BlockData frame = Material.POLISHED_DEEPSLATE.createBlockData();
+        BlockData housing = Material.IRON_BLOCK.createBlockData();
+        BlockData light = Material.SEA_LANTERN.createBlockData();
+        BlockData slab = Bukkit.createBlockData("minecraft:smooth_stone_slab[type=bottom]");
+        BlockData pad = Material.POLISHED_DIORITE.createBlockData();
+        int gateHalf = size >= 15 ? 3 : 1;
+        int gateLo = size / 2 - gateHalf;
+        int gateHi = size / 2 + gateHalf;
+        int wallTop = 5;
+        int gateTop = 4;
+
+        // Floor.
+        for (int x = 0; x <= s; x++) {
+            for (int z = 0; z <= s; z++) {
+                boolean edge = x == 0 || z == 0 || x == s || z == s;
+                put.accept(new int[]{x, 0, z}, edge ? floorEdge : floor);
             }
         }
-        return new PlotTemplate(size, size, size, out, Map.of(), 1, "fallback");
+        // Walls with battlements, leaving the gate opening in the front (z = s).
+        for (int i = 0; i <= s; i++) {
+            for (int[] p : new int[][]{{i, 0}, {i, s}, {0, i}, {s, i}}) {
+                boolean front = p[1] == s && p[0] != 0 && p[0] != s;
+                for (int y = 1; y <= wallTop; y++) {
+                    if (front && p[0] >= gateLo && p[0] <= gateHi && y <= gateTop) {
+                        continue;
+                    }
+                    put.accept(new int[]{p[0], y, p[1]}, y == 1 ? wallBase : y == wallTop ? cap : wall);
+                }
+                if (i % 2 == 0) {
+                    put.accept(new int[]{p[0], wallTop + 1, p[1]}, battlement);
+                }
+            }
+        }
+        // Corner towers.
+        for (int[] c : new int[][]{{0, 0}, {s - 2, 0}, {0, s - 2}, {s - 2, s - 2}}) {
+            for (int dx = 0; dx < 3; dx++) {
+                for (int dz = 0; dz < 3; dz++) {
+                    for (int y = 1; y <= wallTop + 2; y++) {
+                        put.accept(new int[]{c[0] + dx, y, c[1] + dz}, tower);
+                    }
+                    if ((dx + dz) % 2 == 0) {
+                        put.accept(new int[]{c[0] + dx, wallTop + 3, c[1] + dz}, battlement);
+                    }
+                }
+            }
+        }
+        // Gate frame and the door housing above the opening.
+        for (int y = 1; y <= wallTop; y++) {
+            put.accept(new int[]{gateLo - 1, y, s}, frame);
+            put.accept(new int[]{gateHi + 1, y, s}, frame);
+        }
+        for (int x = gateLo; x <= gateHi; x++) {
+            put.accept(new int[]{x, wallTop, s}, housing);
+            for (int y = 1; y <= gateTop; y++) {
+                markers.computeIfAbsent("gate", k -> new ArrayList<>()).add(new BlockVector(x, y, s));
+            }
+        }
+        // Gate button inside, on the front wall beside the opening.
+        BlockData button = Bukkit.createBlockData("minecraft:polished_blackstone_button[face=wall,facing=north]");
+        put.accept(new int[]{gateLo - 2, 2, s - 1}, button);
+        markers.computeIfAbsent("gate_button", k -> new ArrayList<>()).add(new BlockVector(gateLo - 2, 2, s - 1));
+        // Belt: rows across the floor joined at alternate ends, on slabs, in belt order.
+        List<int[]> path = new ArrayList<>();
+        int left = 4;
+        int right = s - 4;
+        boolean eastward = true;
+        int lastRow = -1;
+        for (int z = 4; z <= s - 8; z += 6) {
+            if (lastRow >= 0) {
+                int x = eastward ? left : right; // the turn column is the end the previous row finished at
+                for (int dz = lastRow + 1; dz < z; dz++) {
+                    path.add(new int[]{x, dz});
+                }
+            }
+            if (eastward) {
+                for (int x = lastRow >= 0 ? left : left; x <= right; x++) {
+                    path.add(new int[]{x, z});
+                }
+            } else {
+                for (int x = right; x >= left; x--) {
+                    path.add(new int[]{x, z});
+                }
+            }
+            eastward = !eastward;
+            lastRow = z;
+        }
+        // The turn cells were added before each row, at the row's starting end: drop duplicates.
+        List<int[]> unique = new ArrayList<>();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (int[] p : path) {
+            if (seen.add(((long) p[0] << 20) | p[1])) {
+                unique.add(p);
+            }
+        }
+        for (int[] p : unique) {
+            put.accept(new int[]{p[0], 1, p[1]}, slab);
+            markers.computeIfAbsent("belt", k -> new ArrayList<>()).add(new BlockVector(p[0], 1, p[1]));
+        }
+        // Gen pads along the back, behind the start of the belt.
+        for (int x = left; x <= Math.min(right, left + 12); x += 3) {
+            put.accept(new int[]{x, 0, 2}, pad);
+            markers.computeIfAbsent("pad", k -> new ArrayList<>()).add(new BlockVector(x, 0, 2));
+        }
+        // Floor lights between the belt rows.
+        for (int x = 2; x <= s - 2; x += 5) {
+            for (int z = 7; z <= s - 5; z += 6) {
+                put.accept(new int[]{x, 0, z}, light);
+            }
+        }
+        markers.computeIfAbsent("spawn", k -> new ArrayList<>()).add(new BlockVector(size / 2, 1, s - 3));
+        List<TemplateBlock> out = new ArrayList<>(grid.values());
+        sort(out);
+        return new PlotTemplate(size, size, size, out, markers, wallTop + 4, "built-in fortress");
     }
 
     /** No hub file: nothing on top of the plaza floor. */

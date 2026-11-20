@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
  * token on. A removal whose token is stale is ignored, so a quit timer that fires just as the owner rejoins can never
  * remove the plot from under them.
  */
-final class Plot {
+public final class Plot {
 
     enum State {
         /** The template is being placed. */
@@ -47,11 +47,11 @@ final class Plot {
         this.slot = slot;
     }
 
-    UUID owner() {
+    public UUID owner() {
         return owner;
     }
 
-    int slot() {
+    public int slot() {
         return slot;
     }
 
@@ -68,7 +68,7 @@ final class Plot {
         return state;
     }
 
-    synchronized boolean isReady() {
+    public synchronized boolean isReady() {
         return state == State.READY;
     }
 

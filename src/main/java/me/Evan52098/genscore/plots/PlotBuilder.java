@@ -257,7 +257,10 @@ final class PlotBuilder {
     // ------------------------------------------------------------------ verification (admin / tests)
 
     /** Result of a verify: blocks that differ from what was built, and whether the factory's front looks onto road. */
-    record Check(int checked, int wrong, boolean frontOnRoad) {
+    record Check(int checked, int wrong, boolean frontOnRoad, List<String> examples) {
+        Check(int checked, int wrong, boolean frontOnRoad) {
+            this(checked, wrong, frontOnRoad, List.of());
+        }
     }
 
     /**
@@ -274,9 +277,15 @@ final class PlotBuilder {
             Tasks.region.run(area.anchor(world, grid.floorY()), () -> {
                 try {
                     int wrong = 0;
+                    List<String> examples = new ArrayList<>();
                     for (PlotTemplate.TemplateBlock b : blocks) {
-                        if (!world.getBlockAt(lot.minX() + b.x(), grid.floorY() + b.y(), lot.minZ() + b.z()).getBlockData().equals(b.data())) {
+                        Block at = world.getBlockAt(lot.minX() + b.x(), grid.floorY() + b.y(), lot.minZ() + b.z());
+                        if (!at.getBlockData().equals(b.data())) {
                             wrong++;
+                            if (examples.size() < 3) {
+                                examples.add(at.getX() + "," + at.getY() + "," + at.getZ() + " want " + b.data().getAsString()
+                                        + " got " + at.getBlockData().getAsString());
+                            }
                         }
                     }
                     int s = grid.size() - 1;
@@ -293,7 +302,7 @@ final class PlotBuilder {
                     int rx = lot.minX() + spot[0] + facing[0];
                     int rz = lot.minZ() + spot[1] + facing[1];
                     boolean onRoad = world.getBlockAt(rx, grid.floorY() - 1, rz).getType() == road;
-                    out.complete(new Check(blocks.size(), wrong, onRoad));
+                    out.complete(new Check(blocks.size(), wrong, onRoad, examples));
                 } catch (Throwable t) {
                     out.completeExceptionally(t);
                 }

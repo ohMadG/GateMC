@@ -325,7 +325,7 @@ public final class PlotCommands {
             String rotation = service().grid().lot(slot).rotation().name().toLowerCase();
             checks.add(service().verifyFactory(slot).handle((c, e) -> e != null ? "factory " + slot + " ERROR " + rootMessage(e)
                     : c.wrong() > 0 || !c.frontOnRoad() ? "factory " + slot + " (" + rotation + ") " + c.wrong() + "/" + c.checked()
-                    + " blocks wrong, front on road: " + c.frontOnRoad() : null));
+                    + " blocks wrong, front on road: " + c.frontOnRoad() + " " + c.examples() : null));
         }
         for (int id : service().builtPlatformIds()) {
             checks.add(service().verifyPlatform(id).handle((c, e) -> e != null ? "platform " + id + " ERROR " + rootMessage(e)

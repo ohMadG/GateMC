@@ -56,6 +56,7 @@ public final class GensCore extends JavaPlugin {
         // Modules in load order. A module can use the ones registered before it.
         modules.register(new EconomyModule());
         modules.register(new me.Evan52098.genscore.plots.PlotsModule());     // gens phase 1; uses economy and teleport if on
+        modules.register(new me.Evan52098.genscore.factory.FactoryModule()); // gens phase 2 + gate; needs plots
         modules.register(new TeleportModule());
         modules.register(new EssentialsModule());
         modules.register(new ChatModule());
