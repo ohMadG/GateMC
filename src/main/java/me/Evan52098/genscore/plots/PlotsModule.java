@@ -67,7 +67,24 @@ public final class PlotsModule implements GensModule, Listener {
                         + "CREATE TABLE IF NOT EXISTS gens_slots (slot INTEGER PRIMARY KEY, owner TEXT NOT NULL, since BIGINT NOT NULL)",
                 "CREATE TABLE IF NOT EXISTS gens_platforms (id INTEGER PRIMARY KEY, built_at BIGINT NOT NULL)",
                 "ALTER TABLE gens_plots ADD COLUMN speed_level INTEGER NOT NULL DEFAULT 0",
-                "ALTER TABLE gens_plots ADD COLUMN gen_level INTEGER NOT NULL DEFAULT 0");
+                "ALTER TABLE gens_plots ADD COLUMN gen_level INTEGER NOT NULL DEFAULT 0",
+                // v5: tokens, caches, upgrades and raid stats; plot defences; the raid log
+                "ALTER TABLE gens_players ADD COLUMN tokens BIGINT NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN value_level INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN luck_level INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN gear_level INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN caches TEXT NOT NULL DEFAULT '';"
+                        + "ALTER TABLE gens_players ADD COLUMN milestones TEXT NOT NULL DEFAULT '';"
+                        + "ALTER TABLE gens_players ADD COLUMN lifetime_cents BIGINT NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN raids_won INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN raids_defended INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_players ADD COLUMN hours_rewarded INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_plots ADD COLUMN armor_level INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_plots ADD COLUMN turret_level INTEGER NOT NULL DEFAULT 0;"
+                        + "ALTER TABLE gens_plots ADD COLUMN trap_level INTEGER NOT NULL DEFAULT 0;"
+                        + "CREATE TABLE IF NOT EXISTS gens_raid_log (" + plugin.database().autoIdColumn("id") + ", raider TEXT NOT NULL, "
+                        + "owner TEXT NOT NULL, at BIGINT NOT NULL, segments INTEGER NOT NULL, loot_cents BIGINT NOT NULL, "
+                        + "tokens INTEGER NOT NULL DEFAULT 0, caches INTEGER NOT NULL DEFAULT 0)");
 
         ConfigurationSection root = config();
         grid = PlotSettings.grid(root);
@@ -173,6 +190,11 @@ public final class PlotsModule implements GensModule, Listener {
     public @Nullable PlotData data(UUID player) {
         var data = plugin.playerData().get(player);
         return data == null ? null : data.get(plotSection);
+    }
+
+    /** Saves this player's data within about a second (after a reward or a purchase). */
+    public void saveSoon(UUID player) {
+        plugin.playerData().saveSoon(player);
     }
 
     public @Nullable GensPlayer gensPlayer(UUID player) {

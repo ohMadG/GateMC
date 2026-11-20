@@ -64,6 +64,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     private GensCore plugin;
     private PlotsModule plots;
     private volatile FactorySettings settings;
+    private volatile ProgressSettings progress;
+    private Rewards rewards;
+    private ProgressMenus menus;
+    private final Map<UUID, Long> lastSwing = new ConcurrentHashMap<>();
     private final Map<Integer, Factory> bySlot = new ConcurrentHashMap<>();
     private final Map<UUID, Factory> byOwner = new ConcurrentHashMap<>();
 
@@ -80,6 +84,9 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             throw new IllegalStateException("The factory module needs the plots module.");
         }
         settings = FactorySettings.from(plugin.getConfig().getConfigurationSection("factory"));
+        progress = ProgressSettings.from(plugin.getConfig().getConfigurationSection("factory"));
+        rewards = new Rewards(this);
+        menus = new ProgressMenus(this);
         plugin.commands().register(this);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plots.service().addListener(this);
@@ -100,7 +107,82 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Override
     public void reload() {
         settings = FactorySettings.from(plugin.getConfig().getConfigurationSection("factory"));
+        progress = ProgressSettings.from(plugin.getConfig().getConfigurationSection("factory"));
         logTiers();
+    }
+
+    ProgressSettings progress() {
+        return progress;
+    }
+
+    Rewards rewards() {
+        return rewards;
+    }
+
+    @Nullable me.Evan52098.genscore.plots.GensPlayer gensPlayer(UUID player) {
+        return plots.gensPlayer(player);
+    }
+
+    void saveSoon(UUID player) {
+        plots.saveSoon(player);
+    }
+
+    /** How long this owner's gate stays shut after a click, with their gate-time upgrade. */
+    int gateSeconds(UUID owner) {
+        PlotData data = plotData(owner);
+        return progress.gateSeconds(settings.gateCloseSeconds(), data == null ? 0 : data.lockLevel());
+    }
+
+    String shieldText(UUID owner) {
+        Factory f = byOwner.get(owner);
+        long left = f == null ? 0 : f.shieldLeftSeconds();
+        return left > 0 ? (left / 60) + "m " + (left % 60) + "s" : "none";
+    }
+
+    /** Something upgradeable changed (turrets): redraw what depends on it. */
+    void afterUpgrade(UUID owner) {
+        Factory f = byOwner.get(owner);
+        if (f != null) {
+            Tasks.region.run(f.view.center(), f::redrawTurrets);
+        }
+    }
+
+    /** A segment was broken: log it, tell people. Region thread. */
+    void raidLogged(Player raider, Factory f, long loot, int tokens, int caches, long shieldSeconds) {
+        UUID raiderId = raider.getUniqueId();
+        UUID owner = f.view.owner();
+        long at = System.currentTimeMillis();
+        plugin.database().asyncRun(c -> {
+            try (var ps = c.prepareStatement("INSERT INTO gens_raid_log (raider, owner, at, segments, loot_cents, tokens, caches) "
+                    + "VALUES (?, ?, ?, 1, ?, ?, ?)")) {
+                ps.setString(1, raiderId.toString());
+                ps.setString(2, owner.toString());
+                ps.setLong(3, at);
+                ps.setLong(4, loot);
+                ps.setInt(5, tokens);
+                ps.setInt(6, caches);
+                ps.executeUpdate();
+            }
+        }).exceptionally(e -> {
+            plugin.getLogger().warning("Could not write the raid log: " + e.getMessage());
+            return null;
+        });
+        saveSoon(raiderId);
+        String ownerName = Bukkit.getOfflinePlayer(owner).getName();
+        String line = "<red>⚔</red> <white>" + Msg.escape(raider.getName()) + "</white> <gray>broke a belt in</gray> <white>"
+                + Msg.escape(String.valueOf(ownerName)) + "</white><gray>'s factory" + (loot > 0 ? " and took " + Money.compact(loot) : "")
+                + (shieldSeconds > 0 ? ". Their shield is up." : ".") + "</gray>";
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            Tasks.entity.run(p, () -> p.sendMessage(Msg.parse(line)));
+        }
+        Player o = Bukkit.getPlayer(owner);
+        if (o != null) {
+            Tasks.entity.run(o, () -> {
+                o.playSound(o.getLocation(), Sound.ENTITY_WITHER_BREAK_BLOCK, 0.6f, 1.2f);
+                o.showTitle(net.kyori.adventure.title.Title.title(Msg.parse("<red><bold>RAID!"),
+                        Msg.parse("<white>" + Msg.escape(raider.getName()) + " <gray>broke your belt. Close your gate!")));
+            });
+        }
     }
 
     private void logTiers() {
@@ -231,6 +313,11 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             closeGate(p, f);
         } else if (f.path.contains(b.getX(), b.getY(), b.getZ()) || f.isMachine(b.getX(), b.getY(), b.getZ())) {
             event.setCancelled(true);
+            int index = f.segmentIndex(b.getX(), b.getY(), b.getZ());
+            if (owner && index >= 0 && f.isBroken(index)) {
+                repair(p, f, index);
+                return;
+            }
             openMenu(p, f);
         }
     }
@@ -330,6 +417,134 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         closeGate(p, f);
     }
 
+    // ------------------------------------------------------------------ raids
+
+    /** Left-click a belt segment with the Raid Pick in someone else's factory: a raid hit. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onRaidHit(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        Block b = event.getClickedBlock();
+        Factory f = b == null ? null : at(b.getLocation());
+        if (f == null) {
+            return;
+        }
+        int index = f.segmentIndex(b.getX(), b.getY(), b.getZ());
+        if (index < 0) {
+            return;
+        }
+        Player p = event.getPlayer();
+        event.setCancelled(true);
+        if (p.getUniqueId().equals(f.view.owner())) {
+            return;
+        }
+        if (!menus.isRaidPick(p.getInventory().getItemInMainHand())) {
+            p.sendActionBar(Msg.bad("You need a Raid Pick to break belts (" + Msg.white("/gear") + ")."));
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = lastSwing.get(p.getUniqueId());
+        if (last != null && now - last < progress.hitCooldownMs()) {
+            return; // rate limit (anti-cheat): one hit per cooldown
+        }
+        lastSwing.put(p.getUniqueId(), now);
+        var g = gensPlayer(p.getUniqueId());
+        int damage = progress.hitDamage(g == null ? 0 : g.gearLevel());
+        // Belt state belongs to the factory's region thread; the raider stands in the same region.
+        Tasks.region.run(b.getLocation(), () -> {
+            Factory.HitResult r = f.hit(p, index, damage);
+            Tasks.entity.run(p, () -> {
+                switch (r.hit()) {
+                    case DAMAGED -> p.sendActionBar(Msg.parse("<red>Belt " + "█".repeat(Math.max(0, r.healthLeft()))
+                            + "<dark_gray>" + "█".repeat(Math.max(0, r.maxHealth() - r.healthLeft())) + "</dark_gray> <gray>"
+                            + r.healthLeft() + "/" + r.maxHealth()));
+                    case BROKE -> {
+                        p.sendMessage(Msg.good("Belt broken! " + Msg.white("+" + Money.compact(r.loot())) + ", "
+                                + Msg.white("+" + r.tokens() + " tokens") + (r.caches() > 0 ? ", " + Msg.white("+" + r.caches() + " cache") : "")
+                                + (r.shieldSeconds() > 0 ? ". The factory's shield is up." : ".")));
+                        p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.6f);
+                    }
+                    case BROKEN_ALREADY -> p.sendActionBar(Msg.neutral("That segment is already broken."));
+                    case IDLE_SEGMENT -> p.sendActionBar(Msg.neutral("That part of the belt is not running."));
+                    case SHIELDED -> p.sendActionBar(Msg.bad("This factory is shielded for " + r.shieldSeconds() + "s."));
+                    case GATE_CLOSED -> p.sendActionBar(Msg.bad("The gate is closed."));
+                    case RAID_CAP -> p.sendActionBar(Msg.bad("You have broken all you can here for now."));
+                }
+            });
+        });
+    }
+
+    private void repair(Player p, Factory f, int index) {
+        long cost = Math.round(progress.repairCostMinutes() * rewards.incomePerMinute(p.getUniqueId()));
+        Tasks.region.run(f.view.center(), () -> {
+            long wait = f.repairWait(index);
+            if (wait > 0) {
+                Tasks.entity.run(p, () -> p.sendActionBar(Msg.bad("Under attack: you can repair in " + wait + "s.")));
+                return;
+            }
+            if (!f.isBroken(index)) {
+                return;
+            }
+            if (!withdraw(p, cost, "belt repair")) {
+                return;
+            }
+            if (!f.repair(index)) {
+                pay(p.getUniqueId(), cost); // could not repair after all: give the money back
+                return;
+            }
+            Tasks.entity.run(p, () -> p.sendMessage(Msg.good("Belt repaired for " + Msg.white(Money.compact(cost)) + ".")));
+        });
+    }
+
+    @Command({"tokens", "tokenshop"})
+    @CommandPermission("genscore.belt")
+    @Description("Your tokens and the token shop")
+    public void tokens(BukkitCommandActor actor) {
+        menus.tokens(actor.requirePlayer());
+    }
+
+    @Command("caches")
+    @CommandPermission("genscore.belt")
+    @Description("Break your caches")
+    public void caches(BukkitCommandActor actor) {
+        menus.caches(actor.requirePlayer());
+    }
+
+    @Command({"defence", "defences", "defense"})
+    @CommandPermission("genscore.belt")
+    @Description("Upgrade your factory's defences")
+    public void defence(BukkitCommandActor actor) {
+        menus.defence(actor.requirePlayer());
+    }
+
+    @Command("gear")
+    @CommandPermission("genscore.belt")
+    @Description("Raid gear and the Raid Pick")
+    public void gear(BukkitCommandActor actor) {
+        menus.gear(actor.requirePlayer());
+    }
+
+    @Command("gensadmin tokens")
+    @CommandPermission("genscore.admin.plots")
+    @Description("Give tokens or a cache to an online player (tests)")
+    public void adminTokens(BukkitCommandActor actor, String player, String what, int amount) {
+        Player t = Bukkit.getPlayerExact(player);
+        var g = t == null ? null : gensPlayer(t.getUniqueId());
+        if (g == null) {
+            actor.sender().sendMessage(Msg.bad("That player is not online."));
+            return;
+        }
+        int rarity = java.util.Arrays.asList(me.Evan52098.genscore.plots.GensPlayer.RARITIES).indexOf(what.toLowerCase(java.util.Locale.ROOT));
+        if (rarity >= 0) {
+            g.addCache(rarity, amount);
+        } else {
+            g.addTokens(amount);
+        }
+        saveSoon(t.getUniqueId());
+        actor.sender().sendMessage(Msg.good("Gave " + amount + " " + (rarity >= 0 ? what + " cache(s)" : "tokens") + " to " + t.getName() + "."));
+    }
+
     // ------------------------------------------------------------------ belt menu
 
     private void openMenu(Player p, Factory f) {
@@ -341,7 +556,24 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         FactorySettings s = settings;
         String ownerName = Bukkit.getOfflinePlayer(f.view.owner()).getName();
-        Menu menu = new Menu(3, Msg.parse(owner ? "<dark_gray>Your belt" : "<dark_gray>" + Msg.escape(String.valueOf(ownerName)) + "'s belt"));
+        Menu menu = new Menu(owner ? 4 : 3, Msg.parse(owner ? "<dark_gray>Your belt" : "<dark_gray>" + Msg.escape(String.valueOf(ownerName)) + "'s belt"));
+        if (owner) {
+            var g = gensPlayer(p.getUniqueId());
+            menu.set(28, Lore.item(Material.SUNFLOWER, "&eTokens: &f" + (g == null ? 0 : g.tokens()), Lore.builder(Lore.Accent.WHITE)
+                    .clickPrompt("open the token shop").build()), e -> menus.tokens(p));
+            int cacheCount = 0;
+            for (int r = 0; g != null && r < 4; r++) {
+                cacheCount += g.caches(r);
+            }
+            menu.set(30, Lore.item(Material.ENDER_CHEST, "&dCaches: &f" + cacheCount, Lore.builder(Lore.Accent.WHITE)
+                    .clickPrompt("break your caches").build()), e -> menus.caches(p));
+            menu.set(32, Lore.item(Material.SHIELD, "&bDefences", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Gate", gateSeconds(p.getUniqueId()) + "s").stat("Shield", shieldText(p.getUniqueId()))
+                    .clickPrompt("gate time, armour, turrets, traps").build()), e -> menus.defence(p));
+            menu.set(34, Lore.item(Material.IRON_PICKAXE, "&cRaid gear", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Gear level", String.valueOf(g == null ? 0 : g.gearLevel()))
+                    .clickPrompt("the Raid Pick and gear upgrades").build()), e -> menus.gear(p));
+        }
         int length = f.activeLength();
         int level = data.speedLevel();
         int tier = data.genLevel();
@@ -500,6 +732,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     }
 
     /** Takes the money (atomic). {@code complain}: say so when they cannot afford it (not after a multi-buy's last). */
+    boolean withdraw(Player p, long price, String reason) {
+        return withdraw(p, price, reason, true);
+    }
+
     private boolean withdraw(Player p, long price, String reason, boolean complain) {
         EconomyModule eco = plugin.modules().get(EconomyModule.class);
         if (eco == null) {
@@ -544,6 +780,12 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         Factory f = byOwner.get(p.getUniqueId());
         if (f != null) {
             f.ownerJoined();
+        }
+        var pd = plugin.playerData().get(p.getUniqueId());
+        PlotData data = plotData(p.getUniqueId());
+        if (pd != null && pd.isFirstTime() && data != null && progress.newPlayerShieldMinutes() > 0) {
+            data.setShieldUntil(System.currentTimeMillis() + progress.newPlayerShieldMinutes() * 60_000L);
+            p.sendMessage(Msg.good("Your factory is shielded from raids for your first " + Msg.white(progress.newPlayerShieldMinutes() + " minutes") + "."));
         }
     }
 

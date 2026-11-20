@@ -157,6 +157,39 @@ def vent():
     return 16, 16, rows
 
 
+def coin():
+    """Gold token face: a rim, a raised star, a little shine."""
+    rows = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5
+            c = (236, 186, 46, 255)
+            if d > 6.2:
+                c = (196, 140, 24, 255)   # rim
+            # five-pointed star-ish emblem in the middle
+            ax, ay = abs(x - 7.5), abs(y - 7.5)
+            if (ax < 1.2 and ay < 4.5) or (ay < 1.2 and ax < 4.5) or (abs(ax - ay) < 1.0 and ax < 3.2):
+                c = (255, 236, 140, 255)
+            row.append(shade(c, 0.92 + 0.12 * noise(x, y, 23)))
+        rows.append(row)
+    return 16, 16, rows
+
+
+def tinted_glow(color):
+    def make():
+        rows = []
+        for y in range(16):
+            row = []
+            for x in range(16):
+                d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5 / 10.6
+                f = 0.75 + 0.35 * (1 - d)
+                row.append(shade(color + (255,), f * (0.92 + 0.12 * noise(x, y, 29))))
+            rows.append(row)
+        return 16, 16, rows
+    return make
+
+
 TEXTURES = {
     "belt": belt_frames,
     "steel": steel,
@@ -165,6 +198,12 @@ TEXTURES = {
     "roller": roller,
     "glow": glow,
     "vent": vent,
+    "coin": coin,
+    "glow_common": tinted_glow((235, 235, 235)),
+    "glow_rare": tinted_glow((70, 210, 255)),
+    "glow_epic": tinted_glow((220, 90, 255)),
+    "glow_legendary": tinted_glow((255, 190, 40)),
+    "glow_red": tinted_glow((255, 50, 40)),
 }
 
 
@@ -263,11 +302,53 @@ def gen_machine():
     return e
 
 
+def token():
+    """A gold coin standing in the XY plane (it is laid flat on the belt by the plugin)."""
+    e = []
+    e.append(box("face", (4, 3, 7.25), (12, 13, 8.75), "coin"))
+    e.append(box("round_a", (3, 4, 7.3), (13, 12, 8.7), "coin", faces=("east", "west", "up", "down")))
+    e.append(box("round_b", (3.5, 3.5, 7.35), (12.5, 12.5, 8.65), "coin", faces=("east", "west", "up", "down")))
+    e.append(box("emblem", (6.5, 6.5, 6.9), (9.5, 9.5, 9.1), "glow_legendary", faces=("north", "south"), light=10))
+    return e
+
+
+def cache(rarity):
+    """A small strongbox with glowing seams in the rarity's colour."""
+    glow = "glow_" + rarity
+    e = []
+    e.append(box("body", (3, 3, 3), (13, 13, 13), "steel"))
+    e.append(box("lid", (2.6, 11, 2.6), (13.4, 13.4, 13.4), "dark"))
+    e.append(box("seam", (2.8, 7, 2.8), (13.2, 8.5, 13.2), glow, faces=("north", "east", "south", "west"), light=15))
+    e.append(box("lock", (6.5, 5.5, 2.4), (9.5, 9.5, 3), glow, faces=("north", "east", "west", "up", "down"), light=15))
+    for i, (x, z) in enumerate(((2.6, 2.6), (12.4, 2.6), (2.6, 12.4), (12.4, 12.4))):
+        e.append(box("corner_%d" % i, (x, 3, z), (x + 1, 13.4, z + 1), "dark"))
+    return e
+
+
+def turret():
+    """A wall turret: base, pedestal, head and a barrel pointing +Z with a red lens."""
+    e = []
+    e.append(box("base", (2, 0, 2), (14, 2, 14), "dark"))
+    e.append(box("pedestal", (5, 2, 5), (11, 6, 11), "steel"))
+    e.append(box("head", (3.5, 6, 3), (12.5, 12, 12), "steel"))
+    e.append(box("stripe", (3.4, 9, 2.9), (12.6, 10, 12.1), "hazard", faces=("north", "east", "south", "west")))
+    e.append(box("barrel", (6.5, 7.5, 12), (9.5, 10.5, 18), "dark"))
+    e.append(box("lens", (7, 8, 17.95), (9, 10, 18.1), "glow_red", faces=("south",), light=15))
+    e.append(box("sensor", (6, 12, 6), (10, 13.5, 10), "glow_red", faces=("up", "north", "south", "east", "west"), light=8))
+    return e
+
+
 MODELS = {
     "conveyor_belt": straight,
     "conveyor_corner_left": lambda: corner(False),
     "conveyor_corner_right": lambda: corner(True),
     "gen_machine": gen_machine,
+    "token": token,
+    "cache_common": lambda: cache("common"),
+    "cache_rare": lambda: cache("rare"),
+    "cache_epic": lambda: cache("epic"),
+    "cache_legendary": lambda: cache("legendary"),
+    "turret": turret,
 }
 
 
@@ -282,7 +363,7 @@ def write(path, data, binary=False):
 def java_model(elements):
     used = {f["texture"][1:] for el in elements for f in el["faces"].values()}
     tex = {name: "%s:item/conveyor/%s" % (NS, name) for name in TEXTURES if name in used}
-    tex["particle"] = tex["steel"]
+    tex["particle"] = tex.get("steel") or next(iter(tex.values()))
     return {
         "credit": "GensCore conveyor belt (tools/build_pack.py)",
         "texture_size": [16, 16],

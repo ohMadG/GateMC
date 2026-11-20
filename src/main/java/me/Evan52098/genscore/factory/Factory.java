@@ -85,18 +85,51 @@ final class Factory {
         double pos;
         final Material item;
         final long baseCents; // what this one item is worth before the belt bonus (rule 1: money from data)
+        final int special;    // NORMAL, TOKEN, or CACHE + rarity: a drop that pays out at the sell point
         int display = -1;
         boolean placed; // its display has been put in place once (the first move is not animated)
 
-        BeltItem(double pos, Material item, long baseCents) {
+        BeltItem(double pos, Material item, long baseCents, int special) {
             this.pos = pos;
             this.item = item;
             this.baseCents = baseCents;
+            this.special = special;
+        }
+
+        /** What its display shows: the item, or the token / cache model. */
+        String look() {
+            return special == NORMAL ? item.name() : special == TOKEN ? "token" : "cache_" + GensPlayerRarity.name(special - CACHE);
         }
     }
 
+    static final int NORMAL = -1;
+    static final int TOKEN = 0;
+    static final int CACHE = 1; // + rarity
+
+    /** Lower-case rarity ids, for model names. */
+    static final class GensPlayerRarity {
+        static String name(int rarity) {
+            return me.Evan52098.genscore.plots.GensPlayer.RARITIES[Math.max(0, Math.min(rarity, 3))];
+        }
+    }
+
+    // ---- raids (region thread)
+    private int[] health;          // per segment; -1 = full
+    private long[] brokenAt;       // per segment; 0 = working
+    private long[] lastHit;        // per segment
+    private boolean segmentsDirty;
+    private final Map<UUID, Integer> raidCounts = new HashMap<>();
+    private long lastRaidHit;
+
+    // ---- defences (region thread)
+    private final List<ItemDisplay> turretDisplays = new ArrayList<>();
+    private final Map<Integer, Long> turretReady = new HashMap<>();
+    private final Set<UUID> intruders = new HashSet<>();
+    private int trapPulse;
+    private int turretTick;
+
     private final java.util.Random random = new java.util.Random();
-    private final List<Material> shownItem = new ArrayList<>(); // what each item display shows now
+    private final List<String> shownItem = new ArrayList<>(); // what each item display shows now
 
     /** Where a new item appears: inside the gen's chute, just behind the start of the belt. */
     private static final double SPAWN_POS = -0.55;
@@ -193,7 +226,7 @@ final class Factory {
 
     /** Owner closes the gate (or closes it again for a fresh timer). Applied on the next tick. */
     void requestClose() {
-        closedUntil = System.currentTimeMillis() + module.settings().gateCloseSeconds() * 1000L;
+        closedUntil = System.currentTimeMillis() + module.gateSeconds(view.owner()) * 1000L;
     }
 
     /** Owner opens the gate early. */
@@ -239,6 +272,10 @@ final class Factory {
         }
         if (drawn) {
             redraw(s);
+        }
+        if (++turretTick >= 2) {
+            turretTick = 0;
+            turrets();
         }
         if (++secondCounter >= 20 / PERIOD_TICKS) {
             secondCounter = 0;
@@ -454,24 +491,42 @@ final class Factory {
         PlotData data = module.plotData(view.owner());
         double speed = s.speed(data == null ? 0 : data.speedLevel());
         int tier = data == null ? 0 : data.genLevel();
+        ProgressSettings ps = module.progress();
+        var gp = module.gensPlayer(view.owner());
         genTimer += DT;
         if (genTimer >= s.genIntervalSeconds()) {
             BeltItem newest = items.peekLast();
             if (newest == null || newest.pos >= SPAWN_POS + 1.0) { // one item per segment: the gen waits when the start is full
                 FactorySettings.Output out = s.tier(tier).pick(random); // a blended tier makes a mix of items
-                items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents()));
+                double luck = 1 + ps.luck().perLevel() * (gp == null ? 0 : gp.luckLevel());
+                int special = NORMAL;
+                double roll = random.nextDouble();
+                if (roll < ps.cacheChance() * luck) {
+                    special = CACHE + ps.rollRarity(random);
+                } else if (roll < (ps.cacheChance() + ps.tokenChance()) * luck) {
+                    special = TOKEN;
+                }
+                items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents(), special));
                 genTimer -= s.genIntervalSeconds();
             } else {
                 genTimer = s.genIntervalSeconds();
             }
         }
+        // Items move oldest first. Nothing passes a broken segment, and each item keeps a segment behind the one ahead.
+        double limit = firstBroken(length) >= 0 ? firstBroken(length) - 0.5 : Double.MAX_VALUE;
         for (BeltItem item : items) {
-            item.pos += speed * DT;
+            item.pos = Math.min(item.pos + speed * DT, limit);
+            limit = item.pos - 1.0;
         }
+        double boost = 1 + ps.value().perLevel() * (gp == null ? 0 : gp.valueLevel());
         while (!items.isEmpty() && items.peekFirst().pos >= length) {
             BeltItem sold = items.pollFirst();
             releaseDisplay(sold);
-            long value = s.saleValue(sold.baseCents, length);
+            if (sold.special != NORMAL) {
+                module.rewards().belt(view.owner(), sold.special);
+                continue;
+            }
+            long value = Math.round(s.saleValue(sold.baseCents, length) * boost);
             pendingCents += value;
             earnings.addLast(new long[]{System.currentTimeMillis(), value});
         }
@@ -479,6 +534,8 @@ final class Factory {
     }
 
     private void everySecond(Player owner, FactorySettings s) {
+        autoRepair();
+        defences(owner);
         long cutoff = System.currentTimeMillis() - 60_000;
         long sum = 0;
         for (Iterator<long[]> it = earnings.iterator(); it.hasNext(); ) {
@@ -495,6 +552,11 @@ final class Factory {
             long cents = pendingCents;
             pendingCents = 0;
             module.pay(view.owner(), cents); // online wallet: in memory, saved soon after (no database on this thread)
+            var g = module.gensPlayer(view.owner());
+            if (g != null) {
+                g.addLifetime(cents);
+            }
+            module.rewards().checkMilestones(owner, this);
         }
         if (owner != null && hasGate()) {
             updateBar(owner, s);
@@ -512,7 +574,7 @@ final class Factory {
         long left = gateSecondsLeft();
         Component title = shut ? Msg.parse("<green>Gate closed</green> <white>" + left + "s</white> <gray>- close it again before it opens</gray>")
                 : Msg.parse("<red><bold>GATE OPEN</bold></red> <gray>- press the gate button or /gate</gray>");
-        float progress = shut ? Math.min(1f, Math.max(0f, left / (float) s.gateCloseSeconds())) : 1f;
+        float progress = shut ? Math.min(1f, Math.max(0f, left / (float) module.gateSeconds(view.owner()))) : 1f;
         if (bar == null) {
             bar = BossBar.bossBar(title, progress, shut ? BossBar.Color.GREEN : BossBar.Color.RED, BossBar.Overlay.PROGRESS);
         } else {
@@ -539,6 +601,7 @@ final class Factory {
         drawnLength = -1;
         FactorySettings s = module.settings();
         drawMachine(s);
+        drawTurrets();
         int tier = currentTier();
         drawnTier = tier;
         freeDisplays.clear();
@@ -546,7 +609,7 @@ final class Factory {
         Material first = s.tier(tier).item();
         for (int i = 0; i < s.maxDrawnItems(); i++) {
             freeDisplays.add(i);
-            shownItem.add(first);
+            shownItem.add(first.name());
             itemDisplays.add(view.world().spawn(base, ItemDisplay.class, d -> {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);
@@ -672,6 +735,10 @@ final class Factory {
         genDisplay = null;
         machineDisplay = null;
         machineLabel = null;
+        for (ItemDisplay t : turretDisplays) {
+            t.remove();
+        }
+        turretDisplays.clear();
         freeDisplays.clear();
         for (BeltItem item : items) {
             item.display = -1;
@@ -682,9 +749,10 @@ final class Factory {
 
     private void redraw(FactorySettings s) {
         int length = activeLength();
-        if (length != drawnLength) {
+        if (length != drawnLength || segmentsDirty) {
             drawSegments(length, s);
             drawnLength = length;
+            segmentsDirty = false;
         }
         int tier = currentTier();
         if (tier != drawnTier) {
@@ -703,9 +771,10 @@ final class Factory {
                 item.placed = false;
             }
             ItemDisplay d = itemDisplays.get(item.display);
-            if (shownItem.get(item.display) != item.item) {
-                shownItem.set(item.display, item.item);
-                d.setItemStack(new ItemStack(item.item));
+            String look = item.look();
+            if (!look.equals(shownItem.get(item.display))) {
+                shownItem.set(item.display, look);
+                d.setItemStack(item.special == NORMAL ? new ItemStack(item.item) : modelItem(look));
             }
             d.setInterpolationDelay(0);
             // The first placement jumps straight there; after that every move glides over one update period.
@@ -734,8 +803,15 @@ final class Factory {
                 it.remove();
             }
         }
+        for (Iterator<Map.Entry<Integer, ItemDisplay>> it = segmentDisplays.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<Integer, ItemDisplay> e = it.next();
+            if (isBroken(e.getKey())) {
+                e.getValue().remove();
+                it.remove();
+            }
+        }
         for (int i = 0; i < length; i++) {
-            if (segmentDisplays.containsKey(i)) {
+            if (segmentDisplays.containsKey(i) || isBroken(i)) {
                 continue;
             }
             BeltPath.Segment seg = path.segments().get(i);
@@ -786,6 +862,369 @@ final class Factory {
 
     static String tag() {
         return TAG;
+    }
+
+    // ------------------------------------------------------------------ raids (region thread)
+
+    enum Hit { DAMAGED, BROKE, BROKEN_ALREADY, IDLE_SEGMENT, SHIELDED, GATE_CLOSED, RAID_CAP }
+
+    /** What a hit did, for the raider's message. */
+    record HitResult(Hit hit, int healthLeft, int maxHealth, long loot, int tokens, int caches, long shieldSeconds) {
+    }
+
+    int segmentIndex(int x, int y, int z) {
+        List<BeltPath.Segment> segs = path.segments();
+        for (int i = 0; i < segs.size(); i++) {
+            BlockVector c = segs.get(i).cell();
+            if (c.getBlockX() == x && c.getBlockY() == y && c.getBlockZ() == z) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    boolean isBroken(int i) {
+        return brokenAt != null && i >= 0 && i < brokenAt.length && brokenAt[i] > 0;
+    }
+
+    int brokenCount() {
+        int n = 0;
+        if (brokenAt != null) {
+            for (long b : brokenAt) {
+                if (b > 0) {
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
+
+    private int firstBroken(int length) {
+        if (brokenAt == null) {
+            return -1;
+        }
+        for (int i = 0; i < Math.min(length, brokenAt.length); i++) {
+            if (brokenAt[i] > 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void ensureArrays() {
+        if (health == null || health.length != path.size()) {
+            health = new int[path.size()];
+            java.util.Arrays.fill(health, -1);
+            brokenAt = new long[path.size()];
+            lastHit = new long[path.size()];
+        }
+    }
+
+    long shieldLeftSeconds() {
+        PlotData data = module.plotData(view.owner());
+        long left = data == null ? 0 : data.shieldUntil() - System.currentTimeMillis();
+        return Math.max(0, (left + 999) / 1000);
+    }
+
+    /** A raider hits belt segment {@code index}. Region thread. Only while the gate is open (raids need an open gate). */
+    HitResult hit(Player raider, int index, int damage) {
+        ensureArrays();
+        ProgressSettings ps = module.progress();
+        PlotData data = module.plotData(view.owner());
+        int maxHealth = ps.segmentHealth(data == null ? 0 : data.armorLevel());
+        if (gateClosed()) {
+            return new HitResult(Hit.GATE_CLOSED, 0, maxHealth, 0, 0, 0, 0);
+        }
+        long shield = shieldLeftSeconds();
+        if (shield > 0) {
+            return new HitResult(Hit.SHIELDED, 0, maxHealth, 0, 0, 0, shield);
+        }
+        if (index < 0 || index >= activeLength()) {
+            return new HitResult(Hit.IDLE_SEGMENT, 0, maxHealth, 0, 0, 0, 0);
+        }
+        if (isBroken(index)) {
+            return new HitResult(Hit.BROKEN_ALREADY, 0, maxHealth, 0, 0, 0, 0);
+        }
+        int done = raidCounts.getOrDefault(raider.getUniqueId(), 0);
+        if (done >= ps.segmentsPerRaid()) {
+            return new HitResult(Hit.RAID_CAP, 0, maxHealth, 0, 0, 0, 0);
+        }
+        long now = System.currentTimeMillis();
+        lastRaidHit = now;
+        lastHit[index] = now;
+        int hp = health[index] < 0 ? maxHealth : health[index];
+        hp -= Math.max(1, damage);
+        BlockVector c = path.segments().get(index).cell();
+        Location at = new Location(view.world(), c.getBlockX() + 0.5, c.getBlockY() + 0.6, c.getBlockZ() + 0.5);
+        if (hp > 0) {
+            health[index] = hp;
+            view.world().spawnParticle(org.bukkit.Particle.CRIT, at, 8, 0.3, 0.2, 0.3, 0.05);
+            view.world().playSound(at, Sound.BLOCK_ANVIL_LAND, 0.4f, 1.6f);
+            return new HitResult(Hit.DAMAGED, hp, maxHealth, 0, 0, 0, 0);
+        }
+        // Broken: the items on it spill and the raider takes a share; everything behind it stops.
+        health[index] = 0;
+        brokenAt[index] = now;
+        segmentsDirty = true;
+        FactorySettings s = module.settings();
+        int length = activeLength();
+        var raiderData = module.gensPlayer(raider.getUniqueId());
+        double share = ps.lootShare(raiderData == null ? 0 : raiderData.gearLevel());
+        long loot = 0;
+        int tokens = 0;
+        int caches = 0;
+        for (Iterator<BeltItem> it = items.iterator(); it.hasNext(); ) {
+            BeltItem item = it.next();
+            if (item.pos >= index - 0.5 && item.pos < index + 0.5) {
+                it.remove();
+                releaseDisplay(item);
+                view.world().spawnParticle(org.bukkit.Particle.ITEM, at, 10, 0.3, 0.3, 0.3, 0.08,
+                        new ItemStack(item.special == NORMAL ? item.item : Material.SUNFLOWER));
+                if (item.special == TOKEN) {
+                    tokens++;
+                } else if (item.special >= CACHE) {
+                    caches++;
+                    if (raiderData != null) {
+                        raiderData.addCache(item.special - CACHE, 1);
+                    }
+                } else {
+                    loot += Math.round(s.saleValue(item.baseCents, length) * share);
+                }
+            }
+        }
+        tokens += ps.tokensPerSegment();
+        if (raiderData != null) {
+            raiderData.addTokens(tokens);
+            if (done == 0) {
+                raiderData.addRaidWon();
+            }
+        }
+        if (loot > 0) {
+            module.pay(raider.getUniqueId(), loot);
+        }
+        raidCounts.merge(raider.getUniqueId(), 1, Integer::sum);
+        view.world().spawnParticle(org.bukkit.Particle.EXPLOSION, at, 1);
+        view.world().playSound(at, Sound.ENTITY_ITEM_BREAK, 1f, 0.7f);
+        view.world().playSound(at, Sound.BLOCK_CHAIN_BREAK, 1f, 0.6f);
+        long shieldSeconds = 0;
+        if (done + 1 >= ps.segmentsPerRaid() && data != null) {
+            // The raid cap is reached: the factory gets a shield so it is not raided again straight away.
+            data.setShieldUntil(now + ps.shieldMinutes() * 60_000L);
+            module.saveSoon(view.owner());
+            raidCounts.clear();
+            shieldSeconds = ps.shieldMinutes() * 60L;
+        }
+        module.raidLogged(raider, this, loot, tokens, caches, shieldSeconds);
+        return new HitResult(Hit.BROKE, 0, maxHealth, loot, tokens, caches, shieldSeconds);
+    }
+
+    /** Seconds until the owner may repair segment {@code i} (repairs wait a few seconds after the last hit). */
+    long repairWait(int i) {
+        if (lastHit == null || i < 0 || i >= lastHit.length) {
+            return 0;
+        }
+        long wait = lastHit[i] + module.progress().repairLockSeconds() * 1000L - System.currentTimeMillis();
+        return Math.max(0, (wait + 999) / 1000);
+    }
+
+    /** Repairs one broken segment now (the owner paid for it). Region thread. */
+    boolean repair(int i) {
+        if (!isBroken(i) || repairWait(i) > 0) {
+            return false;
+        }
+        brokenAt[i] = 0;
+        health[i] = -1;
+        segmentsDirty = true;
+        BlockVector c = path.segments().get(i).cell();
+        Location at = new Location(view.world(), c.getBlockX() + 0.5, c.getBlockY() + 0.6, c.getBlockZ() + 0.5);
+        view.world().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, at, 10, 0.3, 0.2, 0.3);
+        view.world().playSound(at, Sound.BLOCK_ANVIL_USE, 0.7f, 1.3f);
+        return true;
+    }
+
+    /** Broken segments mend themselves after a while, so an owner who is away is not stuck. */
+    private void autoRepair() {
+        if (brokenAt == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long after = module.progress().autoRepairSeconds() * 1000L;
+        for (int i = 0; i < brokenAt.length; i++) {
+            if (brokenAt[i] > 0) {
+                BlockVector c = path.segments().get(i).cell();
+                view.world().spawnParticle(org.bukkit.Particle.LARGE_SMOKE, c.getBlockX() + 0.5, c.getBlockY() + 0.7,
+                        c.getBlockZ() + 0.5, 2, 0.2, 0.1, 0.2, 0.01);
+                if (now - brokenAt[i] >= after) {
+                    brokenAt[i] = 0;
+                    health[i] = -1;
+                    segmentsDirty = true;
+                }
+            }
+        }
+        if (now - lastRaidHit > 120_000) {
+            raidCounts.clear();
+        }
+    }
+
+    // ------------------------------------------------------------------ defences (region thread)
+
+    private boolean intruder(Player p) {
+        return !p.getUniqueId().equals(view.owner()) && !p.hasPermission(FactoryModule.BYPASS) && !p.isDead()
+                && (p.getGameMode() == org.bukkit.GameMode.SURVIVAL || p.getGameMode() == org.bukkit.GameMode.ADVENTURE);
+    }
+
+    /** Alarm, traps and turret targets, once a second. */
+    private void defences(Player owner) {
+        PlotData data = module.plotData(view.owner());
+        Set<UUID> now = new HashSet<>();
+        List<Player> inside = new ArrayList<>();
+        for (Player p : view.world().getNearbyPlayers(base, view.size())) {
+            Location l = p.getLocation();
+            if (intruder(p) && view.contains(l.getBlockX(), l.getBlockZ())) {
+                now.add(p.getUniqueId());
+                if (view.inside(l.getBlockX(), l.getBlockZ())) {
+                    inside.add(p);
+                }
+            }
+        }
+        // Alarm: tell the owner who came in.
+        if (owner != null) {
+            for (UUID id : now) {
+                if (!intruders.contains(id)) {
+                    Player p = Bukkit.getPlayer(id);
+                    String name = p == null ? "Someone" : p.getName();
+                    Tasks.entity.run(owner, () -> {
+                        owner.sendMessage(Msg.bad(Msg.white(name) + " entered your factory!"));
+                        owner.playSound(owner.getLocation(), Sound.BLOCK_BELL_USE, 1f, 1.4f);
+                        owner.showTitle(net.kyori.adventure.title.Title.title(Msg.parse("<red><bold>INTRUDER"),
+                                Msg.parse("<white>" + Msg.escape(name) + " <gray>is in your factory")));
+                    });
+                }
+            }
+        }
+        intruders.clear();
+        intruders.addAll(now);
+        // Traps: slow intruders inside the walls; strong traps also throw them back toward the gate.
+        int traps = data == null ? 0 : Math.min(data.trapLevel(), module.progress().traps().max());
+        if (traps > 0 && !inside.isEmpty()) {
+            boolean shove = traps >= 3 && ++trapPulse % 4 == 0;
+            Location gate = outsideGate();
+            for (Player p : inside) {
+                Tasks.entity.run(p, () -> {
+                    p.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 30,
+                            Math.min(traps - 1, 3), false, true, true));
+                    if (shove) {
+                        Vector push = gate.toVector().subtract(p.getLocation().toVector()).setY(0);
+                        if (push.lengthSquared() > 0.01) {
+                            p.setVelocity(push.normalize().multiply(0.9).setY(0.35));
+                            p.playSound(p.getLocation(), Sound.ENTITY_SLIME_JUMP, 1f, 0.6f);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    /** Turrets: called every tick period; each active turret fires at the nearest intruder in range when ready. */
+    private void turrets() {
+        PlotData data = module.plotData(view.owner());
+        int level = data == null ? 0 : data.turretLevel();
+        List<BlockVector> spots = view.marker("turret");
+        int active = Math.min(level, spots.size());
+        if (active <= 0 || intruders.isEmpty()) {
+            return;
+        }
+        ProgressSettings ps = module.progress();
+        long now = System.currentTimeMillis();
+        long cooldownMs = Math.max(250, (ps.turretCooldownTicks() - 3L * (level - 1)) * 50L);
+        double damage = ps.turretDamage() + ps.turretDamagePerLevel() * (level - 1);
+        for (int t = 0; t < active; t++) {
+            if (turretReady.getOrDefault(t, 0L) > now) {
+                continue;
+            }
+            BlockVector spot = spots.get(t);
+            Location muzzle = new Location(view.world(), spot.getBlockX() + 0.5, spot.getBlockY() + 0.8, spot.getBlockZ() + 0.5);
+            Player target = null;
+            double best = ps.turretRange() * ps.turretRange();
+            for (UUID id : intruders) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null || !p.getWorld().equals(view.world())) {
+                    continue;
+                }
+                double d = p.getEyeLocation().distanceSquared(muzzle);
+                if (d < best) {
+                    best = d;
+                    target = p;
+                }
+            }
+            if (target == null) {
+                continue;
+            }
+            turretReady.put(t, now + cooldownMs);
+            Location eye = target.getLocation().add(0, 1.2, 0);
+            Vector dir = eye.toVector().subtract(muzzle.toVector());
+            double len = dir.length();
+            Vector step = dir.clone().normalize().multiply(0.4);
+            Location p = muzzle.clone();
+            org.bukkit.Particle.DustOptions red = new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(255, 40, 30), 0.9f);
+            for (double d = 0; d < len; d += 0.4) {
+                view.world().spawnParticle(org.bukkit.Particle.DUST, p, 1, 0, 0, 0, 0, red);
+                p.add(step);
+            }
+            view.world().playSound(muzzle, Sound.ENTITY_BLAZE_SHOOT, 0.7f, 1.6f);
+            aimTurret(t, dir);
+            Player victim = target;
+            UUID owner = view.owner();
+            Tasks.entity.run(victim, () -> {
+                if (victim.isDead()) {
+                    return;
+                }
+                victim.damage(damage);
+                if (victim.isDead() || victim.getHealth() <= 0) {
+                    module.rewards().turretKill(owner, victim);
+                }
+            });
+        }
+    }
+
+    private void drawTurrets() {
+        PlotData data = module.plotData(view.owner());
+        int level = data == null ? 0 : data.turretLevel();
+        List<BlockVector> spots = view.marker("turret");
+        for (int t = 0; t < Math.min(level, spots.size()); t++) {
+            BlockVector spot = spots.get(t);
+            Location at = new Location(view.world(), spot.getBlockX() + 0.5, spot.getBlockY() + 0.5, spot.getBlockZ() + 0.5);
+            turretDisplays.add(view.world().spawn(at, ItemDisplay.class, d -> {
+                d.setPersistent(false);
+                d.addScoreboardTag(TAG);
+                d.setItemStack(modelItem("turret"));
+                d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+                d.setTransformation(new Transformation(new Vector3f(), new Quaternionf(), new Vector3f(1, 1, 1), new Quaternionf()));
+            }));
+        }
+    }
+
+    /** Turns turret {@code t} to face along {@code dir} (smoothly). */
+    private void aimTurret(int t, Vector dir) {
+        if (t >= turretDisplays.size()) {
+            return;
+        }
+        ItemDisplay d = turretDisplays.get(t);
+        float yaw = (float) (Math.atan2(dir.getX(), dir.getZ()) + Math.PI);
+        d.setInterpolationDelay(0);
+        d.setInterpolationDuration(4);
+        d.setTransformation(new Transformation(new Vector3f(), new Quaternionf().rotateY(yaw), new Vector3f(1, 1, 1), new Quaternionf()));
+    }
+
+    /** The turret count changed (an upgrade): draw them again. */
+    void redrawTurrets() {
+        for (ItemDisplay t : turretDisplays) {
+            t.remove();
+        }
+        turretDisplays.clear();
+        if (drawn) {
+            drawTurrets();
+        }
     }
 
     static UUID ownerOf(Factory f) {

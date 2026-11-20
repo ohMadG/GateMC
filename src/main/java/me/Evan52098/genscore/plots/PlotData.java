@@ -22,6 +22,36 @@ public final class PlotData {
     private long shieldUntil;
     private int speedLevel;
     private int genLevel;
+    private int armorLevel;
+    private int turretLevel;
+    private int trapLevel;
+
+    /** Belt armour: each level adds health to every belt segment, so raids take longer. */
+    public synchronized int armorLevel() {
+        return armorLevel;
+    }
+
+    public synchronized void setArmorLevel(int level) {
+        armorLevel = Math.max(0, level);
+    }
+
+    /** Turrets on the towers: more turrets, more damage, faster fire. */
+    public synchronized int turretLevel() {
+        return turretLevel;
+    }
+
+    public synchronized void setTurretLevel(int level) {
+        turretLevel = Math.max(0, level);
+    }
+
+    /** Traps inside the walls: slow (and at higher levels throw back) intruders. */
+    public synchronized int trapLevel() {
+        return trapLevel;
+    }
+
+    public synchronized void setTrapLevel(int level) {
+        trapLevel = Math.max(0, level);
+    }
 
     PlotData(int beltLength, int lockLevel, long shieldUntil, int speedLevel, int genLevel) {
         this.beltLength = beltLength;
@@ -80,10 +110,13 @@ public final class PlotData {
         shieldUntil = 0;
         speedLevel = 0;
         genLevel = 0;
+        armorLevel = 0;
+        turretLevel = 0;
+        trapLevel = 0;
     }
 
     private synchronized Object[] snapshot() {
-        return new Object[]{beltLength, lockLevel, shieldUntil, speedLevel, genLevel};
+        return new Object[]{beltLength, lockLevel, shieldUntil, speedLevel, genLevel, armorLevel, turretLevel, trapLevel};
     }
 
     /** The player-data section for {@code gens_plots}. */
@@ -97,11 +130,15 @@ public final class PlotData {
             @Override
             public PlotData load(Connection c, UUID player) throws SQLException {
                 try (PreparedStatement ps = c.prepareStatement(
-                        "SELECT belt_length, lock_level, shield_until, speed_level, gen_level FROM gens_plots WHERE uuid = ?")) {
+                        "SELECT belt_length, lock_level, shield_until, speed_level, gen_level, armor_level, turret_level, trap_level FROM gens_plots WHERE uuid = ?")) {
                     ps.setString(1, player.toString());
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
-                            return new PlotData(rs.getInt(1), rs.getInt(2), rs.getLong(3), rs.getInt(4), rs.getInt(5));
+                            PlotData d = new PlotData(rs.getInt(1), rs.getInt(2), rs.getLong(3), rs.getInt(4), rs.getInt(5));
+                            d.armorLevel = rs.getInt(6);
+                            d.turretLevel = rs.getInt(7);
+                            d.trapLevel = rs.getInt(8);
+                            return d;
                         }
                     }
                 }
@@ -112,16 +149,22 @@ public final class PlotData {
             public void save(Connection c, UUID player, PlotData data) throws SQLException {
                 Object[] s = data.snapshot();
                 try (PreparedStatement ps = c.prepareStatement(
-                        "INSERT INTO gens_plots (uuid, belt_length, lock_level, shield_until, speed_level, gen_level) VALUES (?, ?, ?, ?, ?, ?) "
+                        "INSERT INTO gens_plots (uuid, belt_length, lock_level, shield_until, speed_level, gen_level, armor_level, turret_level, "
+                                + "trap_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
                                 + "ON CONFLICT (uuid) DO UPDATE SET belt_length = excluded.belt_length, "
                                 + "lock_level = excluded.lock_level, shield_until = excluded.shield_until, "
-                                + "speed_level = excluded.speed_level, gen_level = excluded.gen_level")) {
+                                + "speed_level = excluded.speed_level, gen_level = excluded.gen_level, "
+                                + "armor_level = excluded.armor_level, turret_level = excluded.turret_level, "
+                                + "trap_level = excluded.trap_level")) {
                     ps.setString(1, player.toString());
                     ps.setInt(2, (Integer) s[0]);
                     ps.setInt(3, (Integer) s[1]);
                     ps.setLong(4, (Long) s[2]);
                     ps.setInt(5, (Integer) s[3]);
                     ps.setInt(6, (Integer) s[4]);
+                    ps.setInt(7, (Integer) s[5]);
+                    ps.setInt(8, (Integer) s[6]);
+                    ps.setInt(9, (Integer) s[7]);
                     ps.executeUpdate();
                 }
             }

@@ -268,11 +268,13 @@ final class PlotTemplate {
                     for (int y = 1; y <= wallTop + 2; y++) {
                         put.accept(new int[]{c[0] + dx, y, c[1] + dz}, tower);
                     }
-                    if ((dx + dz) % 2 == 0) {
+                    if ((dx + dz) % 2 == 0 && !(dx == 1 && dz == 1)) {
                         put.accept(new int[]{c[0] + dx, wallTop + 3, c[1] + dz}, battlement);
                     }
                 }
             }
+            // The middle of each tower top is where a turret stands (drawn by the factory module).
+            markers.computeIfAbsent("turret", k -> new ArrayList<>()).add(new BlockVector(c[0] + 1, wallTop + 3, c[1] + 1));
         }
         // Gate frame and the door housing above the opening.
         for (int y = 1; y <= wallTop; y++) {

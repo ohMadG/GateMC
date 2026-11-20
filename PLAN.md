@@ -140,6 +140,32 @@ Not tested yet:
 - How the platform looks and feels in game (nobody has walked it yet).
 - PostgreSQL (the test server uses SQLite).
 
+## Progress, defences and raiding (2026-11-19)
+
+Decisions (MadG): raids happen only while the target's gate is open; all four defences; tokens and caches come from
+belt drops and milestones.
+
+- **Tokens** (a currency, a count in `gens_players`) drop on the belt (about 1 in 300 items), come from milestones,
+  raids and caches. Spent in `/tokens` (sell value +2%/level, drop luck +10%/level, Common caches) and `/defence`.
+- **Caches** (common, rare, epic, legendary; counts, never items, so they cannot be duplicated) drop on the belt
+  (about 1 in 900) and from milestones. `/caches` breaks them: money worth minutes of your income, tokens, a chance at
+  crate keys (keycrates module), and a small chance of a better cache. Pets are not built yet.
+- **Milestones** pay tokens (and some caches) once each: every 5 gen tiers, full belt, 2/4/6/8/10x speed, lifetime
+  earnings (x10 steps), raids won and raiders stopped, and 5 tokens per hour played.
+- **Defences** (tokens, `/defence`): gate time (+5s a level, 45s to 120s), belt armour (+50% segment health a level),
+  turrets on the four tower tops (aim and fire a beam at intruders; a turret kill counts as a defended raid), traps
+  (slowness; level 3+ throws intruders toward the gate), and an always-on alarm (title and sound when someone enters).
+- **Raiding**: with the Raid Pick (`/gear`), left-click belt segments in a factory whose gate is open. Segments have
+  health; a broken one spills its items (the raider takes a share, tokens and caches on it go to the raider) and stops
+  the belt behind it. After 3 segments the factory gets a 5 minute shield; new players get 15 minutes. Broken
+  segments mend after 90s, or the owner repairs one early (right-click) for half a minute of income, not within 5s of
+  the last hit. Every break is written to `gens_raid_log` and announced in chat.
+- **Gear** (money, `/gear`): +1 damage per hit and +2.5% loot share a level, 25 levels.
+
+Not tested yet: everything that needs two players (raid hits, loot, shields, turrets and traps firing, the alarm).
+Tested: database migration, the menus' data (tokens spent, gate time bought, milestones paid, caches gained), belt
+drops reaching the owner.
+
 ## Phase 0 decisions still open
 
 These come from the roadmap and must be answered before Phase 2 and 3 code: lock behaviour (fixed 45 s re-lock, or a

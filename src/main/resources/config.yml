@@ -83,6 +83,7 @@ plots:
       pad: {block: light_blue_glazed_terracotta, replace-with: 'minecraft:polished_diorite'}
       gate: {block: red_glazed_terracotta, replace-with: 'minecraft:air'}          # the doorway the garage door fills
       gate_button: {block: orange_glazed_terracotta, replace-with: 'minecraft:polished_blackstone_button[face=floor]'}
+      turret: {block: purple_glazed_terracotta, replace-with: 'minecraft:air'}   # where a turret stands (up to 4 used)
   build:
     blocks-per-tick: 2000        # template blocks placed per tick while building a plot
     clear-checks-per-tick: 8000  # positions checked per tick while clearing one
@@ -139,6 +140,49 @@ factory:
               beacon, dragon_egg]
     # tiers:                 # or list them by hand instead (this replaces the generated ones):
     #   - {name: Raw Copper, item: raw_copper, value: 1.0, price: 0}
+  drops:                     # special items that ride the belt now and then (drop luck in /tokens raises both)
+    token-chance: 0.0033     # per item made: about 1 in 300 is a token
+    cache-chance: 0.0011     # about 1 in 900 is a cache
+  caches:                    # broken in /caches
+    weights: {common: 70, rare: 22, epic: 7, legendary: 1}
+    money-minutes: {common: 2, rare: 10, epic: 30, legendary: 120}   # cash = this many minutes of your income (x0.5-1.5)
+    tokens:
+      common: {min: 1, max: 3}
+      rare: {min: 4, max: 10}
+      epic: {min: 12, max: 25}
+      legendary: {min: 40, max: 80}
+    key-chance: {common: 0.05, rare: 0.2, epic: 0.5, legendary: 1.0}
+    key-crates: [amethyst]   # crate keys a cache can give (keycrates module); one is picked at random
+  token-shop:                # prices in tokens; level n costs base-price * price-growth^n
+    value: {max-level: 50, base-price: 15, price-growth: 1.3, per-level: 0.02}    # +2% sale value a level
+    luck: {max-level: 20, base-price: 20, price-growth: 1.35, per-level: 0.10}    # +10% drop chance a level
+    cache-price: 25          # a Common cache
+  defences:                  # prices in tokens
+    gate-time: {max-level: 15, base-price: 5, price-growth: 1.35, per-level: 5}   # +5s closed a level (45s to 120s)
+    armor: {max-level: 10, base-price: 8, price-growth: 1.4, per-level: 0.5}      # +50% segment health a level
+    turrets: {max-level: 8, base-price: 15, price-growth: 1.45, per-level: 1}     # levels 1-4 add turrets; all levels add damage
+    traps: {max-level: 5, base-price: 10, price-growth: 1.5, per-level: 1}        # slowness; level 3+ throws raiders out
+    turret-range: 18
+    turret-damage: 2         # half-hearts a shot at level 1
+    turret-damage-per-level: 0.5
+    turret-cooldown-ticks: 40    # between shots, minus 3 a level
+  raid:                      # raids need the target's gate to be open
+    segment-health: 6        # hits to break a segment with no gear and no armour
+    hit-cooldown-ms: 250     # fastest a raider can hit
+    segments-per-raid: 3     # after this many the factory gets a shield
+    shield-minutes: 5
+    new-player-shield-minutes: 15
+    auto-repair-seconds: 90  # broken segments mend themselves after this
+    repair-cost-minutes: 0.5 # repairing early costs this many minutes of the owner's income
+    repair-lock-seconds: 5   # no repairs until this long after the last hit
+    loot-share: 0.4          # share of a broken segment's items the raider takes with no gear
+    tokens-per-segment: 1
+  gear:                      # raid gear, paid in money
+    max-level: 25
+    base-price: 2000
+    price-growth: 1.6
+    per-level: 1             # extra damage per hit a level
+    loot-share-per-level: 0.025
   visuals:
     max-items-drawn: 64      # item entities per belt; the money is worked out from data either way
     view-distance: 64        # belts are drawn only while a player is this close
