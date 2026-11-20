@@ -66,7 +66,8 @@ public final class PlotsModule implements GensModule, Listener {
                         + "lock_level INTEGER NOT NULL DEFAULT 0, shield_until BIGINT NOT NULL DEFAULT 0);"
                         + "CREATE TABLE IF NOT EXISTS gens_slots (slot INTEGER PRIMARY KEY, owner TEXT NOT NULL, since BIGINT NOT NULL)",
                 "CREATE TABLE IF NOT EXISTS gens_platforms (id INTEGER PRIMARY KEY, built_at BIGINT NOT NULL)",
-                "ALTER TABLE gens_plots ADD COLUMN speed_level INTEGER NOT NULL DEFAULT 0");
+                "ALTER TABLE gens_plots ADD COLUMN speed_level INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE gens_plots ADD COLUMN gen_level INTEGER NOT NULL DEFAULT 0");
 
         ConfigurationSection root = config();
         grid = PlotSettings.grid(root);

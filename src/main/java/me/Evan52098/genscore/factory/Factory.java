@@ -80,7 +80,25 @@ final class Factory {
     private boolean barShown;
 
     // ---- belt simulation (region thread only)
-    private final ArrayDeque<double[]> items = new ArrayDeque<>(); // [position]; first = oldest = furthest along
+    /** One item on the belt. It keeps the same display entity from the gen to the sell point, so it never jumps. */
+    private static final class BeltItem {
+        double pos;
+        int display = -1;
+        boolean placed; // its display has been put in place once (the first move is not animated)
+
+        BeltItem(double pos) {
+            this.pos = pos;
+        }
+    }
+
+    /** Where a new item appears: inside the gen's chute, just behind the start of the belt. */
+    private static final double SPAWN_POS = -0.55;
+    private final ArrayDeque<BeltItem> items = new ArrayDeque<>(); // first = oldest = furthest along
+    private final ArrayDeque<Integer> freeDisplays = new ArrayDeque<>();
+    private int drawnTier = -1;
+    private ItemDisplay machineDisplay;
+    private TextDisplay machineLabel;
+    private boolean machinePlaced;
     private double genTimer;
     private long pendingCents;
     private int depositCountdown;
@@ -191,6 +209,10 @@ final class Factory {
 
     private void tick() {
         FactorySettings s = module.settings();
+        if (!machinePlaced) {
+            machinePlaced = true;
+            placeMachineBlock();
+        }
         Player owner = Bukkit.getPlayer(view.owner());
         ownerOnline = owner != null;
         tickGate(owner);
@@ -416,26 +438,32 @@ final class Factory {
     private void simulate(FactorySettings s) {
         int length = activeLength();
         if (length <= 0) {
+            for (BeltItem item : items) {
+                releaseDisplay(item);
+            }
             items.clear();
             return;
         }
-        double speed = s.speed(module.plotData(view.owner()) == null ? 0 : module.plotData(view.owner()).speedLevel());
+        PlotData data = module.plotData(view.owner());
+        double speed = s.speed(data == null ? 0 : data.speedLevel());
+        int tier = data == null ? 0 : data.genLevel();
         genTimer += DT;
         if (genTimer >= s.genIntervalSeconds()) {
-            double[] newest = items.peekLast();
-            if (newest == null || newest[0] >= 1.0) { // one item per segment: the gen waits when the start is full
-                items.addLast(new double[]{0});
+            BeltItem newest = items.peekLast();
+            if (newest == null || newest.pos >= SPAWN_POS + 1.0) { // one item per segment: the gen waits when the start is full
+                items.addLast(new BeltItem(SPAWN_POS));
                 genTimer -= s.genIntervalSeconds();
             } else {
                 genTimer = s.genIntervalSeconds();
             }
         }
-        for (double[] item : items) {
-            item[0] += speed * DT;
+        for (BeltItem item : items) {
+            item.pos += speed * DT;
         }
-        long value = s.itemValue(length);
-        while (!items.isEmpty() && items.peekFirst()[0] >= length) {
-            items.pollFirst();
+        long value = s.itemValue(length, tier);
+        while (!items.isEmpty() && items.peekFirst().pos >= length) {
+            BeltItem sold = items.pollFirst();
+            releaseDisplay(sold);
             pendingCents += value;
             earnings.addLast(new long[]{System.currentTimeMillis(), value});
         }
@@ -502,24 +530,114 @@ final class Factory {
         drawn = true;
         drawnLength = -1;
         FactorySettings s = module.settings();
-        List<BlockVector> pads = view.marker("pad");
-        if (!pads.isEmpty()) {
-            BlockVector p = pads.get(0);
-            genDisplay = view.world().spawn(new Location(view.world(), p.getBlockX(), p.getBlockY() + 1, p.getBlockZ()), BlockDisplay.class, d -> {
-                d.setPersistent(false);
-                d.addScoreboardTag(TAG);
-                d.setBlock(Bukkit.createBlockData("minecraft:blast_furnace[lit=true]"));
-            });
-        }
+        drawMachine(s);
+        int tier = currentTier();
+        drawnTier = tier;
+        freeDisplays.clear();
         for (int i = 0; i < s.maxDrawnItems(); i++) {
+            freeDisplays.add(i);
             itemDisplays.add(view.world().spawn(base, ItemDisplay.class, d -> {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);
-                d.setItemStack(new ItemStack(s.beltItem()));
+                d.setItemStack(new ItemStack(s.tier(tier).item()));
                 d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
                 d.setViewRange(1.0f);
+                // The display sits in the middle of the factory and is moved to its spot on the belt. Without a
+                // culling box as big as the factory the game hides it whenever the middle is off screen (flicker).
+                d.setDisplayWidth(view.size() + 2);
+                d.setDisplayHeight(4);
                 d.setTransformation(itemTransform(null, false));
             }));
+        }
+        for (BeltItem item : items) {
+            item.display = -1;
+            item.placed = false;
+        }
+    }
+
+    private int currentTier() {
+        PlotData data = module.plotData(view.owner());
+        return data == null ? 0 : data.genLevel();
+    }
+
+    /** The cell just behind the start of the belt, where the gen machine stands. */
+    private BlockVector machineCell() {
+        if (path.size() == 0) {
+            return null;
+        }
+        BeltPath.Segment first = path.segments().get(0);
+        return new BlockVector(first.cell().getBlockX() - first.dx(), first.cell().getBlockY(), first.cell().getBlockZ() - first.dz());
+    }
+
+    boolean isMachine(int x, int y, int z) {
+        BlockVector m = machineCell();
+        return m != null && m.getBlockX() == x && m.getBlockY() == y && m.getBlockZ() == z;
+    }
+
+    /** A barrier in the machine's cell makes it solid and clickable even while it is not drawn. */
+    private void placeMachineBlock() {
+        BlockVector m = machineCell();
+        if (m == null) {
+            return;
+        }
+        Block b = view.world().getBlockAt(m.getBlockX(), m.getBlockY(), m.getBlockZ());
+        if (b.getType().isAir()) {
+            b.setType(Material.BARRIER, false);
+        }
+    }
+
+    private void drawMachine(FactorySettings s) {
+        BlockVector m = machineCell();
+        if (m == null) {
+            return;
+        }
+        BeltPath.Segment first = path.segments().get(0);
+        float yaw = (float) (Math.atan2(first.dx(), first.dz()) + Math.PI + Math.toRadians(s.modelYawOffset()));
+        Location at = new Location(view.world(), m.getBlockX() + 0.5, m.getBlockY() + 0.5, m.getBlockZ() + 0.5);
+        machineDisplay = view.world().spawn(at, ItemDisplay.class, d -> {
+            d.setPersistent(false);
+            d.addScoreboardTag(TAG);
+            d.setItemStack(modelItem("gen_machine"));
+            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            d.setTransformation(new Transformation(new Vector3f(), new Quaternionf().rotateY(yaw), new Vector3f(1, 1, 1), new Quaternionf()));
+        });
+        machineLabel = view.world().spawn(at.clone().add(0, 0.9, 0), TextDisplay.class, d -> {
+            d.setPersistent(false);
+            d.addScoreboardTag(TAG);
+            d.setBillboard(Display.Billboard.CENTER);
+            d.setDefaultBackground(false);
+            d.setBackgroundColor(org.bukkit.Color.fromARGB(120, 0, 0, 0));
+        });
+        updateMachineLabel(s);
+    }
+
+    private void updateMachineLabel(FactorySettings s) {
+        if (machineLabel == null || !machineLabel.isValid()) {
+            return;
+        }
+        int tier = currentTier();
+        FactorySettings.GenTier t = s.tier(tier);
+        machineLabel.text(Msg.parse("<gold><bold>GEN</bold></gold> <white>Tier " + (tier + 1) + "</white>\n<yellow>"
+                + Msg.escape(t.name()) + "</yellow> <gray>" + Money.format(t.valueCents()) + " base</gray>"));
+    }
+
+    private static ItemStack modelItem(String model) {
+        ItemStack stack = new ItemStack(Material.PAPER);
+        ItemMeta meta = stack.getItemMeta();
+        meta.setItemModel(new NamespacedKey("genscore", model));
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private void releaseDisplay(BeltItem item) {
+        if (item.display >= 0) {
+            if (item.display < itemDisplays.size()) {
+                ItemDisplay d = itemDisplays.get(item.display);
+                d.setInterpolationDuration(0);
+                d.setTransformation(itemTransform(null, false));
+            }
+            freeDisplays.add(item.display);
+            item.display = -1;
         }
     }
 
@@ -533,7 +651,7 @@ final class Factory {
             d.remove();
         }
         itemDisplays.clear();
-        for (Entity e : new Entity[]{sellDisplay, sellLabel, genDisplay}) {
+        for (Entity e : new Entity[]{sellDisplay, sellLabel, genDisplay, machineDisplay, machineLabel}) {
             if (e != null) {
                 e.remove();
             }
@@ -541,6 +659,13 @@ final class Factory {
         sellDisplay = null;
         sellLabel = null;
         genDisplay = null;
+        machineDisplay = null;
+        machineLabel = null;
+        freeDisplays.clear();
+        for (BeltItem item : items) {
+            item.display = -1;
+            item.placed = false;
+        }
         drawnLength = -1;
     }
 
@@ -550,21 +675,32 @@ final class Factory {
             drawSegments(length, s);
             drawnLength = length;
         }
-        // Items: the oldest (furthest along) first, so the ones about to be sold are always drawn.
-        int i = 0;
-        for (double[] item : items) {
-            if (i >= itemDisplays.size()) {
-                break;
+        int tier = currentTier();
+        if (tier != drawnTier) {
+            drawnTier = tier;
+            ItemStack stack = new ItemStack(s.tier(tier).item());
+            for (ItemDisplay d : itemDisplays) {
+                d.setItemStack(stack);
             }
-            ItemDisplay d = itemDisplays.get(i++);
-            d.setInterpolationDelay(0);
-            d.setInterpolationDuration(PERIOD_TICKS);
-            d.setTransformation(itemTransform(path.at(item[0]), true));
+            updateMachineLabel(s);
         }
-        for (; i < itemDisplays.size(); i++) {
-            ItemDisplay d = itemDisplays.get(i);
-            d.setInterpolationDuration(0);
-            d.setTransformation(itemTransform(null, false));
+        // Each item keeps one display from the gen to the sell point. New items take a free display; when there are
+        // none free the item rides undrawn (the money is worked out from the data either way).
+        for (BeltItem item : items) {
+            if (item.display < 0) {
+                Integer free = freeDisplays.poll();
+                if (free == null) {
+                    continue;
+                }
+                item.display = free;
+                item.placed = false;
+            }
+            ItemDisplay d = itemDisplays.get(item.display);
+            d.setInterpolationDelay(0);
+            // The first placement jumps straight there; after that every move glides over one update period.
+            d.setInterpolationDuration(item.placed ? PERIOD_TICKS : 0);
+            d.setTransformation(itemTransform(path.at(item.pos), true));
+            item.placed = true;
         }
     }
 
@@ -600,11 +736,9 @@ final class Factory {
             };
             int fx = seg.kind() == BeltPath.Kind.STRAIGHT ? seg.dx() : seg.inDx();
             int fz = seg.kind() == BeltPath.Kind.STRAIGHT ? seg.dz() : seg.inDz();
-            float yaw = (float) Math.atan2(fx, fz) + (float) Math.toRadians(s.modelYawOffset());
-            ItemStack stack = new ItemStack(Material.PAPER);
-            ItemMeta meta = stack.getItemMeta();
-            meta.setItemModel(new NamespacedKey("genscore", model));
-            stack.setItemMeta(meta);
+            // Item displays draw their item turned half a circle (like item frames), so add PI to face the right way.
+            float yaw = (float) (Math.atan2(fx, fz) + Math.PI + Math.toRadians(s.modelYawOffset()));
+            ItemStack stack = modelItem(model);
             Location at = new Location(view.world(), c.getBlockX() + 0.5, c.getBlockY() + 0.5, c.getBlockZ() + 0.5);
             segmentDisplays.put(i, view.world().spawn(at, ItemDisplay.class, d -> {
                 d.setPersistent(false);
@@ -629,7 +763,7 @@ final class Factory {
                 d.addScoreboardTag(TAG);
                 d.setBlock(Bukkit.createBlockData("minecraft:hopper"));
             });
-            long value = s.itemValue(length);
+            long value = s.itemValue(length, currentTier());
             sellLabel = view.world().spawn(at.clone().add(0.5, 1.4, 0.5), TextDisplay.class, d -> {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);

@@ -1,0 +1,827 @@
+{
+  "credit": "GensCore conveyor belt (tools/build_pack.py)",
+  "texture_size": [
+    16,
+    16
+  ],
+  "textures": {
+    "steel": "genscore:item/conveyor/steel",
+    "hazard": "genscore:item/conveyor/hazard",
+    "dark": "genscore:item/conveyor/dark",
+    "roller": "genscore:item/conveyor/roller",
+    "glow": "genscore:item/conveyor/glow",
+    "vent": "genscore:item/conveyor/vent",
+    "particle": "genscore:item/conveyor/steel"
+  },
+  "elements": [
+    {
+      "name": "base",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        2,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "east": {
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "south": {
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "west": {
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#dark"
+        }
+      }
+    },
+    {
+      "name": "body",
+      "from": [
+        1,
+        2,
+        1
+      ],
+      "to": [
+        15,
+        14,
+        13
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            1,
+            2,
+            15,
+            14
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            3,
+            2,
+            15,
+            14
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            1,
+            2,
+            15,
+            14
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            1,
+            2,
+            13,
+            14
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            1,
+            1,
+            15,
+            13
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            1,
+            3,
+            15,
+            15
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "band",
+      "from": [
+        0.9,
+        4,
+        0.9
+      ],
+      "to": [
+        15.1,
+        5,
+        13.1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.9000000000000004,
+            11,
+            15.1,
+            12
+          ],
+          "texture": "#hazard"
+        },
+        "east": {
+          "uv": [
+            2.9000000000000004,
+            11,
+            15.1,
+            12
+          ],
+          "texture": "#hazard"
+        },
+        "south": {
+          "uv": [
+            0.9,
+            11,
+            15.1,
+            12
+          ],
+          "texture": "#hazard"
+        },
+        "west": {
+          "uv": [
+            0.9,
+            11,
+            13.1,
+            12
+          ],
+          "texture": "#hazard"
+        }
+      }
+    },
+    {
+      "name": "vent_top",
+      "from": [
+        3,
+        14,
+        3
+      ],
+      "to": [
+        13,
+        15.5,
+        11
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3,
+            0.5,
+            13,
+            2
+          ],
+          "texture": "#vent"
+        },
+        "east": {
+          "uv": [
+            5,
+            0.5,
+            13,
+            2
+          ],
+          "texture": "#vent"
+        },
+        "south": {
+          "uv": [
+            3,
+            0.5,
+            13,
+            2
+          ],
+          "texture": "#vent"
+        },
+        "west": {
+          "uv": [
+            3,
+            0.5,
+            11,
+            2
+          ],
+          "texture": "#vent"
+        },
+        "up": {
+          "uv": [
+            3,
+            3,
+            13,
+            11
+          ],
+          "texture": "#vent"
+        },
+        "down": {
+          "uv": [
+            3,
+            5,
+            13,
+            13
+          ],
+          "texture": "#vent"
+        }
+      }
+    },
+    {
+      "name": "core_west",
+      "from": [
+        0.4,
+        6,
+        3
+      ],
+      "to": [
+        1,
+        12,
+        10
+      ],
+      "faces": {
+        "west": {
+          "uv": [
+            3,
+            4,
+            10,
+            10
+          ],
+          "texture": "#glow"
+        }
+      },
+      "light_emission": 15
+    },
+    {
+      "name": "core_east",
+      "from": [
+        15,
+        6,
+        3
+      ],
+      "to": [
+        15.6,
+        12,
+        10
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            4,
+            13,
+            10
+          ],
+          "texture": "#glow"
+        }
+      },
+      "light_emission": 15
+    },
+    {
+      "name": "chute_floor",
+      "from": [
+        3,
+        8,
+        13
+      ],
+      "to": [
+        13,
+        9,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3,
+            7,
+            13,
+            8
+          ],
+          "texture": "#dark"
+        },
+        "east": {
+          "uv": [
+            0,
+            7,
+            3,
+            8
+          ],
+          "texture": "#dark"
+        },
+        "south": {
+          "uv": [
+            3,
+            7,
+            13,
+            8
+          ],
+          "texture": "#dark"
+        },
+        "west": {
+          "uv": [
+            13,
+            7,
+            16,
+            8
+          ],
+          "texture": "#dark"
+        },
+        "up": {
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ],
+          "texture": "#dark"
+        },
+        "down": {
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "texture": "#dark"
+        }
+      }
+    },
+    {
+      "name": "chute_west",
+      "from": [
+        3,
+        9,
+        13
+      ],
+      "to": [
+        4,
+        13,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            12,
+            3,
+            13,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            3,
+            3,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            3,
+            3,
+            4,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            13,
+            3,
+            16,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            3,
+            13,
+            4,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            3,
+            0,
+            4,
+            3
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "chute_east",
+      "from": [
+        12,
+        9,
+        13
+      ],
+      "to": [
+        13,
+        13,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3,
+            3,
+            4,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            3,
+            3,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            12,
+            3,
+            13,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            13,
+            3,
+            16,
+            7
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            12,
+            13,
+            13,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            12,
+            0,
+            13,
+            3
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "chute_roof",
+      "from": [
+        3,
+        13,
+        13
+      ],
+      "to": [
+        13,
+        14,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3,
+            2,
+            13,
+            3
+          ],
+          "texture": "#steel"
+        },
+        "east": {
+          "uv": [
+            0,
+            2,
+            3,
+            3
+          ],
+          "texture": "#steel"
+        },
+        "south": {
+          "uv": [
+            3,
+            2,
+            13,
+            3
+          ],
+          "texture": "#steel"
+        },
+        "west": {
+          "uv": [
+            13,
+            2,
+            16,
+            3
+          ],
+          "texture": "#steel"
+        },
+        "up": {
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ],
+          "texture": "#steel"
+        },
+        "down": {
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "chute_glow",
+      "from": [
+        4,
+        9,
+        13.05
+      ],
+      "to": [
+        12,
+        13,
+        13.1
+      ],
+      "faces": {
+        "south": {
+          "uv": [
+            4,
+            3,
+            12,
+            7
+          ],
+          "texture": "#glow"
+        }
+      },
+      "light_emission": 12
+    },
+    {
+      "name": "pipe_a",
+      "from": [
+        3,
+        3,
+        0
+      ],
+      "to": [
+        5,
+        13,
+        1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            11,
+            3,
+            13,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "east": {
+          "uv": [
+            15,
+            3,
+            16,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "south": {
+          "uv": [
+            3,
+            3,
+            5,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "west": {
+          "uv": [
+            0,
+            3,
+            1,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "up": {
+          "uv": [
+            3,
+            0,
+            5,
+            1
+          ],
+          "texture": "#roller"
+        },
+        "down": {
+          "uv": [
+            3,
+            15,
+            5,
+            16
+          ],
+          "texture": "#roller"
+        }
+      }
+    },
+    {
+      "name": "pipe_b",
+      "from": [
+        11,
+        3,
+        0
+      ],
+      "to": [
+        13,
+        13,
+        1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3,
+            3,
+            5,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "east": {
+          "uv": [
+            15,
+            3,
+            16,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "south": {
+          "uv": [
+            11,
+            3,
+            13,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "west": {
+          "uv": [
+            0,
+            3,
+            1,
+            13
+          ],
+          "texture": "#roller"
+        },
+        "up": {
+          "uv": [
+            11,
+            0,
+            13,
+            1
+          ],
+          "texture": "#roller"
+        },
+        "down": {
+          "uv": [
+            11,
+            15,
+            13,
+            16
+          ],
+          "texture": "#roller"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        225,
+        0
+      ],
+      "scale": [
+        0.625,
+        0.625,
+        0.625
+      ]
+    },
+    "ground": {
+      "translation": [
+        0,
+        3,
+        0
+      ],
+      "scale": [
+        0.25,
+        0.25,
+        0.25
+      ]
+    },
+    "fixed": {
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        75,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        2.5,
+        0
+      ],
+      "scale": [
+        0.375,
+        0.375,
+        0.375
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        45,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    }
+  }
+}

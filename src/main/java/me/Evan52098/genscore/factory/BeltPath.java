@@ -60,8 +60,9 @@ final class BeltPath {
         }
         int i = (int) Math.floor(p);
         double f = p - i;
-        if (i < 0) {
-            return surface(0);
+        if (p < 0) { // still in the gen's chute, behind the start
+            Segment first = segments.get(0);
+            return surface(0).add(new Vector(first.dx() * p, -1.0 / 16, first.dz() * p));
         }
         if (i >= segments.size() - 1) {
             Segment last = segments.get(segments.size() - 1);

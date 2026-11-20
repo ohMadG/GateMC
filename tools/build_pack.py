@@ -26,6 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PACK = os.path.join(ROOT, "resourcepack")
 NS = "genscore"
 RESOURCE_MAJOR, RESOURCE_MINOR = 97, 1
+OUT = 0.06  # how far side panels stand outside the block (in 1/16 block), to avoid z-fighting with the slab
 
 
 # ---------------------------------------------------------------------- PNG writing (no Pillow needed)
@@ -124,18 +125,52 @@ def roller():
     return 16, 16, rows
 
 
+def glow(frames=6):
+    """Hot orange core that pulses."""
+    rows = []
+    for f in range(frames):
+        k = 0.8 + 0.2 * abs(f - frames / 2) / (frames / 2)
+        for y in range(16):
+            row = []
+            for x in range(16):
+                d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5 / 10.6
+                c = (255, int(150 + 90 * (1 - d)), int(40 + 60 * (1 - d)), 255)
+                row.append(shade(c, k * (0.9 + 0.15 * noise(x, y, 17 + f))))
+            rows.append(row)
+    return 16, 16 * frames, rows
+
+
+def vent():
+    """Dark grille: slots with a lighter rim."""
+    base = (48, 52, 58, 255)
+    rows = []
+    for y in range(16):
+        row = []
+        for x in range(16):
+            c = shade(base, 0.95 + 0.1 * noise(x, y, 19))
+            if y % 3 == 1 and 2 <= x <= 13:
+                c = (14, 14, 16, 255)
+            if x in (0, 15) or y in (0, 15):
+                c = shade(base, 1.3)
+            row.append(c)
+        rows.append(row)
+    return 16, 16, rows
+
+
 TEXTURES = {
     "belt": belt_frames,
     "steel": steel,
     "hazard": hazard,
     "dark": dark,
     "roller": roller,
+    "glow": glow,
+    "vent": vent,
 }
 
 
 # ---------------------------------------------------------------------- geometry
 
-def box(name, frm, to, tex, faces=("north", "east", "south", "west", "up", "down"), uv=None):
+def box(name, frm, to, tex, faces=("north", "east", "south", "west", "up", "down"), uv=None, light=0):
     """A cuboid using one texture on the given faces; uv per face is worked out from the box size."""
     out = {}
     x1, y1, z1 = frm
@@ -150,14 +185,19 @@ def box(name, frm, to, tex, faces=("north", "east", "south", "west", "up", "down
     }
     for f in faces:
         out[f] = {"uv": (uv or {}).get(f, auto[f]), "texture": "#" + tex}
-    return {"name": name, "from": list(frm), "to": list(to), "faces": out}
+    el = {"name": name, "from": list(frm), "to": list(to), "faces": out}
+    if light:
+        el["light_emission"] = light
+    return el
 
 
 def straight():
     e = []
     # Side frames: full-height steel panels, so the slab under the belt is hidden.
-    e.append(box("frame_west", (0, 0, 0), (2, 10, 16), "steel"))
-    e.append(box("frame_east", (14, 0, 0), (16, 10, 16), "steel"))
+    # Side frames: full-height steel panels set a hair outside the block (OUT), so they never sit in the same plane
+    # as the slab under the belt (that made the sides flicker).
+    e.append(box("frame_west", (-OUT, 0, 0), (2, 10, 16), "steel", faces=("north", "east", "south", "west", "down")))
+    e.append(box("frame_east", (14, 0, 0), (16 + OUT, 10, 16), "steel", faces=("north", "east", "south", "west", "down")))
     # Hazard-striped tops of the frames.
     e.append(box("rail_west", (0, 10, 0), (2, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")))
     e.append(box("rail_east", (14, 10, 0), (16, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")))
@@ -178,9 +218,9 @@ def corner(right):
     """Belt entering from -Z (north). Left turn leaves toward -X (west), right toward +X (east)."""
     e = []
     if right:
-        outer_side = box("frame_west", (0, 0, 0), (2, 10, 16), "steel")             # outside of the bend
-        outer_back = box("frame_south", (2, 0, 14), (16, 10, 16), "steel")
-        post = box("post_ne", (14, 0, 0), (16, 10, 2), "steel")                      # inner corner post
+        outer_side = box("frame_west", (-OUT, 0, 0), (2, 10, 16 + OUT), "steel")   # outside of the bend
+        outer_back = box("frame_south", (2, 0, 14), (16, 10, 16 + OUT), "steel")
+        post = box("post_ne", (14, 0, -OUT), (16 + OUT, 10, 2), "steel")            # inner corner post
         rails = [box("rail_w", (0, 10, 0), (2, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")),
                  box("rail_s", (2, 10, 14), (16, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")),
                  box("rail_post", (14, 10, 0), (16, 10.5, 2), "hazard", faces=("up", "north", "south", "east", "west"))]
@@ -188,9 +228,9 @@ def corner(right):
         rollers = [box("roller_0", (2, 4, 1), (14, 8, 3), "roller", faces=("north", "south", "up", "down")),
                    box("roller_1", (13, 4, 2), (15, 8, 14), "roller", faces=("east", "west", "up", "down"))]
     else:
-        outer_side = box("frame_east", (14, 0, 0), (16, 10, 16), "steel")
-        outer_back = box("frame_south", (0, 0, 14), (14, 10, 16), "steel")
-        post = box("post_nw", (0, 0, 0), (2, 10, 2), "steel")
+        outer_side = box("frame_east", (14, 0, 0), (16 + OUT, 10, 16 + OUT), "steel")
+        outer_back = box("frame_south", (0, 0, 14), (14, 10, 16 + OUT), "steel")
+        post = box("post_nw", (-OUT, 0, -OUT), (2, 10, 2), "steel")
         rails = [box("rail_e", (14, 10, 0), (16, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")),
                  box("rail_s", (0, 10, 14), (14, 10.5, 16), "hazard", faces=("up", "north", "south", "east", "west")),
                  box("rail_post", (0, 10, 0), (2, 10.5, 2), "hazard", faces=("up", "north", "south", "east", "west"))]
@@ -202,10 +242,32 @@ def corner(right):
     return e
 
 
+def gen_machine():
+    """The gen: a machine with an output chute on its +Z side at belt height. Items come out of the chute."""
+    e = []
+    e.append(box("base", (0, 0, 0), (16, 2, 16), "dark"))
+    e.append(box("body", (1, 2, 1), (15, 14, 13), "steel"))
+    e.append(box("band", (0.9, 4, 0.9), (15.1, 5, 13.1), "hazard", faces=("north", "east", "south", "west")))
+    e.append(box("vent_top", (3, 14, 3), (13, 15.5, 11), "vent"))
+    e.append(box("core_west", (0.4, 6, 3), (1, 12, 10), "glow", faces=("west",), light=15))
+    e.append(box("core_east", (15, 6, 3), (15.6, 12, 10), "glow", faces=("east",), light=15))
+    # Output chute: floor at belt height (8..10), open at the +Z end.
+    e.append(box("chute_floor", (3, 8, 13), (13, 9, 16), "dark"))
+    e.append(box("chute_west", (3, 9, 13), (4, 13, 16), "steel"))
+    e.append(box("chute_east", (12, 9, 13), (13, 13, 16), "steel"))
+    e.append(box("chute_roof", (3, 13, 13), (13, 14, 16), "steel"))
+    e.append(box("chute_glow", (4, 9, 13.05), (12, 13, 13.1), "glow", faces=("south",), light=12))
+    # Pipes on the back.
+    e.append(box("pipe_a", (3, 3, 0), (5, 13, 1), "roller"))
+    e.append(box("pipe_b", (11, 3, 0), (13, 13, 1), "roller"))
+    return e
+
+
 MODELS = {
     "conveyor_belt": straight,
     "conveyor_corner_left": lambda: corner(False),
     "conveyor_corner_right": lambda: corner(True),
+    "gen_machine": gen_machine,
 }
 
 
@@ -218,7 +280,8 @@ def write(path, data, binary=False):
 
 
 def java_model(elements):
-    tex = {name: "%s:item/conveyor/%s" % (NS, name) for name in TEXTURES}
+    used = {f["texture"][1:] for el in elements for f in el["faces"].values()}
+    tex = {name: "%s:item/conveyor/%s" % (NS, name) for name in TEXTURES if name in used}
     tex["particle"] = tex["steel"]
     return {
         "credit": "GensCore conveyor belt (tools/build_pack.py)",
@@ -248,7 +311,7 @@ def bbmodel(name, elements, pngs):
             "render_mode": "default", "visible": True, "saved": True, "uuid": str(uuid.uuid4()),
             "relative_path": "../assets/genscore/textures/item/conveyor/" + tname + ".png",
             "source": "data:image/png;base64," + base64.b64encode(data["png"]).decode(),
-            "frame_time": 2 if tname == "belt" else 1,
+            "frame_time": {"belt": 2, "glow": 3}.get(tname, 1),
         })
     els = []
     for el in elements:
@@ -257,7 +320,7 @@ def bbmodel(name, elements, pngs):
             faces[fname] = {"uv": face["uv"], "texture": int(tex_ids[face["texture"][1:]])}
         els.append({"name": el["name"], "box_uv": False, "rescale": False, "locked": False, "from": el["from"],
                     "to": el["to"], "autouv": 0, "color": 0, "origin": [8, 8, 8], "faces": faces, "type": "cube",
-                    "uuid": str(uuid.uuid4())})
+                    "light_emission": el.get("light_emission", 0), "uuid": str(uuid.uuid4())})
     return {
         "meta": {"format_version": "4.10", "model_format": "java_block", "box_uv": False},
         "name": name, "parent": "", "ambientocclusion": True, "front_gui_light": False,
@@ -279,6 +342,8 @@ def main():
         write(os.path.join(PACK, "assets", NS, "textures", "item", "conveyor", name + ".png"), data, binary=True)
     write(os.path.join(PACK, "assets", NS, "textures", "item", "conveyor", "belt.png.mcmeta"),
           json.dumps({"animation": {"frametime": 2, "interpolate": False}}, indent=2) + "\n")
+    write(os.path.join(PACK, "assets", NS, "textures", "item", "conveyor", "glow.png.mcmeta"),
+          json.dumps({"animation": {"frametime": 3, "interpolate": True}}, indent=2) + "\n")
 
     for name, fn in MODELS.items():
         elements = fn()

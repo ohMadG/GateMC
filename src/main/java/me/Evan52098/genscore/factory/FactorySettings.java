@@ -20,16 +20,28 @@ import java.util.Map;
  * @param lengthBasePrice    price of the first length upgrade, in cents
  * @param lengthGrowth       each length upgrade costs this much more than the one before
  * @param genIntervalSeconds seconds between items from the gen; caps throughput at 1 / interval
- * @param itemBaseCents      what an item is worth if sold straight off the gen
+ * @param genTiers           what the gen makes at each tier: the item, its base value and the price of the tier
  * @param valuePerSegment    each belt segment an item rides adds this fraction of its base value
  * @param depositSeconds     earnings are paid into the owner's balance this often (one ledger entry each time)
  */
 record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpeed, List<SpeedLevel> speedLevels,
                        int lengthStep, long lengthBasePrice, double lengthGrowth, double genIntervalSeconds,
-                       long itemBaseCents, double valuePerSegment, int depositSeconds, Material beltItem,
+                       List<GenTier> genTiers, double valuePerSegment, int depositSeconds,
                        int maxDrawnItems, int viewDistance, float modelYawOffset, Pack pack) {
 
     record SpeedLevel(double speed, long price) {
+    }
+
+    record GenTier(String name, Material item, long valueCents, long price) {
+    }
+
+    GenTier tier(int level) {
+        return genTiers.get(Math.max(0, Math.min(level, genTiers.size() - 1)));
+    }
+
+    /** Price of going from gen tier {@code level} to the next, or -1 at the top. */
+    long nextTierPrice(int level) {
+        return level + 1 < genTiers.size() ? genTiers.get(level + 1).price() : -1;
     }
 
     record Pack(String url, String sha1, boolean required, String prompt) {
@@ -56,9 +68,9 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         return Math.round(lengthBasePrice * Math.pow(lengthGrowth, done));
     }
 
-    /** What one item is worth after riding {@code segments} segments, in cents. */
-    long itemValue(int segments) {
-        return Math.round(itemBaseCents * (1 + valuePerSegment * segments));
+    /** What one item from gen tier {@code tier} is worth after riding {@code segments} segments, in cents. */
+    long itemValue(int segments, int tier) {
+        return Math.round(tier(tier).valueCents() * (1 + valuePerSegment * segments));
     }
 
     static FactorySettings from(ConfigurationSection root) {
@@ -80,7 +92,24 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             }
         }
         Material door = Material.matchMaterial(root.getString("gate.door-block", "light_gray_concrete"));
-        Material item = Material.matchMaterial(root.getString("belt.item", "raw_gold"));
+        List<GenTier> tiers = new ArrayList<>();
+        for (Map<?, ?> m : root.getMapList("gen.tiers")) {
+            Material item = m.get("item") == null ? null : Material.matchMaterial(String.valueOf(m.get("item")));
+            Object value = m.get("value");
+            Object price = m.get("price");
+            if (item != null && item.isItem() && value instanceof Number v) {
+                tiers.add(new GenTier(String.valueOf(m.get("name") == null ? item.name() : m.get("name")), item,
+                        Money.toCents(v.doubleValue()), price instanceof Number p ? Money.toCents(p.doubleValue()) : 0));
+            }
+        }
+        if (tiers.isEmpty()) {
+            tiers.add(new GenTier("Raw Copper", Material.RAW_COPPER, 100, 0));
+            tiers.add(new GenTier("Raw Iron", Material.RAW_IRON, 250, Money.toCents(500)));
+            tiers.add(new GenTier("Raw Gold", Material.RAW_GOLD, 600, Money.toCents(2500)));
+            tiers.add(new GenTier("Emerald", Material.EMERALD, 1500, Money.toCents(10000)));
+            tiers.add(new GenTier("Diamond", Material.DIAMOND, 4000, Money.toCents(40000)));
+            tiers.add(new GenTier("Netherite Scrap", Material.NETHERITE_SCRAP, 10000, Money.toCents(150000)));
+        }
         return new FactorySettings(
                 Math.max(1, root.getInt("gate.close-seconds", 45)),
                 door != null && door.isBlock() ? door : Material.LIGHT_GRAY_CONCRETE,
@@ -90,10 +119,9 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
                 Money.toCents(Math.max(0, root.getDouble("belt.length-base-price", 100))),
                 Math.max(1.0, root.getDouble("belt.length-price-growth", 1.3)),
                 Math.max(0.05, root.getDouble("belt.gen-interval-seconds", 0.5)),
-                Money.toCents(Math.max(0, root.getDouble("belt.item-value", 1.0))),
+                List.copyOf(tiers),
                 Math.max(0, root.getDouble("belt.value-per-segment", 0.10)),
                 Math.max(1, root.getInt("belt.deposit-every-seconds", 5)),
-                item != null && item.isItem() ? item : Material.RAW_GOLD,
                 Math.max(0, root.getInt("visuals.max-items-drawn", 24)),
                 Math.max(16, root.getInt("visuals.view-distance", 64)),
                 (float) root.getDouble("visuals.model-yaw-offset", 0),

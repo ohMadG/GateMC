@@ -217,7 +217,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                 return;
             }
             closeGate(p, f);
-        } else if (f.path.contains(b.getX(), b.getY(), b.getZ())) {
+        } else if (f.path.contains(b.getX(), b.getY(), b.getZ()) || f.isMachine(b.getX(), b.getY(), b.getZ())) {
             event.setCancelled(true);
             openMenu(p, f);
         }
@@ -332,10 +332,13 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         Menu menu = new Menu(3, Msg.parse(owner ? "<dark_gray>Your belt" : "<dark_gray>" + Msg.escape(String.valueOf(ownerName)) + "'s belt"));
         int length = f.activeLength();
         int level = data.speedLevel();
+        int tier = data.genLevel();
+        FactorySettings.GenTier gen = s.tier(tier);
         menu.set(10, Lore.item(Material.HOPPER, "&6Belt", Lore.builder(Lore.Accent.WHITE)
                 .stat("Length", length + " / " + f.path.size() + " segments")
                 .stat("Speed", fmt(s.speed(level)) + " segments/s")
-                .stat("Item value", Money.format(s.itemValue(length)))
+                .stat("Gen", "Tier " + (tier + 1) + ": " + gen.name())
+                .stat("Item value", Money.format(s.itemValue(length, tier)))
                 .stat("Income", Money.format(f.incomePerMinute) + " / min")
                 .stat("Items on belt", String.valueOf(f.itemsOnBelt))
                 .divider()
@@ -354,9 +357,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                     ? Lore.builder(Lore.Accent.GREEN).stat("Length", length + " segments").description("The belt fills the factory.")
                     : Lore.builder(Lore.Accent.GREEN).stat("Now", length + " segments")
                     .stat("Next", Math.min(f.path.size(), data.beltLength() + s.lengthStep()) + " segments")
-                    .stat("Item value then", Money.format(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()))))
+                    .stat("Item value then", Money.format(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
                     .stat("Price", Money.format(s.lengthPrice(done))).clickPrompt("buy"))
                     .build()), e -> buyLength(p, f));
+            long tierPrice = s.nextTierPrice(tier);
+            menu.set(13, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), "&6Gen upgrade", (tierPrice < 0
+                    ? Lore.builder(Lore.Accent.WHITE).stat("Gen", "Tier " + (tier + 1) + ": " + gen.name()).description("Top tier.")
+                    : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.name() + " (" + Money.format(gen.valueCents()) + ")")
+                    .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).name() + " (" + Money.format(s.tier(tier + 1).valueCents()) + ")")
+                    .stat("Item value then", Money.format(s.itemValue(length, tier + 1)))
+                    .stat("Price", Money.format(tierPrice)).clickPrompt("buy"))
+                    .build()), e -> buyTier(p, f));
             boolean shut = f.gateClosed();
             menu.set(16, Lore.item(shut ? Material.IRON_DOOR : Material.OAK_DOOR, shut ? "&aGate closed" : "&cGate OPEN",
                     Lore.builder(shut ? Lore.Accent.GREEN : Lore.Accent.RED)
@@ -388,6 +399,27 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plugin.playerData().saveSoon(p.getUniqueId());
         p.sendMessage(Msg.good("Belt speed upgraded to " + Msg.white(fmt(settings.speed(level + 1)) + " segments/s") + "."));
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
+        openMenu(p, f);
+    }
+
+    private void buyTier(Player p, Factory f) {
+        PlotData data = plotData(p.getUniqueId());
+        if (data == null) {
+            return;
+        }
+        int tier = data.genLevel();
+        long price = settings.nextTierPrice(tier);
+        if (price < 0) {
+            p.sendMessage(Msg.neutral("Your gen is already the top tier."));
+            return;
+        }
+        if (!withdraw(p, price, "gen tier " + (tier + 2))) {
+            return;
+        }
+        data.setGenLevel(tier + 1); // checklist 1: the money is taken first
+        plugin.playerData().saveSoon(p.getUniqueId());
+        p.sendMessage(Msg.good("Gen upgraded: it now makes " + Msg.white(settings.tier(tier + 1).name()) + "."));
+        p.playSound(p.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1.2f);
         openMenu(p, f);
     }
 
