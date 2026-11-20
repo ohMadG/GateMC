@@ -537,8 +537,8 @@ wipe:
     - {module: vouchers, id: returns, label: vouchers owed back, table: pvp_voucher_returns, key-column: uuid, category: items}
     - {module: daily, id: claims, label: daily reward claims, table: pvp_daily_claims, key-column: uuid, category: progress}
     - {module: daily, id: stats, label: daily reward streak, table: pvp_daily_stats, key-column: uuid, category: progress}
-    - {module: plots, id: plot, label: plot upgrades (belt length, lock level, shield), table: gens_plots, key-column: uuid, category: progress}
-    - {module: plots, id: progress, label: rebirths, table: gens_players, key-column: uuid, category: progress}
+    - {module: plots, id: plot, label: 'plot upgrades, gen tier, defences and shield', table: gens_plots, key-column: uuid, category: progress}
+    - {module: plots, id: progress, label: 'tokens, caches, milestones, gear and rebirths', table: gens_players, key-column: uuid, category: progress}
     - {module: vote, id: stats, label: vote totals and streak, table: pvp_vote_stats, key-column: uuid, category: progress}
     - {module: settings, id: settings, label: personal settings, table: pvp_settings, key-column: uuid, category: identity}
     - {module: mail, id: inbox, label: mail inbox, table: pvp_mail, key-column: recipient_uuid, category: identity}
