@@ -134,9 +134,15 @@ final class ProgressMenus {
                             .clickPrompt("break one").description("Shift-click: break up to 10.").build());
             icon.setAmount(Math.max(1, Math.min(64, count)));
             menu.set(10 + r * 2, icon, e -> {
-                int n = e.isShiftClick() ? 10 : 1;
+                if (!e.isShiftClick()) {
+                    // One cache: the spinning reel.
+                    if (!module.rewards().openAnimated(p, rarity)) {
+                        p.sendMessage(Msg.bad("You have no " + ProgressSettings.RARITY_NAMES[rarity] + " caches."));
+                    }
+                    return;
+                }
                 int opened = 0;
-                for (int i = 0; i < n; i++) {
+                for (int i = 0; i < 10; i++) {
                     if (!module.rewards().open(p, rarity)) {
                         break;
                     }

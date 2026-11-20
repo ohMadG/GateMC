@@ -658,8 +658,28 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plugin.playerData().saveSoon(p.getUniqueId());
         p.sendMessage(Msg.good("Belt speed upgraded" + (bought > 1 ? " " + bought + " times" : "") + " to "
                 + Msg.white(mult(settings, data.speedLevel())) + "."));
-        p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
+        celebrate(p, "<aqua><bold>SPEED UP", "<white>" + mult(settings, data.speedLevel()) + " belt speed", false);
         openMenu(p, f);
+    }
+
+    /** Title, sound and a burst of particles (a firework for the big ones) when something good happens. */
+    void celebrate(Player p, String title, String subtitle, boolean big) {
+        p.showTitle(net.kyori.adventure.title.Title.title(Msg.parse(title), Msg.parse(subtitle),
+                net.kyori.adventure.title.Title.Times.times(java.time.Duration.ofMillis(100), java.time.Duration.ofMillis(1400),
+                        java.time.Duration.ofMillis(400))));
+        p.playSound(p.getLocation(), big ? Sound.UI_TOAST_CHALLENGE_COMPLETE : Sound.ENTITY_PLAYER_LEVELUP, 1f, big ? 1f : 1.4f);
+        p.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, p.getLocation().add(0, 1, 0), 25, 0.5, 0.7, 0.5, 0.1);
+        if (big) {
+            p.getWorld().spawn(p.getLocation().add(0, 1.5, 0), org.bukkit.entity.Firework.class, fw -> {
+                var meta = fw.getFireworkMeta();
+                meta.addEffect(org.bukkit.FireworkEffect.builder().with(org.bukkit.FireworkEffect.Type.BALL_LARGE)
+                        .withColor(org.bukkit.Color.YELLOW, org.bukkit.Color.ORANGE).withFade(org.bukkit.Color.WHITE)
+                        .flicker(true).trail(true).build());
+                fw.setFireworkMeta(meta);
+                fw.setPersistent(false);
+                fw.detonate();
+            });
+        }
     }
 
     private void buyTier(Player p, Factory f, boolean many) {
@@ -693,7 +713,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         int now = data.genLevel();
         p.sendMessage(Msg.good("Gen upgraded" + (bought > 1 ? " " + bought + " tiers" : "") + " to tier " + (now + 1) + ": it now makes "
                 + Msg.white(settings.tier(now).mix()) + "."));
-        p.playSound(p.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1.2f);
+        celebrate(p, "<gold><bold>GEN TIER " + (now + 1), "<yellow>" + Msg.escape(settings.tier(now).mix()), bought > 1 || now % 10 == 0);
         openMenu(p, f);
     }
 
@@ -727,7 +747,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plugin.playerData().saveSoon(p.getUniqueId());
         p.sendMessage(Msg.good("Belt extended" + (bought > 1 ? " " + bought + " times" : "") + " to "
                 + Msg.white(data.beltLength() + " segments") + "."));
-        p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_USE, 0.7f, 1.4f);
+        celebrate(p, "<green><bold>BELT EXTENDED", "<white>" + data.beltLength() + " segments", data.beltLength() >= f.path.size());
         openMenu(p, f);
     }
 

@@ -112,13 +112,13 @@ factory:
     speed:                   # speed upgrades, generated: 1.25x, 1.5x ... up to max-multiplier x the start speed
       max-multiplier: 10     # 10x = 5 segments a second
       step: 0.25             # 36 upgrades from 1x to 10x
-      base-price: 150        # the first speed upgrade
-      price-growth: 1.35     # each costs this much more than the last (all 36: about $21M)
+      base-price: 800        # the first speed upgrade
+      price-growth: 1.5      # each costs this much more than the last (10x after about 95 hours of play)
     # speed-levels:          # or list them by hand instead (this replaces the generated ones):
     #   - {speed: 0.75, price: 150}
     length-step: 2           # segments added per length upgrade
-    length-base-price: 100   # first length upgrade
-    length-price-growth: 1.3 # each length upgrade costs this much more than the last
+    length-base-price: 200   # first length upgrade
+    length-price-growth: 1.5 # each length upgrade costs this much more than the last (full belt after about a day)
     gen-interval-seconds: 0.1    # fastest the gen can make items (10 a second); it waits while the start of the belt is full
     value-per-segment: 0.10  # each working belt segment adds 10% of the item's base value
     deposit-every-seconds: 5 # earnings are paid into the balance this often (one ledger line each time)
@@ -128,8 +128,13 @@ factory:
       count: 150
       base-value: 1          # the first item's value; each tier's average is worth about value-growth times the last
       value-growth: 1.12
-      base-price: 300        # tier 2 price; each tier costs price-growth times the one before (tier 1 is free)
+      # Prices: tier 2 costs base-price; each next tier costs (price-growth + early extra) times the one before, the
+      # early extra fading over early-fade-tiers. Quick at the start, then each tier takes longer than the last.
+      # An efficient player (tools/balance_sim.py): tier 11 ~1h, 26 ~4h, 51 ~20h, 101 ~180h, 150 ~800h of play.
+      base-price: 100
       price-growth: 1.135
+      early-extra-growth: 0.25
+      early-fade-tiers: 40
       items: [cobblestone, coal, raw_copper, copper_ingot, raw_iron, iron_ingot, redstone, lapis_lazuli, raw_gold,
               gold_ingot, quartz, amethyst_shard, slime_ball, honeycomb, resin_clump, armadillo_scute, turtle_scute,
               rabbit_foot, glowstone_dust, magma_cream, prismarine_shard, prismarine_crystals, emerald, diamond,

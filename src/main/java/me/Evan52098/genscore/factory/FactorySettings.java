@@ -142,8 +142,17 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         int count = Math.max(1, root.getInt("gen.generate.count", 150));
         double baseValue = Math.max(0.01, root.getDouble("gen.generate.base-value", 1));
         double valueGrowth = Math.max(1, root.getDouble("gen.generate.value-growth", 1.12));
-        double basePrice = Math.max(0, root.getDouble("gen.generate.base-price", 300));
+        double basePrice = Math.max(0, root.getDouble("gen.generate.base-price", 100));
         double priceGrowth = Math.max(1, root.getDouble("gen.generate.price-growth", 1.135));
+        // Early tiers get extra price growth that fades out: quick at the start, then each tier takes longer than the
+        // last. Tuned with tools/balance_sim.py.
+        double earlyExtra = Math.max(0, root.getDouble("gen.generate.early-extra-growth", 0.25));
+        double earlyFade = Math.max(1, root.getDouble("gen.generate.early-fade-tiers", 40));
+        double[] priceFactor = new double[Math.max(1, count)];
+        priceFactor[0] = 1;
+        for (int t = 1; t < priceFactor.length; t++) {
+            priceFactor[t] = priceFactor[t - 1] * (priceGrowth + earlyExtra * Math.exp(-(t - 1) / earlyFade));
+        }
         List<GenTier> out = new ArrayList<>(count);
         // Blend: tier t sits at position x along the item list (tier 1 = the first item, the last tier = the last item).
         // Between two items the gen makes both, the next one's share growing with x, so every tier is a small step.
@@ -179,7 +188,8 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
                 avg += o.valueCents() * o.weight();
             }
             average = Math.round(avg);
-            long price = t == 0 ? 0 : Math.round(basePrice * Math.pow(priceGrowth, t - 1) * 100);
+            double priceDollars = t == 0 ? 0 : basePrice * priceFactor[t - 1];
+            long price = priceDollars * 100 >= Long.MAX_VALUE / 2 ? Long.MAX_VALUE / 2 : Math.round(priceDollars * 100);
             out.add(new GenTier(name, main, average, price, List.copyOf(outputs)));
         }
         return out;
@@ -223,8 +233,8 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             // Generated: from 1x to belt.speed.max-multiplier times the start speed, in equal steps.
             double max = Math.max(1, root.getDouble("belt.speed.max-multiplier", 10));
             double step = Math.max(0.01, root.getDouble("belt.speed.step", 0.25));
-            double price = Math.max(0, root.getDouble("belt.speed.base-price", 150));
-            double growth = Math.max(1, root.getDouble("belt.speed.price-growth", 1.35));
+            double price = Math.max(0, root.getDouble("belt.speed.base-price", 800));
+            double growth = Math.max(1, root.getDouble("belt.speed.price-growth", 1.5));
             int n = 0;
             for (double mult = 1 + step; mult <= max + 1e-9; mult += step) {
                 levels.add(new SpeedLevel(startSpeed * mult, Math.round(price * Math.pow(growth, n++) * 100)));
@@ -250,8 +260,8 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
                 startSpeed,
                 List.copyOf(levels),
                 Math.max(1, root.getInt("belt.length-step", 2)),
-                Money.toCents(Math.max(0, root.getDouble("belt.length-base-price", 100))),
-                Math.max(1.0, root.getDouble("belt.length-price-growth", 1.3)),
+                Money.toCents(Math.max(0, root.getDouble("belt.length-base-price", 200))),
+                Math.max(1.0, root.getDouble("belt.length-price-growth", 1.5)),
                 Math.max(0.05, root.getDouble("belt.gen-interval-seconds", 0.1)),
                 List.copyOf(tiers),
                 Math.max(0, root.getDouble("belt.value-per-segment", 0.10)),

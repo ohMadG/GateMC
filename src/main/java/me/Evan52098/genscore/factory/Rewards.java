@@ -78,11 +78,93 @@ final class Rewards {
         return Math.max(5000, Math.round(perMinute)); // at least $50
     }
 
-    /** Breaks one cache of this rarity. Player thread. Returns false if they have none. */
+    /** What came out of a cache: chat lines, and the icon of the best part (where the reel stops). */
+    record Loot(List<String> lines, org.bukkit.Material icon, String iconName) {
+    }
+
+    /** Breaks one cache of this rarity with titles (used for breaking several at once). Player thread. */
     boolean open(Player p, int rarity) {
+        Loot loot = roll(p, rarity);
+        if (loot == null) {
+            return false;
+        }
+        showTitles(p, rarity, loot.lines());
+        return true;
+    }
+
+    /**
+     * Breaks one cache with a spinning reel: a row of prizes scrolls past, slows down and stops on what came out.
+     * The loot is given before the reel starts, so closing the menu early loses nothing. Player thread.
+     */
+    boolean openAnimated(Player p, int rarity) {
+        Loot loot = roll(p, rarity);
+        if (loot == null) {
+            return false;
+        }
+        String color = ProgressSettings.RARITY_COLORS[rarity];
+        me.Evan52098.genscore.menu.Menu menu = new me.Evan52098.genscore.menu.Menu(3,
+                Msg.parse("<dark_gray>Opening " + ProgressSettings.RARITY_NAMES[rarity] + " cache"));
+        org.bukkit.Material[] pool = {org.bukkit.Material.GOLD_INGOT, org.bukkit.Material.SUNFLOWER, org.bukkit.Material.TRIPWIRE_HOOK,
+                org.bukkit.Material.EMERALD, org.bukkit.Material.DIAMOND, org.bukkit.Material.CHEST, org.bukkit.Material.GOLD_NUGGET,
+                org.bukkit.Material.ENDER_CHEST, org.bukkit.Material.AMETHYST_SHARD};
+        int finalOffset = 26;
+        org.bukkit.Material[] strip = new org.bukkit.Material[finalOffset + 9];
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        for (int i = 0; i < strip.length; i++) {
+            strip[i] = pool[r.nextInt(pool.length)];
+        }
+        strip[finalOffset + 4] = loot.icon();
+        org.bukkit.Material frame = rarity == 0 ? org.bukkit.Material.WHITE_STAINED_GLASS_PANE : rarity == 1 ? org.bukkit.Material.LIGHT_BLUE_STAINED_GLASS_PANE
+                : rarity == 2 ? org.bukkit.Material.MAGENTA_STAINED_GLASS_PANE : org.bukkit.Material.ORANGE_STAINED_GLASS_PANE;
+        for (int i = 0; i < 27; i++) {
+            if (i < 9 || i >= 18) {
+                menu.set(i, pane(i == 4 || i == 22 ? org.bukkit.Material.HOPPER : org.bukkit.Material.GRAY_STAINED_GLASS_PANE, " "), null);
+            }
+        }
+        menu.open(p);
+        spin(p, menu, strip, 0, finalOffset, rarity, loot, frame, color);
+        return true;
+    }
+
+    private void spin(Player p, me.Evan52098.genscore.menu.Menu menu, org.bukkit.Material[] strip, int offset, int finalOffset,
+                      int rarity, Loot loot, org.bukkit.Material frame, String color) {
+        if (!p.isOnline()) {
+            return;
+        }
+        for (int i = 0; i < 9; i++) {
+            menu.set(9 + i, pane(strip[offset + i], " "), null);
+        }
+        if (offset >= finalOffset) {
+            // Landed: light the frame in the rarity's colour and show the prize.
+            for (int i = 0; i < 27; i++) {
+                if (i < 9 || i >= 18) {
+                    menu.set(i, pane(frame, " "), null);
+                }
+            }
+            org.bukkit.inventory.ItemStack prize = me.Evan52098.genscore.menu.Lore.item(loot.icon(), "&f" + loot.iconName(),
+                    loot.lines().stream().map(l -> "&7" + net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                            .serialize(Msg.parse(l))).toList());
+            menu.set(13, prize, null);
+            showTitles(p, rarity, loot.lines());
+            return;
+        }
+        float pitch = 0.6f + 1.2f * offset / finalOffset;
+        p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.4f, pitch);
+        // Fast at first, slowing down for the last few steps.
+        int left = finalOffset - offset;
+        long delay = left > 12 ? 1 : left > 6 ? 2 : left > 3 ? 4 : 7;
+        Tasks.entity.later(p, () -> spin(p, menu, strip, offset + 1, finalOffset, rarity, loot, frame, color), delay);
+    }
+
+    private static org.bukkit.inventory.ItemStack pane(org.bukkit.Material m, String name) {
+        return me.Evan52098.genscore.menu.Lore.item(m, name, List.of());
+    }
+
+    /** Takes one cache and gives what is in it. Returns null if they have none. Player thread. */
+    Loot roll(Player p, int rarity) {
         GensPlayer g = module.gensPlayer(p.getUniqueId());
         if (g == null || !g.takeCache(rarity)) { // take first
-            return false;
+            return null;
         }
         ProgressSettings ps = module.progress();
         ThreadLocalRandom r = ThreadLocalRandom.current();
@@ -100,12 +182,24 @@ final class Rewards {
                 lines.add("<aqua>+1 " + Msg.escape(crate) + " key</aqua>");
             }
         }
+        org.bukkit.Material icon = org.bukkit.Material.GOLD_INGOT;
+        String iconName = Money.compact(money);
+        if (lines.size() > 2) {
+            icon = org.bukkit.Material.TRIPWIRE_HOOK;
+            iconName = "Crate key";
+        }
         // A small chance at a better cache inside the cache.
         if (rarity < 3 && r.nextDouble() < 0.08) {
             g.addCache(rarity + 1, 1);
             lines.add(ProgressSettings.RARITY_COLORS[rarity + 1] + "+1 " + ProgressSettings.RARITY_NAMES[rarity + 1] + " cache");
+            icon = org.bukkit.Material.ENDER_CHEST;
+            iconName = ProgressSettings.RARITY_NAMES[rarity + 1] + " cache";
         }
         module.saveSoon(p.getUniqueId());
+        return new Loot(List.copyOf(lines), icon, iconName);
+    }
+
+    private void showTitles(Player p, int rarity, List<String> lines) {
         String color = ProgressSettings.RARITY_COLORS[rarity];
         p.playSound(p.getLocation(), Sound.BLOCK_CHEST_LOCKED, 1f, 0.8f);
         p.showTitle(Title.title(Msg.parse(color + "<bold>Cracking...</bold>"), Msg.parse("<gray>" + ProgressSettings.RARITY_NAMES[rarity] + " cache"),
@@ -118,8 +212,11 @@ final class Rewards {
             p.playSound(p.getLocation(), rarity >= 2 ? Sound.UI_TOAST_CHALLENGE_COMPLETE : Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
             p.getWorld().spawnParticle(rarity >= 2 ? Particle.TOTEM_OF_UNDYING : Particle.HAPPY_VILLAGER,
                     p.getLocation().add(0, 1, 0), 40, 0.6, 0.8, 0.6, 0.2);
+            if (rarity >= 2) {
+                module.celebrate(p, color + "<bold>" + ProgressSettings.RARITY_NAMES[rarity].toUpperCase() + " CACHE",
+                        String.join(" <dark_gray>|</dark_gray> ", lines), true);
+            }
         }, 18);
-        return true;
     }
 
     // ------------------------------------------------------------------ milestones
@@ -192,7 +289,7 @@ final class Rewards {
             String line = "<gold><bold>MILESTONE</bold></gold> <white>" + Msg.escape(m.name()) + "</white> <yellow>+" + m.tokens() + " tokens</yellow>" + cache;
             Tasks.entity.run(owner, () -> {
                 owner.sendMessage(Msg.parse(line));
-                owner.playSound(owner.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8f, 1.2f);
+                module.celebrate(owner, "<gold><bold>MILESTONE", "<white>" + Msg.escape(m.name()) + " <yellow>+" + m.tokens() + " tokens", true);
             });
         }
         if (any) {

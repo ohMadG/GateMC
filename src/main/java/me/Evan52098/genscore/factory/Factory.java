@@ -128,6 +128,12 @@ final class Factory {
     private int trapPulse;
     private int turretTick;
 
+    // ---- effects (region thread)
+    private boolean emitted;        // the gen made an item this tick: pulse the machine
+    private boolean machinePulsed;  // the machine is scaled up and must settle back
+    private long popupCents;        // sold this second, shown as a floating "+$X" over the sell point
+    private int salesThisTick;
+
     private final java.util.Random random = new java.util.Random();
     private final List<String> shownItem = new ArrayList<>(); // what each item display shows now
 
@@ -464,6 +470,19 @@ final class Factory {
     }
 
     private void animateDoor(boolean shut) {
+        Location g = gateCenter();
+        if (shut) {
+            Tasks.region.later(g, () -> {
+                view.world().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK, g.clone().add(0, 0.1, 0), 30, 1.6, 0.05, 0.3, 0.15);
+                view.world().spawnParticle(org.bukkit.Particle.BLOCK, g.clone().add(0, 0.1, 0), 20, 1.6, 0.05, 0.3, 0,
+                        module.settings().doorBlock().createBlockData());
+                view.world().playSound(g, Sound.BLOCK_IRON_DOOR_CLOSE, 1f, 0.5f);
+                view.world().playSound(g, Sound.BLOCK_ANVIL_LAND, 0.4f, 0.6f);
+            }, 22);
+        } else {
+            view.world().spawnParticle(org.bukkit.Particle.CLOUD, g.clone().add(0, 3, 0), 12, 1.5, 0.2, 0.3, 0.02);
+            view.world().playSound(g, Sound.BLOCK_IRON_DOOR_OPEN, 1f, 0.6f);
+        }
         for (int k = 0; k < slats.size(); k++) {
             BlockDisplay d = slats.get(k);
             if (!d.isValid()) {
@@ -507,6 +526,7 @@ final class Factory {
                     special = TOKEN;
                 }
                 items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents(), special));
+                emitted = true;
                 genTimer -= s.genIntervalSeconds();
             } else {
                 genTimer = s.genIntervalSeconds();
@@ -528,12 +548,15 @@ final class Factory {
             }
             long value = Math.round(s.saleValue(sold.baseCents, length) * boost);
             pendingCents += value;
+            popupCents += value;
+            salesThisTick++;
             earnings.addLast(new long[]{System.currentTimeMillis(), value});
         }
         itemsOnBelt = items.size();
     }
 
     private void everySecond(Player owner, FactorySettings s) {
+        salePopup();
         autoRepair();
         defences(owner);
         long cutoff = System.currentTimeMillis() - 60_000;
@@ -626,6 +649,100 @@ final class Factory {
         for (BeltItem item : items) {
             item.display = -1;
             item.placed = false;
+        }
+    }
+
+    /** Small effects every update: the gen pulses and puffs when it makes an item; the sell point sparkles. */
+    private void effects() {
+        if (machineDisplay != null && machineDisplay.isValid()) {
+            if (emitted) {
+                Transformation t = machineDisplay.getTransformation();
+                machineDisplay.setInterpolationDelay(0);
+                machineDisplay.setInterpolationDuration(1);
+                machineDisplay.setTransformation(new Transformation(new Vector3f(0, 0.02f, 0), t.getLeftRotation(),
+                        new Vector3f(1.07f, 0.94f, 1.07f), t.getRightRotation()));
+                machinePulsed = true;
+                Vector chute = path.size() > 0 ? path.at(-0.45) : null;
+                if (chute != null) {
+                    view.world().spawnParticle(org.bukkit.Particle.SMOKE, chute.getX(), chute.getY() + 0.2, chute.getZ(), 2, 0.08, 0.05, 0.08, 0.01);
+                }
+            } else if (machinePulsed) {
+                Transformation t = machineDisplay.getTransformation();
+                machineDisplay.setInterpolationDelay(0);
+                machineDisplay.setInterpolationDuration(3);
+                machineDisplay.setTransformation(new Transformation(new Vector3f(), t.getLeftRotation(), new Vector3f(1, 1, 1), t.getRightRotation()));
+                machinePulsed = false;
+            }
+        }
+        emitted = false;
+        if (salesThisTick > 0) {
+            Vector end = path.size() > 0 ? path.at(activeLength()) : null;
+            if (end != null) {
+                view.world().spawnParticle(org.bukkit.Particle.WAX_ON, end.getX(), end.getY() + 0.3, end.getZ(),
+                        Math.min(6, 1 + salesThisTick), 0.2, 0.15, 0.2, 0.5);
+            }
+        }
+        salesThisTick = 0;
+    }
+
+    /** A floating "+$X" that rises over the sell point and fades, once a second. */
+    private void salePopup() {
+        long cents = popupCents;
+        popupCents = 0;
+        if (cents <= 0 || !drawn || path.size() == 0) {
+            return;
+        }
+        Vector end = path.at(activeLength());
+        Location at = new Location(view.world(), end.getX(), end.getY() + 1.0, end.getZ());
+        TextDisplay popup = view.world().spawn(at, TextDisplay.class, d -> {
+            d.setPersistent(false);
+            d.addScoreboardTag(TAG);
+            d.setBillboard(Display.Billboard.CENTER);
+            d.setDefaultBackground(false);
+            d.setBackgroundColor(org.bukkit.Color.fromARGB(0, 0, 0, 0));
+            d.setShadowed(true);
+            d.text(Msg.parse("<green><bold>+" + Money.compact(cents) + "</bold></green>"));
+            d.setTransformation(new Transformation(new Vector3f(), new Quaternionf(), new Vector3f(0.6f, 0.6f, 0.6f), new Quaternionf()));
+        });
+        Tasks.region.later(at, () -> {
+            if (popup.isValid()) {
+                popup.setInterpolationDelay(0);
+                popup.setInterpolationDuration(18);
+                popup.setTransformation(new Transformation(new Vector3f(0, 1.1f, 0), new Quaternionf(), new Vector3f(1.1f, 1.1f, 1.1f), new Quaternionf()));
+            }
+        }, 2);
+        Tasks.region.later(at, popup::remove, 22);
+    }
+
+    /** A flash of light. Some versions want a colour for it, some want nothing: never let an effect throw. */
+    private void flash(Location at, org.bukkit.Color color) {
+        try {
+            if (org.bukkit.Particle.FLASH.getDataType() == org.bukkit.Color.class) {
+                view.world().spawnParticle(org.bukkit.Particle.FLASH, at, 1, 0, 0, 0, 0, color);
+            } else {
+                view.world().spawnParticle(org.bukkit.Particle.FLASH, at, 1, 0, 0, 0, 0);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // effects are optional
+        }
+    }
+
+    /** The gen went up a tier: a burst over the machine. */
+    private void tierUpFlash() {
+        BlockVector m = machineCell();
+        if (m == null) {
+            return;
+        }
+        Location at = new Location(view.world(), m.getBlockX() + 0.5, m.getBlockY() + 1.0, m.getBlockZ() + 0.5);
+        view.world().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING, at, 60, 0.4, 0.6, 0.4, 0.35);
+        flash(at, org.bukkit.Color.WHITE);
+        view.world().playSound(at, Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1.4f);
+        if (machineDisplay != null && machineDisplay.isValid()) {
+            Transformation t = machineDisplay.getTransformation();
+            machineDisplay.setInterpolationDelay(0);
+            machineDisplay.setInterpolationDuration(4);
+            machineDisplay.setTransformation(new Transformation(new Vector3f(0, 0.1f, 0), t.getLeftRotation(), new Vector3f(1.25f, 1.25f, 1.25f), t.getRightRotation()));
+            machinePulsed = true;
         }
     }
 
@@ -756,9 +873,14 @@ final class Factory {
         }
         int tier = currentTier();
         if (tier != drawnTier) {
+            boolean up = drawnTier >= 0 && tier > drawnTier;
             drawnTier = tier;
             updateMachineLabel(s);
+            if (up) {
+                tierUpFlash();
+            }
         }
+        effects();
         // Each item keeps one display from the gen to the sell point. New items take a free display; when there are
         // none free the item rides undrawn (the money is worked out from the data either way).
         for (BeltItem item : items) {
@@ -779,14 +901,19 @@ final class Factory {
             d.setInterpolationDelay(0);
             // The first placement jumps straight there; after that every move glides over one update period.
             d.setInterpolationDuration(item.placed ? PERIOD_TICKS : 0);
-            d.setTransformation(itemTransform(path.at(item.pos), true));
+            d.setTransformation(itemTransform(path.at(item.pos), true, (float) (item.pos * 1.4)));
             item.placed = true;
         }
     }
 
     /** An item lying flat on the belt at {@code world}, relative to the display's spawn point; hidden when not shown. */
     private Transformation itemTransform(Vector world, boolean shown) {
-        Quaternionf flat = new Quaternionf().rotateX((float) Math.toRadians(90));
+        return itemTransform(world, shown, 0);
+    }
+
+    /** An item lying flat on the belt, turned {@code spin} radians about the vertical so it slowly spins as it rides. */
+    private Transformation itemTransform(Vector world, boolean shown, float spin) {
+        Quaternionf flat = new Quaternionf().rotateY(spin).rotateX((float) Math.toRadians(90));
         if (!shown || world == null) {
             return new Transformation(new Vector3f(0, -2, 0), flat, new Vector3f(0, 0, 0), new Quaternionf());
         }
@@ -1172,6 +1299,8 @@ final class Factory {
                 p.add(step);
             }
             view.world().playSound(muzzle, Sound.ENTITY_BLAZE_SHOOT, 0.7f, 1.6f);
+            flash(muzzle, org.bukkit.Color.RED);
+            view.world().spawnParticle(org.bukkit.Particle.LAVA, eye, 4, 0.2, 0.3, 0.2, 0);
             aimTurret(t, dir);
             Player victim = target;
             UUID owner = view.owner();
