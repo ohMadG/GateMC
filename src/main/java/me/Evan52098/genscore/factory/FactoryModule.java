@@ -85,6 +85,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plots.service().addListener(this);
         plugin.getLogger().info("Factory: gate closes for " + settings.gateCloseSeconds() + "s, belt starts at "
                 + settings.startSpeed() + " segments/s, resource pack " + (settings.pack().enabled() ? settings.pack().url() : "off") + ".");
+        logTiers();
     }
 
     @Override
@@ -99,6 +100,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Override
     public void reload() {
         settings = FactorySettings.from(plugin.getConfig().getConfigurationSection("factory"));
+        logTiers();
+    }
+
+    private void logTiers() {
+        FactorySettings s = settings;
+        var tiers = s.genTiers();
+        var last = tiers.get(tiers.size() - 1);
+        plugin.getLogger().info("Factory: " + tiers.size() + " gen tiers (" + tiers.get(0).name() + " " + Money.compact(tiers.get(0).valueCents())
+                + " ... " + last.name() + " " + Money.compact(last.valueCents()) + ", last costs " + Money.compact(last.price()) + "), "
+                + s.speedLevels().size() + " speed levels up to " + fmt(s.speed(s.speedLevels().size()) / s.startSpeed()) + "x ("
+                + fmt(s.speed(s.speedLevels().size())) + " segments/s).");
     }
 
     GensCore plugin() {
@@ -336,10 +348,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         FactorySettings.GenTier gen = s.tier(tier);
         menu.set(10, Lore.item(Material.HOPPER, "&6Belt", Lore.builder(Lore.Accent.WHITE)
                 .stat("Length", length + " / " + f.path.size() + " segments")
-                .stat("Speed", fmt(s.speed(level)) + " segments/s")
+                .stat("Speed", mult(s, level) + " (" + fmt(s.speed(level)) + " segments/s)")
                 .stat("Gen", "Tier " + (tier + 1) + ": " + gen.name())
-                .stat("Item value", Money.format(s.itemValue(length, tier)))
-                .stat("Income", Money.format(f.incomePerMinute) + " / min")
+                .stat("Item value", Money.compact(s.itemValue(length, tier)))
+                .stat("Income", Money.compact(f.incomePerMinute) + " / min")
                 .stat("Items on belt", String.valueOf(f.itemsOnBelt))
                 .divider()
                 .description("Items ride the belt to the sell point.", "The longer the belt, the more each is worth.")
@@ -347,27 +359,30 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         if (owner) {
             long speedPrice = s.nextSpeedPrice(level);
             menu.set(12, Lore.item(Material.SUGAR, "&bSpeed upgrade", (speedPrice < 0
-                    ? Lore.builder(Lore.Accent.CYAN).stat("Speed", fmt(s.speed(level)) + " segments/s").description("Fully upgraded.")
-                    : Lore.builder(Lore.Accent.CYAN).stat("Now", fmt(s.speed(level)) + " segments/s")
-                    .stat("Next", fmt(s.speed(level + 1)) + " segments/s").stat("Price", Money.format(speedPrice)).clickPrompt("buy"))
-                    .build()), e -> buySpeed(p, f));
+                    ? Lore.builder(Lore.Accent.CYAN).stat("Speed", mult(s, level)).description("Top speed.")
+                    : Lore.builder(Lore.Accent.CYAN).stat("Level", level + " / " + s.speedLevels().size())
+                    .stat("Now", mult(s, level)).stat("Next", mult(s, level + 1)).stat("Price", Money.compact(speedPrice))
+                    .clickPrompt("buy").description("Shift-click: buy as many as you can afford."))
+                    .build()), e -> buySpeed(p, f, e.isShiftClick()));
             int done = Math.max(0, (data.beltLength() - plots.defaultBeltLength()) / Math.max(1, s.lengthStep()));
             boolean maxed = data.beltLength() >= f.path.size();
             menu.set(14, Lore.item(Material.IRON_CHAIN, "&aLength upgrade", (maxed
                     ? Lore.builder(Lore.Accent.GREEN).stat("Length", length + " segments").description("The belt fills the factory.")
                     : Lore.builder(Lore.Accent.GREEN).stat("Now", length + " segments")
                     .stat("Next", Math.min(f.path.size(), data.beltLength() + s.lengthStep()) + " segments")
-                    .stat("Item value then", Money.format(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
-                    .stat("Price", Money.format(s.lengthPrice(done))).clickPrompt("buy"))
-                    .build()), e -> buyLength(p, f));
+                    .stat("Item value then", Money.compact(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
+                    .stat("Price", Money.compact(s.lengthPrice(done))).clickPrompt("buy")
+                    .description("Shift-click: buy as many as you can afford."))
+                    .build()), e -> buyLength(p, f, e.isShiftClick()));
             long tierPrice = s.nextTierPrice(tier);
             menu.set(13, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), "&6Gen upgrade", (tierPrice < 0
                     ? Lore.builder(Lore.Accent.WHITE).stat("Gen", "Tier " + (tier + 1) + ": " + gen.name()).description("Top tier.")
-                    : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.name() + " (" + Money.format(gen.valueCents()) + ")")
-                    .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).name() + " (" + Money.format(s.tier(tier + 1).valueCents()) + ")")
-                    .stat("Item value then", Money.format(s.itemValue(length, tier + 1)))
-                    .stat("Price", Money.format(tierPrice)).clickPrompt("buy"))
-                    .build()), e -> buyTier(p, f));
+                    : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.name() + " (" + Money.compact(gen.valueCents()) + ")")
+                    .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).name() + " (" + Money.compact(s.tier(tier + 1).valueCents()) + ")")
+                    .stat("Item value then", Money.compact(s.itemValue(length, tier + 1)))
+                    .stat("Price", Money.compact(tierPrice)).clickPrompt("buy")
+                    .description("Shift-click: buy as many as you can afford.", "Tier " + (tier + 1) + " of " + s.genTiers().size() + "."))
+                    .build()), e -> buyTier(p, f, e.isShiftClick()));
             boolean shut = f.gateClosed();
             menu.set(16, Lore.item(shut ? Material.IRON_DOOR : Material.OAK_DOOR, shut ? "&aGate closed" : "&cGate OPEN",
                     Lore.builder(shut ? Lore.Accent.GREEN : Lore.Accent.RED)
@@ -381,80 +396,128 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         menu.open(p);
     }
 
-    private void buySpeed(Player p, Factory f) {
+    private void buySpeed(Player p, Factory f, boolean many) {
         PlotData data = plotData(p.getUniqueId());
         if (data == null) {
             return;
         }
-        int level = data.speedLevel();
-        long price = settings.nextSpeedPrice(level);
-        if (price < 0) {
-            p.sendMessage(Msg.neutral("Your belt is already at top speed."));
+        int bought = 0;
+        while (true) {
+            int level = data.speedLevel();
+            long price = settings.nextSpeedPrice(level);
+            if (price < 0) {
+                if (bought == 0) {
+                    p.sendMessage(Msg.neutral("Your belt is already at top speed."));
+                }
+                break;
+            }
+            if (!withdraw(p, price, "belt speed level " + (level + 1), bought == 0)) {
+                break;
+            }
+            data.setSpeedLevel(level + 1); // checklist 1: the money is taken first
+            bought++;
+            if (!many) {
+                break;
+            }
+        }
+        if (bought == 0) {
             return;
         }
-        if (!withdraw(p, price, "belt speed level " + (level + 1))) {
-            return;
-        }
-        data.setSpeedLevel(level + 1); // checklist 1: the money is taken first
         plugin.playerData().saveSoon(p.getUniqueId());
-        p.sendMessage(Msg.good("Belt speed upgraded to " + Msg.white(fmt(settings.speed(level + 1)) + " segments/s") + "."));
+        p.sendMessage(Msg.good("Belt speed upgraded" + (bought > 1 ? " " + bought + " times" : "") + " to "
+                + Msg.white(mult(settings, data.speedLevel())) + "."));
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
         openMenu(p, f);
     }
 
-    private void buyTier(Player p, Factory f) {
+    private void buyTier(Player p, Factory f, boolean many) {
         PlotData data = plotData(p.getUniqueId());
         if (data == null) {
             return;
         }
-        int tier = data.genLevel();
-        long price = settings.nextTierPrice(tier);
-        if (price < 0) {
-            p.sendMessage(Msg.neutral("Your gen is already the top tier."));
+        int bought = 0;
+        while (true) {
+            int tier = data.genLevel();
+            long price = settings.nextTierPrice(tier);
+            if (price < 0) {
+                if (bought == 0) {
+                    p.sendMessage(Msg.neutral("Your gen is already the top tier."));
+                }
+                break;
+            }
+            if (!withdraw(p, price, "gen tier " + (tier + 2), bought == 0)) {
+                break;
+            }
+            data.setGenLevel(tier + 1); // checklist 1: the money is taken first
+            bought++;
+            if (!many) {
+                break;
+            }
+        }
+        if (bought == 0) {
             return;
         }
-        if (!withdraw(p, price, "gen tier " + (tier + 2))) {
-            return;
-        }
-        data.setGenLevel(tier + 1); // checklist 1: the money is taken first
         plugin.playerData().saveSoon(p.getUniqueId());
-        p.sendMessage(Msg.good("Gen upgraded: it now makes " + Msg.white(settings.tier(tier + 1).name()) + "."));
+        int now = data.genLevel();
+        p.sendMessage(Msg.good("Gen upgraded" + (bought > 1 ? " " + bought + " tiers" : "") + " to tier " + (now + 1) + ": it now makes "
+                + Msg.white(settings.tier(now).name()) + "."));
         p.playSound(p.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1.2f);
         openMenu(p, f);
     }
 
-    private void buyLength(Player p, Factory f) {
+    private void buyLength(Player p, Factory f, boolean many) {
         PlotData data = plotData(p.getUniqueId());
         if (data == null) {
             return;
         }
-        if (data.beltLength() >= f.path.size()) {
-            p.sendMessage(Msg.neutral("Your belt already fills the factory."));
+        int bought = 0;
+        while (true) {
+            if (data.beltLength() >= f.path.size()) {
+                if (bought == 0) {
+                    p.sendMessage(Msg.neutral("Your belt already fills the factory."));
+                }
+                break;
+            }
+            int done = Math.max(0, (data.beltLength() - plots.defaultBeltLength()) / Math.max(1, settings.lengthStep()));
+            long price = settings.lengthPrice(done);
+            if (!withdraw(p, price, "belt length upgrade " + (done + 1), bought == 0)) {
+                break;
+            }
+            data.setBeltLength(Math.min(f.path.size(), data.beltLength() + settings.lengthStep()));
+            bought++;
+            if (!many) {
+                break;
+            }
+        }
+        if (bought == 0) {
             return;
         }
-        int done = Math.max(0, (data.beltLength() - plots.defaultBeltLength()) / Math.max(1, settings.lengthStep()));
-        long price = settings.lengthPrice(done);
-        if (!withdraw(p, price, "belt length upgrade " + (done + 1))) {
-            return;
-        }
-        data.setBeltLength(Math.min(f.path.size(), data.beltLength() + settings.lengthStep()));
         plugin.playerData().saveSoon(p.getUniqueId());
-        p.sendMessage(Msg.good("Belt extended to " + Msg.white(data.beltLength() + " segments") + "."));
+        p.sendMessage(Msg.good("Belt extended" + (bought > 1 ? " " + bought + " times" : "") + " to "
+                + Msg.white(data.beltLength() + " segments") + "."));
         p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_USE, 0.7f, 1.4f);
         openMenu(p, f);
     }
 
-    private boolean withdraw(Player p, long price, String reason) {
+    /** Takes the money (atomic). {@code complain}: say so when they cannot afford it (not after a multi-buy's last). */
+    private boolean withdraw(Player p, long price, String reason, boolean complain) {
         EconomyModule eco = plugin.modules().get(EconomyModule.class);
         if (eco == null) {
             p.sendMessage(Msg.bad("The economy is off."));
             return false;
         }
         if (!eco.service().withdraw(p.getUniqueId(), price, reason)) {
-            p.sendMessage(Msg.bad("You need " + Msg.white(Money.format(price)) + " for that."));
+            if (complain) {
+                p.sendMessage(Msg.bad("You need " + Msg.white(Money.compact(price)) + " for that."));
+            }
             return false;
         }
         return true;
+    }
+
+    /** The belt speed at a level as a multiple of the starting speed, e.g. "3.25x". */
+    private static String mult(FactorySettings s, int level) {
+        return fmt(s.speed(level) / s.startSpeed()) + "x";
     }
 
     private static String fmt(double d) {
@@ -503,7 +566,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             sender.sendMessage(Msg.parse("<gray>slot <white>" + f.view.slot() + "</white> " + Msg.escape(String.valueOf(name))
                     + " (" + f.view.rotation().name().toLowerCase() + "): path <white>" + f.path.size() + "</white> (" + corners
                     + " corners), belt <white>" + f.activeLength() + "</white> at " + fmt(f.speed()) + "/s, items " + f.itemsOnBelt
-                    + ", " + Money.format(f.incomePerMinute) + "/min, gate " + (f.gateClosed() ? "<green>closed " + f.gateSecondsLeft() + "s</green>"
+                    + ", " + Money.compact(f.incomePerMinute) + "/min, gate " + (f.gateClosed() ? "<green>closed " + f.gateSecondsLeft() + "s</green>"
                     : "<red>open</red>") + " (" + f.view.marker("gate").size() + " cells, " + f.view.marker("gate_button").size()
                     + " button), owner " + (f.ownerOnline ? "online" : "offline")));
         }

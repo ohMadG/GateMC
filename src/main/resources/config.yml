@@ -108,26 +108,36 @@ factory:
     door-block: light_gray_concrete   # the garage door slats
   belt:
     start-speed: 0.5         # segments per second; one item per segment, so this is also items sold per second
-    speed-levels:            # each upgrade: new speed and its price
-      - {speed: 0.75, price: 150}
-      - {speed: 1.0, price: 400}
-      - {speed: 1.25, price: 900}
-      - {speed: 1.5, price: 2000}
-      - {speed: 2.0, price: 4500}
+    speed:                   # speed upgrades, generated: 1.25x, 1.5x ... up to max-multiplier x the start speed
+      max-multiplier: 10     # 10x = 5 segments a second
+      step: 0.25             # 36 upgrades from 1x to 10x
+      base-price: 150        # the first speed upgrade
+      price-growth: 1.35     # each costs this much more than the last (all 36: about $21M)
+    # speed-levels:          # or list them by hand instead (this replaces the generated ones):
+    #   - {speed: 0.75, price: 150}
     length-step: 2           # segments added per length upgrade
     length-base-price: 100   # first length upgrade
     length-price-growth: 1.3 # each length upgrade costs this much more than the last
-    gen-interval-seconds: 0.5    # the gen makes an item this often (it waits while the start of the belt is full)
+    gen-interval-seconds: 0.1    # fastest the gen can make items (10 a second); it waits while the start of the belt is full
     value-per-segment: 0.10  # each working belt segment adds 10% of the item's base value
     deposit-every-seconds: 5 # earnings are paid into the balance this often (one ledger line each time)
   gen:                       # the machine items come out of. Upgrade it in the belt menu for better items.
-    tiers:                   # first tier is free; value is the item's base value
-      - {name: Raw Copper, item: raw_copper, value: 1.0, price: 0}
-      - {name: Raw Iron, item: raw_iron, value: 2.5, price: 500}
-      - {name: Raw Gold, item: raw_gold, value: 6, price: 2500}
-      - {name: Emerald, item: emerald, value: 15, price: 10000}
-      - {name: Diamond, item: diamond, value: 40, price: 40000}
-      - {name: Netherite Scrap, item: netherite_scrap, value: 100, price: 150000}
+    generate:                # tiers are generated: count tiers spread over the items list in order (Coal I, Coal II...)
+      count: 150
+      base-value: 1          # tier 1 item value; each tier is worth value-growth times the one before
+      value-growth: 1.12
+      base-price: 300        # tier 2 price; each tier costs price-growth times the one before (tier 1 is free)
+      price-growth: 1.135
+      items: [cobblestone, coal, raw_copper, copper_ingot, raw_iron, iron_ingot, redstone, lapis_lazuli, raw_gold,
+              gold_ingot, quartz, amethyst_shard, slime_ball, honeycomb, resin_clump, armadillo_scute, turtle_scute,
+              rabbit_foot, glowstone_dust, magma_cream, prismarine_shard, prismarine_crystals, emerald, diamond,
+              blaze_rod, breeze_rod, ender_pearl, ghast_tear, phantom_membrane, golden_apple, nautilus_shell,
+              copper_block, iron_block, gold_block, trial_key, ominous_trial_key, shulker_shell, echo_shard,
+              heart_of_the_sea, dragon_breath, emerald_block, diamond_block, netherite_scrap, netherite_ingot,
+              end_crystal, heavy_core, totem_of_undying, enchanted_golden_apple, nether_star, netherite_block,
+              beacon, dragon_egg]
+    # tiers:                 # or list them by hand instead (this replaces the generated ones):
+    #   - {name: Raw Copper, item: raw_copper, value: 1.0, price: 0}
   visuals:
     max-items-drawn: 64      # item entities per belt; the money is worked out from data either way
     view-distance: 64        # belts are drawn only while a player is this close

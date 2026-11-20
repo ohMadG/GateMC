@@ -26,6 +26,24 @@ public final class Money {
         return cents / 100.0;
     }
 
+    private static final String[] COMPACT = {"", "K", "M", "B", "T", "Qa", "Qi"};
+
+    /** "$950.00", "$12.5K", "$3.42M", "$1.07B": short enough for labels and menus at any size. */
+    public static String compact(long cents) {
+        double v = toDouble(cents);
+        if (Math.abs(v) < 10_000) {
+            return format(cents);
+        }
+        int i = 0;
+        while (Math.abs(v) >= 1000 && i < COMPACT.length - 1) {
+            v /= 1000;
+            i++;
+        }
+        String n = Math.abs(v) >= 100 ? String.format(Locale.ROOT, "%.0f", v)
+                : Math.abs(v) >= 10 ? String.format(Locale.ROOT, "%.1f", v) : String.format(Locale.ROOT, "%.2f", v);
+        return "$" + n + COMPACT[i];
+    }
+
     /** "$1,234.50" */
     public static String format(long cents) {
         return "$" + FORMAT.get().format(toDouble(cents));

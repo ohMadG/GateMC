@@ -73,10 +73,74 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         return Math.round(tier(tier).valueCents() * (1 + valuePerSegment * segments));
     }
 
+    /**
+     * Gen tiers made from {@code gen.generate}: {@code count} tiers spread evenly over the {@code items} list in order
+     * (each item gets a few tiers: "Coal I", "Coal II", ...). Tier {@code t} (from 0) is worth
+     * {@code base-value * value-growth^t} and costs {@code base-price * price-growth^(t-1)}; the first tier is free.
+     */
+    static List<GenTier> generateTiers(ConfigurationSection root) {
+        List<Material> items = new ArrayList<>();
+        for (String name : root.getStringList("gen.generate.items")) {
+            Material m = Material.matchMaterial(name);
+            if (m != null && m.isItem()) {
+                items.add(m);
+            }
+        }
+        if (items.isEmpty()) {
+            for (String name : DEFAULT_ITEMS) {
+                Material m = Material.matchMaterial(name);
+                if (m != null && m.isItem()) {
+                    items.add(m);
+                }
+            }
+        }
+        int count = Math.max(1, root.getInt("gen.generate.count", 150));
+        double baseValue = Math.max(0.01, root.getDouble("gen.generate.base-value", 1));
+        double valueGrowth = Math.max(1, root.getDouble("gen.generate.value-growth", 1.12));
+        double basePrice = Math.max(0, root.getDouble("gen.generate.base-price", 300));
+        double priceGrowth = Math.max(1, root.getDouble("gen.generate.price-growth", 1.135));
+        List<GenTier> out = new ArrayList<>(count);
+        // Spread the tiers evenly so every item is used: item i covers tiers [first(i), first(i + 1)).
+        java.util.function.IntUnaryOperator first = i -> (int) Math.ceil((double) i * count / items.size());
+        for (int t = 0; t < count; t++) {
+            int itemIndex = (int) Math.min(items.size() - 1, (long) t * items.size() / count);
+            int sub = t - first.applyAsInt(itemIndex);
+            int span = first.applyAsInt(itemIndex + 1) - first.applyAsInt(itemIndex);
+            Material item = items.get(itemIndex);
+            String name = pretty(item) + (span > 1 ? " " + ROMAN[Math.max(0, Math.min(sub, ROMAN.length - 1))] : "");
+            long value = Math.round(baseValue * Math.pow(valueGrowth, t) * 100);
+            long price = t == 0 ? 0 : Math.round(basePrice * Math.pow(priceGrowth, t - 1) * 100);
+            out.add(new GenTier(name, item, value, price));
+        }
+        return out;
+    }
+
+    private static final String[] ROMAN = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"};
+
+    /** Items from plain to precious; generated tiers walk through them in this order. */
+    static final List<String> DEFAULT_ITEMS = List.of(
+            "cobblestone", "coal", "raw_copper", "copper_ingot", "raw_iron", "iron_ingot", "redstone", "lapis_lazuli",
+            "raw_gold", "gold_ingot", "quartz", "amethyst_shard", "slime_ball", "honeycomb", "resin_clump",
+            "armadillo_scute", "turtle_scute", "rabbit_foot", "glowstone_dust", "magma_cream", "prismarine_shard",
+            "prismarine_crystals", "emerald", "diamond", "blaze_rod", "breeze_rod", "ender_pearl", "ghast_tear",
+            "phantom_membrane", "golden_apple", "nautilus_shell", "copper_block", "iron_block", "gold_block",
+            "trial_key", "ominous_trial_key", "shulker_shell", "echo_shard", "heart_of_the_sea", "dragon_breath",
+            "emerald_block", "diamond_block", "netherite_scrap", "netherite_ingot", "end_crystal", "heavy_core",
+            "totem_of_undying", "enchanted_golden_apple", "nether_star", "netherite_block", "beacon", "dragon_egg");
+
+    private static String pretty(Material m) {
+        StringBuilder sb = new StringBuilder();
+        for (String w : m.name().toLowerCase(java.util.Locale.ROOT).split("_")) {
+            sb.append(sb.isEmpty() ? "" : " ").append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+        }
+        return sb.toString();
+    }
+
     static FactorySettings from(ConfigurationSection root) {
         if (root == null) {
             root = new MemoryConfiguration();
         }
+        double startSpeed = Math.max(0.05, root.getDouble("belt.start-speed", 0.5));
         List<SpeedLevel> levels = new ArrayList<>();
         for (Map<?, ?> m : root.getMapList("belt.speed-levels")) {
             Object speed = m.get("speed");
@@ -86,9 +150,14 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             }
         }
         if (levels.isEmpty()) {
-            double[][] d = {{0.75, 150}, {1.0, 400}, {1.25, 900}, {1.5, 2000}, {2.0, 4500}};
-            for (double[] l : d) {
-                levels.add(new SpeedLevel(l[0], Money.toCents(l[1])));
+            // Generated: from 1x to belt.speed.max-multiplier times the start speed, in equal steps.
+            double max = Math.max(1, root.getDouble("belt.speed.max-multiplier", 10));
+            double step = Math.max(0.01, root.getDouble("belt.speed.step", 0.25));
+            double price = Math.max(0, root.getDouble("belt.speed.base-price", 150));
+            double growth = Math.max(1, root.getDouble("belt.speed.price-growth", 1.35));
+            int n = 0;
+            for (double mult = 1 + step; mult <= max + 1e-9; mult += step) {
+                levels.add(new SpeedLevel(startSpeed * mult, Math.round(price * Math.pow(growth, n++) * 100)));
             }
         }
         Material door = Material.matchMaterial(root.getString("gate.door-block", "light_gray_concrete"));
@@ -103,22 +172,17 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             }
         }
         if (tiers.isEmpty()) {
-            tiers.add(new GenTier("Raw Copper", Material.RAW_COPPER, 100, 0));
-            tiers.add(new GenTier("Raw Iron", Material.RAW_IRON, 250, Money.toCents(500)));
-            tiers.add(new GenTier("Raw Gold", Material.RAW_GOLD, 600, Money.toCents(2500)));
-            tiers.add(new GenTier("Emerald", Material.EMERALD, 1500, Money.toCents(10000)));
-            tiers.add(new GenTier("Diamond", Material.DIAMOND, 4000, Money.toCents(40000)));
-            tiers.add(new GenTier("Netherite Scrap", Material.NETHERITE_SCRAP, 10000, Money.toCents(150000)));
+            tiers.addAll(generateTiers(root));
         }
         return new FactorySettings(
                 Math.max(1, root.getInt("gate.close-seconds", 45)),
                 door != null && door.isBlock() ? door : Material.LIGHT_GRAY_CONCRETE,
-                Math.max(0.05, root.getDouble("belt.start-speed", 0.5)),
+                startSpeed,
                 List.copyOf(levels),
                 Math.max(1, root.getInt("belt.length-step", 2)),
                 Money.toCents(Math.max(0, root.getDouble("belt.length-base-price", 100))),
                 Math.max(1.0, root.getDouble("belt.length-price-growth", 1.3)),
-                Math.max(0.05, root.getDouble("belt.gen-interval-seconds", 0.5)),
+                Math.max(0.05, root.getDouble("belt.gen-interval-seconds", 0.1)),
                 List.copyOf(tiers),
                 Math.max(0, root.getDouble("belt.value-per-segment", 0.10)),
                 Math.max(1, root.getInt("belt.deposit-every-seconds", 5)),

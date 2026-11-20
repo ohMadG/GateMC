@@ -492,7 +492,7 @@ final class Factory {
             updateBar(owner, s);
         }
         if (owner != null && view.contains(owner.getLocation().getBlockX(), owner.getLocation().getBlockZ())) {
-            Component line = Msg.parse("<gold>+" + Money.format(incomePerMinute) + "/min</gold>  <gray>|</gray>  <white>Belt "
+            Component line = Msg.parse("<gold>+" + Money.compact(incomePerMinute) + "/min</gold>  <gray>|</gray>  <white>Belt "
                     + activeLength() + "/" + path.size() + "</white>  <gray>|</gray>  " + (gateClosed()
                     ? "<green>Gate closed " + gateSecondsLeft() + "s</green>" : "<red>Gate OPEN</red>"));
             Tasks.entity.run(owner, () -> owner.sendActionBar(line));
@@ -618,7 +618,7 @@ final class Factory {
         int tier = currentTier();
         FactorySettings.GenTier t = s.tier(tier);
         machineLabel.text(Msg.parse("<gold><bold>GEN</bold></gold> <white>Tier " + (tier + 1) + "</white>\n<yellow>"
-                + Msg.escape(t.name()) + "</yellow> <gray>" + Money.format(t.valueCents()) + " base</gray>"));
+                + Msg.escape(t.name()) + "</yellow> <gray>" + Money.compact(t.valueCents()) + " base</gray>"));
     }
 
     private static ItemStack modelItem(String model) {
@@ -768,7 +768,7 @@ final class Factory {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);
                 d.setBillboard(Display.Billboard.CENTER);
-                d.text(Msg.parse("<gold><bold>SELL</bold></gold>\n<white>" + Money.format(value) + " each</white>"));
+                d.text(Msg.parse("<gold><bold>SELL</bold></gold>\n<white>" + Money.compact(value) + " each</white>"));
             });
         }
     }
