@@ -83,13 +83,20 @@ final class Factory {
     /** One item on the belt. It keeps the same display entity from the gen to the sell point, so it never jumps. */
     private static final class BeltItem {
         double pos;
+        final Material item;
+        final long baseCents; // what this one item is worth before the belt bonus (rule 1: money from data)
         int display = -1;
         boolean placed; // its display has been put in place once (the first move is not animated)
 
-        BeltItem(double pos) {
+        BeltItem(double pos, Material item, long baseCents) {
             this.pos = pos;
+            this.item = item;
+            this.baseCents = baseCents;
         }
     }
+
+    private final java.util.Random random = new java.util.Random();
+    private final List<Material> shownItem = new ArrayList<>(); // what each item display shows now
 
     /** Where a new item appears: inside the gen's chute, just behind the start of the belt. */
     private static final double SPAWN_POS = -0.55;
@@ -451,7 +458,8 @@ final class Factory {
         if (genTimer >= s.genIntervalSeconds()) {
             BeltItem newest = items.peekLast();
             if (newest == null || newest.pos >= SPAWN_POS + 1.0) { // one item per segment: the gen waits when the start is full
-                items.addLast(new BeltItem(SPAWN_POS));
+                FactorySettings.Output out = s.tier(tier).pick(random); // a blended tier makes a mix of items
+                items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents()));
                 genTimer -= s.genIntervalSeconds();
             } else {
                 genTimer = s.genIntervalSeconds();
@@ -460,10 +468,10 @@ final class Factory {
         for (BeltItem item : items) {
             item.pos += speed * DT;
         }
-        long value = s.itemValue(length, tier);
         while (!items.isEmpty() && items.peekFirst().pos >= length) {
             BeltItem sold = items.pollFirst();
             releaseDisplay(sold);
+            long value = s.saleValue(sold.baseCents, length);
             pendingCents += value;
             earnings.addLast(new long[]{System.currentTimeMillis(), value});
         }
@@ -534,12 +542,15 @@ final class Factory {
         int tier = currentTier();
         drawnTier = tier;
         freeDisplays.clear();
+        shownItem.clear();
+        Material first = s.tier(tier).item();
         for (int i = 0; i < s.maxDrawnItems(); i++) {
             freeDisplays.add(i);
+            shownItem.add(first);
             itemDisplays.add(view.world().spawn(base, ItemDisplay.class, d -> {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);
-                d.setItemStack(new ItemStack(s.tier(tier).item()));
+                d.setItemStack(new ItemStack(first));
                 d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
                 d.setViewRange(1.0f);
                 // The display sits in the middle of the factory and is moved to its spot on the belt. Without a
@@ -618,7 +629,7 @@ final class Factory {
         int tier = currentTier();
         FactorySettings.GenTier t = s.tier(tier);
         machineLabel.text(Msg.parse("<gold><bold>GEN</bold></gold> <white>Tier " + (tier + 1) + "</white>\n<yellow>"
-                + Msg.escape(t.name()) + "</yellow> <gray>" + Money.compact(t.valueCents()) + " base</gray>"));
+                + Msg.escape(t.mix()) + "</yellow>\n<gray>about " + Money.compact(t.valueCents()) + " each before the belt</gray>"));
     }
 
     private static ItemStack modelItem(String model) {
@@ -678,10 +689,6 @@ final class Factory {
         int tier = currentTier();
         if (tier != drawnTier) {
             drawnTier = tier;
-            ItemStack stack = new ItemStack(s.tier(tier).item());
-            for (ItemDisplay d : itemDisplays) {
-                d.setItemStack(stack);
-            }
             updateMachineLabel(s);
         }
         // Each item keeps one display from the gen to the sell point. New items take a free display; when there are
@@ -696,6 +703,10 @@ final class Factory {
                 item.placed = false;
             }
             ItemDisplay d = itemDisplays.get(item.display);
+            if (shownItem.get(item.display) != item.item) {
+                shownItem.set(item.display, item.item);
+                d.setItemStack(new ItemStack(item.item));
+            }
             d.setInterpolationDelay(0);
             // The first placement jumps straight there; after that every move glides over one update period.
             d.setInterpolationDuration(item.placed ? PERIOD_TICKS : 0);
@@ -768,7 +779,7 @@ final class Factory {
                 d.setPersistent(false);
                 d.addScoreboardTag(TAG);
                 d.setBillboard(Display.Billboard.CENTER);
-                d.text(Msg.parse("<gold><bold>SELL</bold></gold>\n<white>" + Money.compact(value) + " each</white>"));
+                d.text(Msg.parse("<gold><bold>SELL</bold></gold>\n<white>about " + Money.compact(value) + " each</white>"));
             });
         }
     }

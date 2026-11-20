@@ -32,7 +32,47 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
     record SpeedLevel(double speed, long price) {
     }
 
-    record GenTier(String name, Material item, long valueCents, long price) {
+    /** One thing a gen tier can make: the item, what it is worth before the belt bonus, and how often (0..1). */
+    record Output(Material item, long valueCents, double weight) {
+    }
+
+    /**
+     * A gen tier. Generated tiers blend two neighbouring items: as the tiers climb, the next item's share grows until
+     * it is all that comes out. {@code item} is the main item (the larger share) and {@code valueCents} the average
+     * value of what comes out, for menus and labels.
+     */
+    record GenTier(String name, Material item, long valueCents, long price, List<Output> outputs) {
+
+        GenTier(String name, Material item, long valueCents, long price) {
+            this(name, item, valueCents, price, List.of(new Output(item, valueCents, 1)));
+        }
+
+        /** Picks what the gen makes next, by share. */
+        Output pick(java.util.random.RandomGenerator random) {
+            if (outputs.size() == 1) {
+                return outputs.get(0);
+            }
+            double r = random.nextDouble();
+            for (Output o : outputs) {
+                r -= o.weight();
+                if (r < 0) {
+                    return o;
+                }
+            }
+            return outputs.get(outputs.size() - 1);
+        }
+
+        /** "70% Coal, 30% Raw Copper", or just "Coal". */
+        String mix() {
+            if (outputs.size() == 1) {
+                return pretty(outputs.get(0).item());
+            }
+            StringBuilder sb = new StringBuilder();
+            for (Output o : outputs) {
+                sb.append(sb.isEmpty() ? "" : ", ").append(Math.round(o.weight() * 100)).append("% ").append(pretty(o.item()));
+            }
+            return sb.toString();
+        }
     }
 
     GenTier tier(int level) {
@@ -68,9 +108,14 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         return Math.round(lengthBasePrice * Math.pow(lengthGrowth, done));
     }
 
-    /** What one item from gen tier {@code tier} is worth after riding {@code segments} segments, in cents. */
+    /** What an average item from gen tier {@code tier} is worth after riding {@code segments} segments, in cents. */
     long itemValue(int segments, int tier) {
-        return Math.round(tier(tier).valueCents() * (1 + valuePerSegment * segments));
+        return saleValue(tier(tier).valueCents(), segments);
+    }
+
+    /** What an item with base value {@code baseCents} sells for after riding {@code segments} segments. */
+    long saleValue(long baseCents, int segments) {
+        return Math.round(baseCents * (1 + valuePerSegment * segments));
     }
 
     /**
@@ -100,17 +145,42 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         double basePrice = Math.max(0, root.getDouble("gen.generate.base-price", 300));
         double priceGrowth = Math.max(1, root.getDouble("gen.generate.price-growth", 1.135));
         List<GenTier> out = new ArrayList<>(count);
-        // Spread the tiers evenly so every item is used: item i covers tiers [first(i), first(i + 1)).
-        java.util.function.IntUnaryOperator first = i -> (int) Math.ceil((double) i * count / items.size());
+        // Blend: tier t sits at position x along the item list (tier 1 = the first item, the last tier = the last item).
+        // Between two items the gen makes both, the next one's share growing with x, so every tier is a small step.
+        // Item i is worth what the tier where it comes out pure is worth, so the average value still climbs smoothly.
+        int n = items.size();
+        double perItem = n > 1 ? (count - 1) / (double) (n - 1) : 1;
         for (int t = 0; t < count; t++) {
-            int itemIndex = (int) Math.min(items.size() - 1, (long) t * items.size() / count);
-            int sub = t - first.applyAsInt(itemIndex);
-            int span = first.applyAsInt(itemIndex + 1) - first.applyAsInt(itemIndex);
-            Material item = items.get(itemIndex);
-            String name = pretty(item) + (span > 1 ? " " + ROMAN[Math.max(0, Math.min(sub, ROMAN.length - 1))] : "");
-            long value = Math.round(baseValue * Math.pow(valueGrowth, t) * 100);
+            double x = n > 1 && count > 1 ? t * (n - 1) / (double) (count - 1) : 0;
+            int a = (int) Math.floor(x + 1e-9);
+            double share = x - a;
+            if (a >= n - 1) {
+                a = n - 1;
+                share = 0;
+            }
+            long valueA = Math.round(baseValue * Math.pow(valueGrowth, a * perItem) * 100);
+            List<Output> outputs = new ArrayList<>(2);
+            String name;
+            Material main;
+            if (share < 0.01) {
+                outputs.add(new Output(items.get(a), valueA, 1));
+                name = pretty(items.get(a));
+                main = items.get(a);
+            } else {
+                long valueB = Math.round(baseValue * Math.pow(valueGrowth, (a + 1) * perItem) * 100);
+                outputs.add(new Output(items.get(a), valueA, 1 - share));
+                outputs.add(new Output(items.get(a + 1), valueB, share));
+                name = pretty(items.get(a)) + " + " + pretty(items.get(a + 1));
+                main = share > 0.5 ? items.get(a + 1) : items.get(a);
+            }
+            long average = 0;
+            double avg = 0;
+            for (Output o : outputs) {
+                avg += o.valueCents() * o.weight();
+            }
+            average = Math.round(avg);
             long price = t == 0 ? 0 : Math.round(basePrice * Math.pow(priceGrowth, t - 1) * 100);
-            out.add(new GenTier(name, item, value, price));
+            out.add(new GenTier(name, main, average, price, List.copyOf(outputs)));
         }
         return out;
     }
@@ -128,7 +198,7 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             "emerald_block", "diamond_block", "netherite_scrap", "netherite_ingot", "end_crystal", "heavy_core",
             "totem_of_undying", "enchanted_golden_apple", "nether_star", "netherite_block", "beacon", "dragon_egg");
 
-    private static String pretty(Material m) {
+    static String pretty(Material m) {
         StringBuilder sb = new StringBuilder();
         for (String w : m.name().toLowerCase(java.util.Locale.ROOT).split("_")) {
             sb.append(sb.isEmpty() ? "" : " ").append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));

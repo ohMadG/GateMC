@@ -349,8 +349,8 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         menu.set(10, Lore.item(Material.HOPPER, "&6Belt", Lore.builder(Lore.Accent.WHITE)
                 .stat("Length", length + " / " + f.path.size() + " segments")
                 .stat("Speed", mult(s, level) + " (" + fmt(s.speed(level)) + " segments/s)")
-                .stat("Gen", "Tier " + (tier + 1) + ": " + gen.name())
-                .stat("Item value", Money.compact(s.itemValue(length, tier)))
+                .stat("Gen", "Tier " + (tier + 1) + ": " + gen.mix())
+                .stat("Average item", Money.compact(s.itemValue(length, tier)))
                 .stat("Income", Money.compact(f.incomePerMinute) + " / min")
                 .stat("Items on belt", String.valueOf(f.itemsOnBelt))
                 .divider()
@@ -376,10 +376,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                     .build()), e -> buyLength(p, f, e.isShiftClick()));
             long tierPrice = s.nextTierPrice(tier);
             menu.set(13, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), "&6Gen upgrade", (tierPrice < 0
-                    ? Lore.builder(Lore.Accent.WHITE).stat("Gen", "Tier " + (tier + 1) + ": " + gen.name()).description("Top tier.")
-                    : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.name() + " (" + Money.compact(gen.valueCents()) + ")")
-                    .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).name() + " (" + Money.compact(s.tier(tier + 1).valueCents()) + ")")
-                    .stat("Item value then", Money.compact(s.itemValue(length, tier + 1)))
+                    ? Lore.builder(Lore.Accent.WHITE).stat("Gen", "Tier " + (tier + 1) + ": " + gen.mix()).description("Top tier.")
+                    : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.mix())
+                    .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).mix())
+                    .stat("Average item then", Money.compact(s.itemValue(length, tier + 1)))
                     .stat("Price", Money.compact(tierPrice)).clickPrompt("buy")
                     .description("Shift-click: buy as many as you can afford.", "Tier " + (tier + 1) + " of " + s.genTiers().size() + "."))
                     .build()), e -> buyTier(p, f, e.isShiftClick()));
@@ -460,7 +460,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plugin.playerData().saveSoon(p.getUniqueId());
         int now = data.genLevel();
         p.sendMessage(Msg.good("Gen upgraded" + (bought > 1 ? " " + bought + " tiers" : "") + " to tier " + (now + 1) + ": it now makes "
-                + Msg.white(settings.tier(now).name()) + "."));
+                + Msg.white(settings.tier(now).mix()) + "."));
         p.playSound(p.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1.2f);
         openMenu(p, f);
     }

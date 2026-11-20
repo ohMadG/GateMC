@@ -122,9 +122,10 @@ factory:
     value-per-segment: 0.10  # each working belt segment adds 10% of the item's base value
     deposit-every-seconds: 5 # earnings are paid into the balance this often (one ledger line each time)
   gen:                       # the machine items come out of. Upgrade it in the belt menu for better items.
-    generate:                # tiers are generated: count tiers spread over the items list in order (Coal I, Coal II...)
+    generate:                # tiers are generated along the items list, blending neighbours: the gen makes a mix of
+                             # two items whose next item's share grows each tier (100% Coal, 67% Coal + 33% Raw Copper...)
       count: 150
-      base-value: 1          # tier 1 item value; each tier is worth value-growth times the one before
+      base-value: 1          # the first item's value; each tier's average is worth about value-growth times the last
       value-growth: 1.12
       base-price: 300        # tier 2 price; each tier costs price-growth times the one before (tier 1 is free)
       price-growth: 1.135
