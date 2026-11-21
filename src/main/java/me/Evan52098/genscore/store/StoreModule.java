@@ -215,8 +215,9 @@ public final class StoreModule implements GensModule {
     @CommandPermission("genscore.store")
     @Description("Link to the server store")
     public void store(BukkitCommandActor actor) {
-        if (actor.sender() instanceof Player player && !catalog.categories().isEmpty()) {
-            menu.open(player, 0, 0);
+        if (actor.sender() instanceof Player player) {
+            player.closeInventory();
+            popup.show(player, settings);
             return;
         }
         linkCommand(actor);
