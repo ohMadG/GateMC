@@ -113,8 +113,8 @@ public final class DiscordModule implements GensModule, Listener {
                         + "uuid TEXT NOT NULL, claimed_at BIGINT NOT NULL, PRIMARY KEY (owner, reward));"
                         + "CREATE TABLE IF NOT EXISTS pvp_discord_nitro (uuid TEXT PRIMARY KEY, permissions TEXT NOT NULL, "
                         + "granted_at BIGINT NOT NULL)",
-                "ALTER TABLE pvp_discord_links ADD COLUMN discord_roles TEXT NOT NULL DEFAULT '';"
-                        + "ALTER TABLE pvp_discord_links ADD COLUMN game_ranks TEXT NOT NULL DEFAULT '';"
+                "ALTER TABLE pvp_discord_links ADD COLUMN IF NOT EXISTS discord_roles TEXT NOT NULL DEFAULT '';"
+                        + "ALTER TABLE pvp_discord_links ADD COLUMN IF NOT EXISTS game_ranks TEXT NOT NULL DEFAULT '';"
                         + "CREATE TABLE IF NOT EXISTS pvp_discord_role_grants (uuid TEXT PRIMARY KEY, groups TEXT NOT NULL, "
                         + "granted_at BIGINT NOT NULL)");
         config = new DiscordConfig(plugin.getConfig().getConfigurationSection("discord"), logger);
