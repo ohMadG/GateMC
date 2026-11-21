@@ -8,7 +8,10 @@ import me.Evan52098.genscore.scheduler.Tasks;
 import me.Evan52098.genscore.util.Cooldowns;
 import me.Evan52098.genscore.util.Money;
 import me.Evan52098.genscore.util.Msg;
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.Bukkit;
@@ -20,6 +23,7 @@ import io.papermc.paper.event.player.PlayerCustomClickEvent;
 import net.kyori.adventure.key.Key;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.jetbrains.annotations.Nullable;
@@ -32,6 +36,7 @@ import revxrsal.commands.bukkit.actor.BukkitCommandActor;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
 import java.io.File;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.Map;
@@ -84,6 +89,9 @@ public final class StoreModule implements GensModule {
     private volatile String lastSyncResult = "not run yet";
     private volatile long monthTotalCents;
     private volatile YearMonth monthShown = YearMonth.now();
+    private volatile long lastCelebration;
+    private volatile long keyAllTotalCents = -1;
+    private final BossBar keyAllBar = BossBar.bossBar(Component.empty(), 0f, BossBar.Color.YELLOW, BossBar.Overlay.NOTCHED_10);
 
     @Override
     public String id() {
@@ -132,6 +140,14 @@ public final class StoreModule implements GensModule {
             }
 
             @EventHandler
+            public void onJoin(PlayerJoinEvent event) {
+                Player p = event.getPlayer();
+                if (settings.keyAll().enabled() && keyAllTotalCents >= 0) {
+                    p.showBossBar(keyAllBar);
+                }
+            }
+
+            @EventHandler
             public void onQuit(PlayerQuitEvent event) {
                 packLoaded.remove(event.getPlayer().getUniqueId());
                 menu.forget(event.getPlayer().getUniqueId());
@@ -146,8 +162,22 @@ public final class StoreModule implements GensModule {
     }
 
     @Override
+    public void disable() {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.hideBossBar(keyAllBar);
+        }
+    }
+
+    @Override
     public void reload() {
         settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
+        Tasks.async.run(() -> {
+            try {
+                refreshKeyAll();
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "[store] Could not update the key all", e);
+            }
+        });
         popup.forgetAll();
         catalog = loadCatalog();
         warnBadUrl();
@@ -275,6 +305,11 @@ public final class StoreModule implements GensModule {
         } catch (Exception e) {
             plugin.getLogger().log(Level.WARNING, "[store] Could not update the community goal", e);
         }
+        try {
+            refreshKeyAll();
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[store] Could not update the key all", e);
+        }
         if (reportTo != null) {
             String r = result;
             Tasks.forSender(reportTo, () -> reportTo.sendMessage(Msg.neutral("Store sync: " + Msg.white(r) + ".")));
@@ -358,6 +393,102 @@ public final class StoreModule implements GensModule {
         }
     }
 
+    private void refreshKeyAll() throws Exception {
+        StoreSettings s = settings;
+        StoreSettings.KeyAll k = s.keyAll();
+        if (!k.enabled()) {
+            keyAllTotalCents = -1;
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                Tasks.onEntity(p, () -> p.hideBossBar(keyAllBar));
+            }
+            return;
+        }
+        payments.claim("key-all", "start");
+        long start = payments.markerTime("key-all", "start");
+        long total = start < 0 ? 0 : payments.totalSince(start);
+        long due = total / k.stepCents();
+        for (long n = 1; n <= due; n++) {
+            if (!payments.claim("key-all", Long.toString(n))) {
+                continue;
+            }
+            plugin.getLogger().info("[store] Key all #" + n + " reached (" + s.formatMoney(total) + " since the start); giving rewards.");
+            broadcast(Text.legacy(k.reachedBroadcast().replace("{step}", s.formatMoney(k.stepCents()))
+                    .replace("{current}", s.formatMoney(total))));
+            if (!k.reward().isEmpty()) {
+                rewards.give(k.reward(), "store key all " + n, false, null);
+            }
+        }
+        long into = total % k.stepCents();
+        keyAllBar.name(Text.legacy(k.bossbar().replace("{current}", s.formatMoney(into))
+                .replace("{step}", s.formatMoney(k.stepCents()))
+                .replace("{left}", s.formatMoney(k.stepCents() - into))));
+        keyAllBar.progress(Math.max(0f, Math.min(1f, into / (float) k.stepCents())));
+        boolean first = keyAllTotalCents < 0;
+        keyAllTotalCents = total;
+        if (first) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                Tasks.onEntity(p, () -> p.showBossBar(keyAllBar));
+            }
+        }
+    }
+
+    private void celebrate(String buyer) {
+        StoreSettings.Celebration c = settings.celebration();
+        if (!c.enabled()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastCelebration < c.repeatGapSeconds() * 1000L) {
+            return;
+        }
+        lastCelebration = now;
+        Sound sound = null;
+        if (!c.sound().isBlank()) {
+            try {
+                sound = Sound.sound(Key.key(c.sound().trim()), Sound.Source.MASTER, c.volume(), 1f);
+            } catch (Exception e) {
+                plugin.getLogger().warning("[store] store.celebration.sound is not a valid sound key.");
+            }
+        }
+        Title title = Title.title(Text.legacy(c.title().replace("{player}", buyer)), Text.legacy(c.subtitle().replace("{player}", buyer)),
+                Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1)));
+        int seconds = c.ggWaveSeconds();
+        BossBar bar = seconds <= 0 ? null : BossBar.bossBar(Text.legacy(c.bossbar().replace("{player}", buyer)), 1f,
+                BossBar.Color.PURPLE, BossBar.Overlay.PROGRESS);
+        Sound s = sound;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            Tasks.onEntity(p, () -> {
+                if (s != null) {
+                    p.playSound(s, Sound.Emitter.self());
+                }
+                p.showTitle(title);
+                if (bar != null) {
+                    p.showBossBar(bar);
+                }
+            });
+        }
+        if (bar == null) {
+            return;
+        }
+        me.Evan52098.genscore.chat.GgWave.start(seconds * 1000L);
+        if (!c.ggWaveBroadcast().isBlank()) {
+            broadcast(Text.legacy(c.ggWaveBroadcast().replace("{player}", buyer).replace("{seconds}", String.valueOf(seconds))));
+        }
+        long total = seconds * 20L;
+        long[] left = {total};
+        Tasks.global.timer(task -> {
+            left[0] -= 10;
+            if (left[0] <= 0) {
+                task.cancel();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    Tasks.onEntity(p, () -> p.hideBossBar(bar));
+                }
+                return;
+            }
+            bar.progress(Math.max(0f, left[0] / (float) total));
+        }, 10, 10);
+    }
+
     /** A sync about a minute from now, so a purchase shows up in the goal and top list quickly. Debounced. */
     private void syncSoon() {
         if (settings.tebexEnabled() && syncSoon.compareAndSet(false, true)) {
@@ -397,8 +528,21 @@ public final class StoreModule implements GensModule {
                 line = line.clickEvent(ClickEvent.openUrl(s.url().trim())).hoverEvent(HoverEvent.showText(Text.legacy(s.purchaseHover())));
             }
             broadcast(line);
+            celebrate(name);
             plugin.getLogger().info("[store] Purchase announced: " + name + " bought " + what);
             syncSoon();
+        }
+
+        @Subcommand("celebrate")
+        @Description("Play the purchase sound and start a GG wave")
+        public void celebrateNow(BukkitCommandActor actor, @Named("player") String player) {
+            String name = Text.stripCodes(player);
+            if (!PLAYER_NAME.matcher(name).matches()) {
+                actor.sender().sendMessage(Msg.bad("Invalid player name."));
+                return;
+            }
+            lastCelebration = 0;
+            celebrate(name);
         }
 
         @Subcommand("party")

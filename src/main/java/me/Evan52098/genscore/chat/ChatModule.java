@@ -77,8 +77,13 @@ public final class ChatModule implements GensModule, Listener {
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         String raw = PlainTextComponentSerializer.plainText().serialize(event.message());
+        boolean gg = GgWave.active() && GgWave.isGg(raw);
+        if (gg && GgWave.tooFast(player.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
 
-        if (cooldownMillis > 0 && !player.hasPermission("genscore.chat.bypass.cooldown")
+        if (!gg && cooldownMillis > 0 && !player.hasPermission("genscore.chat.bypass.cooldown")
                 && !cooldowns.tryStart(player.getUniqueId(), "chat", cooldownMillis)) {
             event.setCancelled(true);
             player.sendMessage(Msg.bad("Please wait " + Msg.white(Cooldowns.format(cooldowns.remaining(player.getUniqueId(), "chat"))) + " before chatting again."));
@@ -92,7 +97,7 @@ public final class ChatModule implements GensModule, Listener {
             return;
         }
 
-        if (!allowed(player, raw, false)) {
+        if (!gg && !allowed(player, raw, false)) {
             event.setCancelled(true);
             return;
         }
@@ -108,7 +113,7 @@ public final class ChatModule implements GensModule, Listener {
 
         Component colored = raw.indexOf('&') >= 0 && player.hasPermission("genscore.chat.color") ? null
                 : me.Evan52098.genscore.cosmetics.CosmeticsModule.chatColored(player.getUniqueId(), raw);
-        Component message = colored != null ? colored
+        Component message = gg ? GgWave.render(raw) : colored != null ? colored
                 : player.hasPermission("genscore.chat.color") ? LEGACY.deserialize(raw) : Component.text(raw);
         Component prefix = luckPerms ? LEGACY.deserialize(LuckPermsPrefix.prefix(player)) : Component.empty();
         Component suffix = luckPerms ? LEGACY.deserialize(LuckPermsPrefix.suffix(player)) : Component.empty();

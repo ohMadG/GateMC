@@ -23,7 +23,7 @@ record StoreSettings(
         boolean tebexEnabled, String tebexConfigFile, List<String> tebexKeyPaths, int refreshMinutes, int recheckPages,
         int maxPages,
         boolean topEnabled, Set<String> topExclude, String currencySymbol,
-        Popup popup, Goal goal, Party party) {
+        Popup popup, Goal goal, Party party, Celebration celebration, KeyAll keyAll) {
 
     /** A box in one world, corners included. */
     record Zone(String world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -48,6 +48,13 @@ record StoreSettings(
 
     record Goal(boolean enabled, long targetCents, ZoneId zone, int barLength, String line, String reachedBroadcast,
                 Reward reward) {
+    }
+
+    record Celebration(boolean enabled, String sound, float volume, int ggWaveSeconds, int repeatGapSeconds,
+                       String title, String subtitle, String bossbar, String ggWaveBroadcast) {
+    }
+
+    record KeyAll(boolean enabled, long stepCents, String bossbar, String reachedBroadcast, Reward reward) {
     }
 
     record Party(boolean enabled, int countdownSeconds, boolean onePerIp, String startBroadcast, String doneBroadcast,
@@ -90,7 +97,29 @@ record StoreSettings(
                 top.getString("currency-symbol", "$"),
                 popup(sub(c, "popup"), log),
                 goal(sub(c, "goal"), log),
-                party(sub(c, "party"), log));
+                party(sub(c, "party"), log),
+                celebration(sub(c, "celebration")),
+                keyAll(sub(c, "key-all"), log));
+    }
+
+    private static Celebration celebration(ConfigurationSection c) {
+        return new Celebration(c.getBoolean("enabled", true),
+                c.getString("sound", "hawkmc:donation"),
+                (float) Math.max(0, Math.min(2, c.getDouble("volume", 0.6))),
+                Math.max(0, Math.min(120, c.getInt("gg-wave-seconds", 15))),
+                Math.max(0, c.getInt("repeat-gap-seconds", 10)),
+                c.getString("title", "&6&l{player}"),
+                c.getString("subtitle", "&fsupported GateMC! &7Type &a&lGG"),
+                c.getString("bossbar", "&6&lGG WAVE &8- &fthank &e{player}"),
+                c.getString("gg-wave-broadcast", "&6&lGG WAVE! &fType &a&lGG &fin chat to thank &e{player}&f! &7({seconds}s)"));
+    }
+
+    private static KeyAll keyAll(ConfigurationSection k, Logger log) {
+        long step = cents(k.getDouble("every", 25.0));
+        return new KeyAll(k.getBoolean("enabled", true) && step > 0, step,
+                k.getString("bossbar", "&6&lKEY ALL &8» &f{current} &7/ &f{step} &8- &7every &f{step} &7spent gives everyone a key"),
+                k.getString("reached-broadcast", "&6&lKEY ALL &8» &7The store hit &f{step}&7! Everyone online gets a key."),
+                reward(sub(k, "reward"), "store.key-all.reward", log));
     }
 
     private static ConfigurationSection sub(ConfigurationSection c, String path) {
