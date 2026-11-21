@@ -349,7 +349,7 @@ public final class NpcsModule implements GensModule, Listener {
         List<Shot> shots = List.of(
                 new Shot(look(w, 1236, 118, 1236, CX, 64, 1152), "<gold><bold>GATEMC", "<gray>Build your factory. Raid the rest.", 90),
                 new Shot(look(w, 1190, 98, 1108, CX, 66, 1148), "<yellow><bold>Spawn", "<gray>Crates, shops and helpers live here", 80),
-                new Shot(look(w, 1152.5, 76, 1128, CX, 67, 1150), "<light_purple><bold>Crates", "<gray>Open them with keys from the store and votes", 80),
+                new Shot(look(w, 1152.5, 76, 1128, CX, 67, 1150), "<light_purple><bold>Crates", "<gray>Open them with keys from the store and playtime", 80),
                 new Shot(look(w, 1128, 84, 1188, 1152, 64, 1206), "<aqua><bold>Factories", "<gray>Every player gets one along the roads", 90),
                 new Shot(look(w, 1192, 80, 1170, 1172, 64, 1180), "<red><bold>Raids", "<gray>Open gates can be raided. Close yours!", 80),
                 new Shot(look(w, 1152.5, 128, 1160, CX, 64, 1152.5), "<green><bold>Your turn", "<gray>Let's go to your factory", 60));

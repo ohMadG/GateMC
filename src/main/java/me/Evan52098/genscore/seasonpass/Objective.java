@@ -15,7 +15,6 @@ public enum Objective {
     PLAYTIME_MINUTES(Material.CLOCK, "Play for %d minutes"),
     SELL_ITEMS(Material.GOLD_INGOT, "Sell %d items"),
     OPEN_CRATES(Material.TRIPWIRE_HOOK, "Open %d crates"),
-    VOTE(Material.PAPER, "Vote %d times"),
     CUSTOM(Material.NETHER_STAR, "Complete %d tasks");
 
     final Material icon;

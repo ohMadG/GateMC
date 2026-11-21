@@ -68,12 +68,11 @@ public final class GensCore extends JavaPlugin {
         modules.register(new me.Evan52098.genscore.settings.SettingsModule());         // uses essentials
         modules.register(new me.Evan52098.genscore.trade.TradeModule());               // reads settings
         modules.register(new me.Evan52098.genscore.mail.MailModule());
-        modules.register(new me.Evan52098.genscore.vote.VoteModule());                 // pays through economy
         modules.register(new me.Evan52098.genscore.polls.PollsModule());
         modules.register(new me.Evan52098.genscore.crates.CratesModule());     // Daily Lockbox; pays through economy
         modules.register(new me.Evan52098.genscore.vouchers.VouchersModule());
         modules.register(new me.Evan52098.genscore.daily.DailyModule());       // after crates (/daily shows the lockbox)
-        modules.register(new me.Evan52098.genscore.leaderboards.LeaderboardsModule()); // after economy and vote
+        modules.register(new me.Evan52098.genscore.leaderboards.LeaderboardsModule()); // after economy
         modules.register(new me.Evan52098.genscore.wipe.WipeModule());          // before future factions/combat (they join wipes)
         modules.register(new me.Evan52098.genscore.lagwatch.LagWatchModule());
         modules.register(new me.Evan52098.genscore.antihack.AntiHackModule());

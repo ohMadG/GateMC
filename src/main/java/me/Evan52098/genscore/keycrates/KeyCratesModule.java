@@ -23,11 +23,11 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Key crates (HxCrates): physical keys, crate blocks, chance previews, open one / open all with an animation, the claim
- * box, broadcasts, playtime and vote keys, retired keys turning into shards, and the welcome spin. The Daily Lockbox
+ * box, broadcasts, playtime keys, retired keys turning into shards, and the welcome spin. The Daily Lockbox
  * is a different module ({@code crates}).
  *
  * <p>For other modules: {@link #giveKeys(UUID, String, int, String)} (any thread; offline players get the keys in
- * their claim box) and {@link #vote(Player)} (the vote module's hook).
+ * their claim box).
  */
 public final class KeyCratesModule implements GensModule, Listener {
 
@@ -95,14 +95,6 @@ public final class KeyCratesModule implements GensModule, Listener {
     public static boolean giveKeys(UUID player, String crate, int amount, String reason) {
         KeyCratesModule m = instance;
         return m != null && amount > 0 && amount <= 10_000 && m.service.giveKeys(player, crate, amount, reason);
-    }
-
-    /** The vote module's hook: call on the voter's thread after a vote is paid. Gives vote keys and vote shards. */
-    public static void vote(Player player) {
-        KeyCratesModule m = instance;
-        if (m != null) {
-            Tasks.onEntity(player, () -> m.service.onVote(player));
-        }
     }
 
     // ------------------------------------------------------------------ events and timers

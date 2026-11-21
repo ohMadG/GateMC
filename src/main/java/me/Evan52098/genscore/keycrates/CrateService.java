@@ -31,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Opening crates, giving keys, the claim box, retired keys, playtime and vote keys, and the welcome spin.
+ * Opening crates, giving keys, the claim box, retired keys, playtime keys and the welcome spin.
  *
  * <p>Keys are treated as money. Opening is, in order (checklist numbers in brackets):
  * <ol>
@@ -665,7 +665,7 @@ final class CrateService {
         return found;
     }
 
-    // =================================================================== join, playtime, votes, welcome spin
+    // =================================================================== join, playtime, welcome spin
 
     /** Shortly after join, on the player's thread. */
     void onJoined(Player player) {
@@ -753,27 +753,6 @@ final class CrateService {
                 }
             }, () -> refundToClaims(uuid, crateId, 1, "playtime (left before delivery)"), 1);
         });
-    }
-
-    /** A vote was paid. On the voter's thread (called from the vote module's hook, see group-f.md). */
-    void onVote(Player player) {
-        CrateConfig cfg = config;
-        StringBuilder keyText = new StringBuilder();
-        if (cfg.voteCrate != null && cfg.voteKeys > 0) {
-            CrateConfig.Crate crate = cfg.crate(cfg.voteCrate);
-            if (crate != null && giveKeys(player, crate.id(), cfg.voteKeys, "vote")) {
-                keyText.append(" &7and &f").append(cfg.voteKeys).append("x ").append(crate.keyName());
-            }
-        }
-        long shards = 0;
-        ShardsService service = ShardsModule.service();
-        if (cfg.voteShards > 0 && service != null && service.deposit(player.getUniqueId(), cfg.voteShards, "vote")) {
-            shards = cfg.voteShards;
-        }
-        if ((shards > 0 || keyText.length() > 0) && cfg.voteMessage != null && !cfg.voteMessage.isBlank()) {
-            player.sendMessage(CrateConfig.text(cfg.voteMessage.replace("{shards}", Long.toString(shards)).replace("{keys}", keyText.toString())
-                    .replace("{player}", player.getName())));
-        }
     }
 
     /**

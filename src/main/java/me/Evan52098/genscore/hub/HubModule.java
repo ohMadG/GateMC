@@ -494,7 +494,7 @@ public final class HubModule implements GensModule, Listener {
                 new HubTiles.Button(4, MenuStyle.close(), Player::closeInventory),
                 new HubTiles.Button(5, icon(Material.FIREWORK_ROCKET, "&6&lEvent", eventLine), x -> {
                 }),
-                new HubTiles.Button(6, icon(Material.LIME_DYE, "&a&lVote", "Vote for rewards."), x -> run(x, "vote")),
+                new HubTiles.Button(6, icon(Material.EGG, "&d&lPets", "Hatch and equip pets."), x -> run(x, "pets")),
                 new HubTiles.Button(7, icon(Material.WRITTEN_BOOK, "&e&lTutorial", "How to play GateMC."), x -> run(x, "tutorial")),
                 new HubTiles.Button(8, icon(Material.GOLD_BLOCK, "&6&lServer", "Richest players, tutorial", "and the store."), x -> category(x, "server")));
         return tiles.open(p, list, bar);

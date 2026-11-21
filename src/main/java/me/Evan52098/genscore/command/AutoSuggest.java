@@ -7,7 +7,6 @@ import me.Evan52098.genscore.leaderboards.LeaderboardsModule;
 import me.Evan52098.genscore.plots.GensPlayer;
 import me.Evan52098.genscore.seasonpass.Objective;
 import me.Evan52098.genscore.teleport.TeleportModule;
-import me.Evan52098.genscore.vote.VoteModule;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -133,10 +132,6 @@ public final class AutoSuggest implements SuggestionProvider.Factory<BukkitComma
             case "category" -> {
                 CosmeticsModule m = Suggest.module(CosmeticsModule.class);
                 return m == null ? List.of() : m.cosmeticCategories();
-            }
-            case "service" -> {
-                VoteModule m = Suggest.module(VoteModule.class);
-                return m == null ? List.of() : m.serviceNames();
             }
             case "reason" -> {
                 return List.of("hacking", "spam", "scamming", "griefing", "toxic");

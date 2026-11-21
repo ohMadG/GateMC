@@ -2010,58 +2010,6 @@ polls:
   # Money paid for voting in a poll (BlockvilleCore paid 5 credits; this server has no credits). 0 = no reward.
   reward: 100
 
-vote:
-  enabled: true
-  # Days start and streaks count in this timezone.
-  timezone: "America/New_York"
-  # GensCore's own Votifier listener (no Votifier plugin needed). Open the port in the firewall.
-  # On first start it creates modules/vote/votifier/rsa/public.key (paste it into each voting site) and
-  # modules/vote/votifier/token.txt (the v2 token for sites that ask for one; keep it secret, you may replace it).
-  listener:
-    enabled: false
-    host: "0.0.0.0"
-    port: 8192
-    max-per-ip-per-minute: 30
-    # Votes from the same name on the same site this close together count once (sites retry on timeouts).
-    duplicate-window-minutes: 60
-    # Votes older than this that were never claimed (the name never joined) are not paid.
-    expire-days: 30
-  # Shown in /vote. "service" is the name the site sends with its votes (logged the first time an unknown one arrives).
-  sites: {}
-  #  example:
-  #    name: "ExampleList"
-  #    url: "https://example.org/vote/000000"
-  #    service: "ExampleList"
-  #    cooldown-hours: 24
-  #    icon: "EMERALD"
-  # Paid for every vote. money is dollars, xp is vanilla experience points, commands run from the console
-  # ({player}, {uuid}, {site}). display = lines shown in /vote for what the commands give.
-  reward:
-    money: 250
-    xp: 0
-    commands: []
-    display: []
-    message: "Thanks for voting on <white>{site}</white>! +<white>{money}</white>."
-  streak:
-    milestones:
-      3:
-        money: 500
-      7:
-        money: 1500
-      14:
-        money: 3000
-      30:
-        money: 7500
-  party:
-    enabled: true
-    goal: 50
-    money: 500
-    commands: []
-  # Shown to everyone when someone votes. Empty = off.
-  announce: "<white>{player}</white> voted for the server! <gray>Type</gray> <white>/vote</white> <gray>to vote too.</gray>"
-  reminder:
-    on-join: true
-
 leaderboards:
   # How long a board is cached before it is read again.
   cache-seconds: 60
@@ -2130,7 +2078,6 @@ wipe:
       core: [playtime, nickname, msg_prefs, economy_prefs, ignores]
       settings: [settings]
       mail: [inbox]
-      vote: [stats]
   # Extra player tables a wipe takes (data-driven; also how modules added later join without code). key-column holds
   # the player's UUID as TEXT. "reset:" sets columns instead of deleting the row. The entries below map the other groups'
   # current tables; each owning module should confirm it keeps no copy of these rows in memory while the player is offline.
@@ -2141,7 +2088,6 @@ wipe:
     - {module: daily, id: stats, label: daily reward streak, table: pvp_daily_stats, key-column: uuid, category: progress}
     - {module: plots, id: plot, label: 'plot upgrades, gen tier, defences and shield', table: gens_plots, key-column: uuid, category: progress}
     - {module: plots, id: progress, label: 'tokens, caches, milestones, gear and rebirths', table: gens_players, key-column: uuid, category: progress}
-    - {module: vote, id: stats, label: vote totals and streak, table: pvp_vote_stats, key-column: uuid, category: progress}
     - {module: settings, id: settings, label: personal settings, table: pvp_settings, key-column: uuid, category: identity}
     - {module: mail, id: inbox, label: mail inbox, table: pvp_mail, key-column: recipient_uuid, category: identity}
   # Receipt wording overrides, e.g. receipts: {core: {describe: "..."}}
@@ -2200,14 +2146,14 @@ info:
         tags:     { slot: 29, material: NAME_TAG,      name: '&5/tags',     lore: ['&7Wear a chat tag.'], command: tags }
         lb:       { slot: 30, material: PLAYER_HEAD,   name: '&e/leaderboard', lore: ['&7Richest players and more.'], command: leaderboard }
         daily:    { slot: 31, material: CLOCK,         name: '&a/daily',    lore: ['&7Daily rewards.'], command: daily }
-        vote:     { slot: 32, material: LIME_DYE,      name: '&a/vote',     lore: ['&7Vote for rewards.'], command: vote }
+        pets:     { slot: 32, material: EGG,           name: '&d/pets',     lore: ['&7Hatch and equip pets.'], command: pets }
         rules:    { slot: 33, material: WRITABLE_BOOK, name: '&c/rules',    lore: ['&7What''s allowed.'], command: rules }
         store:    { slot: 40, material: GOLD_BLOCK,    glow: true, name: '&6&l/store', lore: ['&7Ranks, keys and more.'], command: store }
       chat:
         - '&8&m                                        '
         - '&6&lGUIDE'
         - '&e/menu   &e/plot   &e/spawn   &e/tpa <name>'
-        - '&e/powers   &e/crates   &e/tags   &e/daily   &e/vote'
+        - '&e/powers   &e/crates   &e/tags   &e/daily   &e/pets'
         - '&8&m                                        '
     ranks:
       title: '&c&l❄ &f&lRANKS &c&l❄'
@@ -2368,12 +2314,6 @@ keycrates:
     crate: amethyst
     minutes: 60
     count-afk: false
-  # Paid by the vote module hook (group-f.md section 2).
-  vote:
-    crate: vote
-    keys: 1
-    shards: 30
-    message: '&6&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}'
   # Every crate win is announced. Wins with a chance below broadcast-under % get the "rare" line.
   broadcast-under: 5.0
   broadcast: '&6&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!'
@@ -2432,7 +2372,7 @@ seasonpass:
     daily-count: 3
     weekly-count: 3
     # type: KILL_PLAYERS, KILL_MOBS, MINE_BLOCKS, FISH, BREED_ANIMALS, PLAYTIME_MINUTES (counted by GensCore),
-    # SELL_ITEMS, OPEN_CRATES, VOTE (need the hooks in integration/group-h.md, or /pass progress), CUSTOM (/pass progress
+    # SELL_ITEMS, OPEN_CRATES (need the hooks in integration/group-h.md, or /pass progress), CUSTOM (/pass progress
     # with the filter as a tag). filter: material / entity type names (empty = anything).
     daily:
       - {id: mine-stone, type: MINE_BLOCKS, amount: 500, xp: 40, filter: [STONE, DEEPSLATE, COBBLESTONE], name: '&fMine 500 stone'}
@@ -2444,7 +2384,6 @@ seasonpass:
       - {id: breed, type: BREED_ANIMALS, amount: 10, xp: 30, name: '&fBreed 10 animals'}
       - {id: play-60, type: PLAYTIME_MINUTES, amount: 60, xp: 50, name: '&fPlay for an hour'}
       - {id: sell-items, type: SELL_ITEMS, amount: 500, xp: 40, name: '&fSell 500 items'}
-      - {id: vote, type: VOTE, amount: 1, xp: 40, name: '&fVote for the server'}
     weekly:
       - {id: kill-players-w, type: KILL_PLAYERS, amount: 25, xp: 250, name: '&fKill 25 players'}
       - {id: kill-mobs-w, type: KILL_MOBS, amount: 500, xp: 200, name: '&fKill 500 mobs'}
@@ -2452,7 +2391,6 @@ seasonpass:
       - {id: diamonds-w, type: MINE_BLOCKS, amount: 64, xp: 250, filter: [DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE], name: '&fMine 64 diamond ore'}
       - {id: play-w, type: PLAYTIME_MINUTES, amount: 600, xp: 250, name: '&fPlay for 10 hours'}
       - {id: crates-w, type: OPEN_CRATES, amount: 10, xp: 200, name: '&fOpen 10 crates'}
-      - {id: vote-w, type: VOTE, amount: 7, xp: 250, name: '&fVote 7 times'}
       - {id: fish-w, type: FISH, amount: 100, xp: 200, name: '&fCatch 100 fish'}
   # Rewards per tier. Tiers not listed have no reward on that track. Placeholder amounts: tune them for the economy.
   tiers:
@@ -2651,7 +2589,6 @@ modules:
   settings: true
   trade: false        # player trading is after launch
   mail: false
-  vote: true
   polls: false
   leaderboards: true
   crates: true

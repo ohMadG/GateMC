@@ -15,8 +15,6 @@ import me.Evan52098.genscore.storage.Database;
 import me.Evan52098.genscore.storage.Migrations;
 import me.Evan52098.genscore.util.Money;
 import me.Evan52098.genscore.util.Msg;
-import me.Evan52098.genscore.vote.VoteModule;
-import me.Evan52098.genscore.vote.VoteStats;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -53,8 +51,8 @@ import java.util.function.ToLongFunction;
 import java.util.logging.Level;
 
 /**
- * Leaderboards over GensCore's own data: richest players (pvp_balances), most playtime (pvp_players) and, when the vote
- * module is on, most votes and best voting streak (pvp_vote_stats). BlockvilleCore built these from its balance top,
+ * Leaderboards over GensCore's own data: richest players (pvp_balances), most playtime (pvp_players).
+ * BlockvilleCore built these from its balance top,
  * PlaytimeService's playtime top and the {@code bvcore_leaderboard_stats} store (rank placeholders, the balance top
  * menu, and floating TextDisplay boards placed with a command); this module ports those:
  * <ul>
@@ -202,32 +200,6 @@ public final class LeaderboardsModule implements GensModule {
             GensPlayer g = plots == null ? null : plots.gensPlayer(uuid);
             return g == null ? -1 : g.rebirths();
         }));
-        if (plugin.modules().get(VoteModule.class) != null) {
-            register(votesBoard("votes", "Top Voters", "Votes", Material.PAPER, "total_votes", VoteStats::totalVotes));
-            register(votesBoard("vote-streak", "Best Voting Streaks", "Best streak", Material.BLAZE_POWDER, "best_streak", VoteStats::bestStreak));
-        }
-    }
-
-    private Board votesBoard(String id, String title, String label, Material icon, String column, ToLongFunction<VoteStats> read) {
-        return new Board(id, title, label, icon, (database, limit) -> database.sync(c -> {
-            List<Entry> out = new ArrayList<>();
-            try (PreparedStatement ps = c.prepareStatement(
-                    "SELECT v.uuid, p.name, v." + column + " FROM pvp_vote_stats v LEFT JOIN pvp_players p ON p.uuid = v.uuid "
-                            + "WHERE v." + column + " > 0 ORDER BY v." + column + " DESC LIMIT ?")) {
-                ps.setInt(1, limit + 20);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String name = rs.getString(2);
-                        out.add(new Entry(UUID.fromString(rs.getString(1)), name != null ? name : "?", rs.getLong(3)));
-                    }
-                }
-            }
-            return out;
-        }), v -> String.format(Locale.ROOT, "%,d", v), uuid -> {
-            VoteModule votes = plugin.modules().get(VoteModule.class);
-            VoteStats s = votes == null ? null : votes.stats(uuid);
-            return s == null ? -1 : read.applyAsLong(s);
-        });
     }
 
     /** Adds a board (for other modules, while enabling). Replaces one with the same id. */

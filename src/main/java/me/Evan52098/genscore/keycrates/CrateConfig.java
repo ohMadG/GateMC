@@ -95,10 +95,6 @@ final class CrateConfig {
     final @Nullable String playtimeCrate;
     final int playtimeMinutes;
     final boolean playtimeCountAfk;
-    final @Nullable String voteCrate;
-    final int voteKeys;
-    final long voteShards;
-    final String voteMessage;
     final double broadcastUnder;
     final String broadcast;
     final String broadcastRare;
@@ -125,10 +121,6 @@ final class CrateConfig {
         playtimeCrate = known(s.getString("playtime.crate", "amethyst"), crates, "playtime.crate", logger);
         playtimeMinutes = Math.max(1, Math.min(24 * 60, s.getInt("playtime.minutes", 60)));
         playtimeCountAfk = s.getBoolean("playtime.count-afk", false);
-        voteCrate = known(s.getString("vote.crate", ""), crates, "vote.crate", logger);
-        voteKeys = Math.max(0, Math.min(64, s.getInt("vote.keys", 0)));
-        voteShards = Math.max(0, Math.min(1_000_000, s.getLong("vote.shards", 30)));
-        voteMessage = s.getString("vote.message", "&6&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}");
         broadcastUnder = s.getDouble("broadcast-under", 5.0);
         broadcast = s.getString("broadcast", "&6&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!");
         broadcastRare = s.getString("broadcast-rare", "&d&l✦ RARE WIN ✦ &f{player} &7won {reward} &7from the {crate}&7! &8({chance}%)");
