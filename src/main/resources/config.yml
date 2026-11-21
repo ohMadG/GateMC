@@ -2019,6 +2019,92 @@ leaderboards:
   rows: 100
 
 # Anti x-ray: ore-watch vein alerts plus the "Nightwatch" anti-autominer (BlockvilleCore's ore-watch: and anti-miner:).
+discord:
+  enabled: true
+  invite: 'https://discord.gg/gatemc'
+  # How long a /link code works.
+  code-minutes: 10
+  # How often link and boost changes from the Discord bot are picked up.
+  poll-seconds: 15
+  # A player can't /unlink until this long after linking.
+  unlink-cooldown-hours: 24
+  # Paid once per Minecraft account and once per Discord account.
+  link-reward:
+    - {command: 'gensreward {player} tokens 25', display: '&e25 Tokens'}
+    - {keys: {crate: vote, amount: 2}}
+  role-sync:
+    # Discord role id -> LuckPerms group, given in game while the linked player has the role.
+    groups: {}
+    # Ranks written to the database so the bot can give matching Discord roles.
+    ranks: [vip, vipplus, mvp, mvpplus, legend]
+    rank-sync-seconds: 300
+  nitro:
+    # Given while a linked player is boosting, removed when they stop or unlink.
+    permissions:
+      - genscore.turbo
+      - genscore.nitro
+    # No kits on GateMC: the /nitro menu shows the monthly reward instead.
+    kit: ''
+    broadcast: true
+    # Every this many days of boosting (adds up across boosts), the booster gets these once, automatically.
+    monthly:
+      enabled: true
+      days: 30
+      rewards:
+        - {command: 'pets egg give {player} epic 1', display: '&5Epic Pet Egg'}
+    # Steps on the /nitro path, by total days boosted. Each step is claimed once per Discord account, while boosting.
+    path:
+      - id: boost
+        days: 0
+        name: 'Booster'
+        icon: AMETHYST_SHARD
+        description: ['Thanks for boosting!']
+        rewards:
+          - {command: 'gensreward {player} tokens 25', display: '&e25 Tokens'}
+          - {command: 'pets egg give {player} rare 1', display: '&9Rare Pet Egg'}
+      - id: week
+        days: 7
+        name: '1 Week'
+        icon: AMETHYST_CLUSTER
+        rewards:
+          - {command: 'gensreward {player} tokens 30', display: '&e30 Tokens'}
+          - {keys: {crate: vote, amount: 2}}
+      - id: month
+        days: 30
+        name: '1 Month'
+        icon: DIAMOND
+        rewards:
+          - {command: 'gensreward {player} tokens 50', display: '&e50 Tokens'}
+          - {keys: {crate: cosmetic, amount: 1}}
+      - id: two-months
+        days: 60
+        name: '2 Months'
+        icon: EMERALD
+        rewards:
+          - {keys: {crate: amethyst, amount: 1}}
+          - {command: 'credits give {player} 50', display: '&b50 Credits'}
+      - id: three-months
+        days: 90
+        name: '3 Months'
+        icon: NETHERITE_INGOT
+        rewards:
+          - {keys: {crate: amethyst, amount: 2}}
+      - id: six-months
+        days: 180
+        name: '6 Months'
+        icon: NETHER_STAR
+        rewards:
+          - {keys: {crate: op, amount: 1}}
+          - {command: 'pets egg give {player} legendary 1', display: '&6Legendary Pet Egg'}
+      - id: year
+        days: 365
+        name: '1 Year'
+        icon: DRAGON_EGG
+        rewards:
+          - {keys: {crate: op, amount: 2}}
+          - {command: 'pets egg give {player} legendary 1', display: '&6Legendary Pet Egg'}
+          - {command: 'credits give {player} 250', display: '&b250 Credits'}
+
 antihack:
   enabled: true
   # Checks that are stopped, not just reported: speed and fly pull the player back, reach cancels the hit.

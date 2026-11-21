@@ -101,6 +101,7 @@ public final class GensCore extends JavaPlugin {
         modules.register(new me.Evan52098.genscore.npcs.NpcsModule());
         modules.register(new me.Evan52098.genscore.weekly.WeeklyModule());
         modules.register(new me.Evan52098.genscore.merchant.MerchantModule());
+        modules.register(new me.Evan52098.genscore.discord.DiscordModule());
         modules.enableAll();
         connectModules();
 
