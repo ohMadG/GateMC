@@ -48,7 +48,8 @@ final class CrateConfig {
 
     record Crate(String id, String name, String keyName, Material keyMaterial, @Nullable NamespacedKey keyModel,
                  ItemStack icon, int menuSlot, List<String> hologram, double hologramHeight, List<String> locations,
-                 boolean noDuplicates, List<Reward> rewards, double totalWeight, @Nullable String model, org.bukkit.Color color) {
+                 boolean noDuplicates, List<Reward> rewards, double totalWeight, @Nullable String model, org.bukkit.Color color,
+                 long creditPrice) {
 
         @Nullable Reward reward(String rewardId) {
             for (Reward r : rewards) {
@@ -309,7 +310,8 @@ final class CrateConfig {
                 c.getInt("menu-slot", -1), List.copyOf(c.getStringList("hologram")),
                 Double.isNaN(height) ? 1.6 : Math.max(0.5, Math.min(5, height)),
                 List.copyOf(c.getStringList("locations")), c.getBoolean("no-duplicates", false), List.copyOf(rewards), total,
-                blankToNull(c.getString("model")), color(c.getString("color")));
+                blankToNull(c.getString("model")), color(c.getString("color")),
+                Math.max(0, Math.min(1_000_000_000L, c.getLong("credit-price", 0))));
     }
 
     private static @Nullable String blankToNull(@Nullable String s) {

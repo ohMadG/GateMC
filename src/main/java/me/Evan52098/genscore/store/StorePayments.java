@@ -137,6 +137,31 @@ final class StorePayments {
         });
     }
 
+    long totalSince(long fromMillis) throws SQLException {
+        return db.sync(c -> {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT COALESCE(SUM(amount_cents), 0) FROM pvp_store_payments WHERE status = ? AND created_at >= ?")) {
+                ps.setString(1, COMPLETE);
+                ps.setLong(2, fromMillis);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return Math.max(0, rs.next() ? rs.getLong(1) : 0L);
+                }
+            }
+        });
+    }
+
+    long markerTime(String kind, String ref) throws SQLException {
+        return db.sync(c -> {
+            try (PreparedStatement ps = c.prepareStatement("SELECT created_at FROM pvp_store_events WHERE kind = ? AND ref = ?")) {
+                ps.setString(1, kind);
+                ps.setString(2, ref);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getLong(1) : -1L;
+                }
+            }
+        });
+    }
+
     void adjust(YearMonth month, long cents, String by) throws SQLException {
         db.sync(c -> {
             try (PreparedStatement ps = c.prepareStatement(

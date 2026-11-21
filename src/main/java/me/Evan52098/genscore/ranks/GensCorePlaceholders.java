@@ -63,6 +63,9 @@ public final class GensCorePlaceholders extends PlaceholderExpansion {
                 String name = me.Evan52098.genscore.powers.PowersModule.activePowerName(player.getUniqueId());
                 return name == null || name.isEmpty() ? "&7None" : name.replace("&l", "");
             }
+            case "keyall" -> {
+                return me.Evan52098.genscore.store.StoreModule.keyAllPlaceholder();
+            }
             default -> {
                 String staff = me.Evan52098.genscore.staffmode.StaffModeModule.placeholder(online, id);
                 if (staff != null) {

@@ -2169,7 +2169,7 @@ info:
         crates:  { slot: 40, material: ENDER_CHEST, name: '&5&lCrate keys', command: store, lore: ['&7Keys are on the store too.'] }
 
 store:
-  url: 'https://hxsmp.tebex.store'
+  url: 'https://store.gatemc.org'
   link-label: '&6&l[CLICK FOR STORE]'
   message:
     - '&6&lSTORE &8» &7Ranks, crate keys & more: {store}'
@@ -2228,6 +2228,29 @@ store:
     reward:
       money: 250
       console-commands: []
+      player-commands: []
+  # Played for everyone when a Tebex package runs  storeadmin purchase {username} <item>  (and by /storeadmin celebrate).
+  # During the GG wave, "gg" in chat shows in rainbow and skips the chat cooldown.
+  celebration:
+    enabled: true
+    sound: 'hawkmc:donation'
+    volume: 0.6
+    gg-wave-seconds: 15
+    repeat-gap-seconds: 10
+    title: '&6&l{player}'
+    subtitle: '&fsupported GateMC! &7Type &a&lGG'
+    bossbar: '&6&lGG WAVE &8- &fthank &e{player}'
+    gg-wave-broadcast: '&6&lGG WAVE! &fType &a&lGG &fin chat to thank &e{player}&f! &7({seconds}s)'
+  # Every "every" dollars of completed store payments (counted from when this was first turned on) gives everyone
+  # online the reward once. Progress shows on the scoreboard (%genscore_keyall%): {current} into this step, {step}, {left}.
+  key-all:
+    enabled: true
+    every: 25.0
+    scoreboard: '&f{current}&7/&f{step}'
+    reached-broadcast: '&6&lKEY ALL &8» &7The store hit &f{step}&7! Everyone online gets a key.'
+    reward:
+      money: 0
+      console-commands: ['crate giveall cosmetic 1']
       player-commands: []
 
 # Rank badges and chat tags. Badges: the first entry the player has the permission for (default group.<id>, which
