@@ -7,7 +7,7 @@ final class CrateDefaults {
     }
 
     static final String CRATES_YML = """
-            # GensCore key crates. Settings (broadcasts, playtime keys, vote keys, welcome spin) are under keycrates: in config.yml.
+            # GensCore key crates. Settings (broadcasts, playtime keys, welcome spin) are under keycrates: in config.yml.
             #
             # Each crate:
             #   name, key (key item name), key-material (default TRIPWIRE_HOOK), key-model / icon-model (resource-pack item
@@ -28,11 +28,11 @@ final class CrateDefaults {
             crates:
 
               vote:
-                name: '&a&lVOTE CRATE'
-                key: '&aVote Key'
+                name: '&a&lCOMMON CRATE'
+                key: '&aCommon Key'
                 icon: LIME_SHULKER_BOX
                 menu-slot: 12
-                hologram: ['&a&lVOTE CRATE', '&eR-click &7open &8| &eL-click &7preview']
+                hologram: ['&a&lCOMMON CRATE', '&eR-click &7open &8| &eL-click &7preview']
                 locations: []
                 rewards:
                   diamond_helmet:     { weight: 7,  icon: DIAMOND_HELMET,     name: '&bDiamond Helmet &7(Prot II)',         glow: true, give: ['minecraft:diamond_helmet[enchantments={protection:2,unbreaking:1}]'] }

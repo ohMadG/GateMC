@@ -156,7 +156,7 @@ permissions:
   genscore.command.daily: {default: true}
   genscore.admin.dailyreward: {default: op}
   # auction, sell, homes
-  # settings, trade, mail, vote, polls, leaderboards
+  # settings, trade, mail, polls, leaderboards
   genscore.command.settings: {default: true}
   genscore.tptoggle: {default: true}
   genscore.tp.toggle.bypass: {default: op}
@@ -164,7 +164,6 @@ permissions:
   genscore.trade: {default: true}
   genscore.mail: {default: true}
   genscore.admin.poll: {default: op}
-  genscore.admin.votes: {default: op}
   genscore.leaderboard: {default: true}
   genscore.admin.leaderboards: {default: op}
   # anti x-ray, anti-hack, lag watch, wipe
