@@ -9,6 +9,7 @@
 #   token-double: chance a belt token pays double. cache-upgrade: extra chance a cache holds a better one.
 #   gate-seconds: extra seconds the gate stays shut. repair-speed: 0.5 = broken belts mend 50% sooner.
 #   raid-damage: extra damage per Raid Pick hit. raid-defense: 0.5 = raiders do half damage to your belt.
+#   golden-chance: chance a belt item turns to gold. golden-value: 4 = a golden item sells for 5x (raiders steal it at 5x too).
 # Durations and cooldowns are in seconds.
 
 menu-title: '&b&l⚡ &f&lPOWERS &b&l⚡'
@@ -109,8 +110,9 @@ list:
     op: true
     cost: 1200
     material: GOLD_BLOCK
-    lore: ['Everything you sell off', 'your belt is worth 50% more.']
-    sale-value: 0.50
+    lore: ['Items on your belt have a', '5% chance to turn to gold', 'and sell for 5x their value.']
+    golden-chance: 0.05
+    golden-value: 4
   hyperdrive:
     name: '&b&lHyperdrive'
     op: true

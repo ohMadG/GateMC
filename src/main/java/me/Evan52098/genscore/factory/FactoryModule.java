@@ -69,6 +69,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     private ProgressMenus menus;
     private Managers managers;
     private Lockpicks lockpicks;
+    private Trust trust;
     private final Map<UUID, Long> lastSwing = new ConcurrentHashMap<>();
     private final Map<Integer, Factory> bySlot = new ConcurrentHashMap<>();
     private final Map<UUID, Factory> byOwner = new ConcurrentHashMap<>();
@@ -79,7 +80,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     }
 
     @Override
-    public void enable(GensCore plugin) {
+    public void enable(GensCore plugin) throws Exception {
         this.plugin = plugin;
         powerHooks = this;
         this.plots = plugin.modules().get(PlotsModule.class);
@@ -92,6 +93,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         menus = new ProgressMenus(this);
         managers = new Managers(this, plugin);
         lockpicks = new Lockpicks(this, plugin, plugin.getConfig().getConfigurationSection("factory.lockpick"));
+        trust = new Trust(plugin);
         RankPerks.load(plugin.getConfig().getConfigurationSection("factory.rank-perks"));
         Tasks.global.timer(t -> {
             for (Player online : Bukkit.getOnlinePlayers()) {
@@ -102,6 +104,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             Tasks.onEntity(online, () -> managers.start(online));
         }
         plugin.commands().register(this);
+        plugin.commands().register(trust);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plots.service().addListener(this);
         plugin.getLogger().info("Factory: gate closes for " + settings.gateCloseSeconds() + "s, belt starts at "
@@ -392,7 +395,11 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     // ------------------------------------------------------------------ gate: keeping people out
 
     private boolean blockedFrom(Player p, Factory f) {
-        return f.gateClosed() && !p.getUniqueId().equals(f.view.owner()) && !bypasses(p);
+        return f.gateClosed() && !p.getUniqueId().equals(f.view.owner()) && !bypasses(p) && !trusted(f.view.owner(), p);
+    }
+
+    boolean trusted(@Nullable UUID owner, Player p) {
+        return trust != null && trust.trusts(owner, p.getUniqueId());
     }
 
     boolean bypasses(Player p) {
@@ -510,6 +517,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     }
 
     private void gateClicked(Player p, Factory f, boolean sneaking, Location at) {
+        if (!p.getUniqueId().equals(f.view.owner()) && trusted(f.view.owner(), p)) {
+            p.sendActionBar(Msg.good("You're trusted here. Walk right through the gate."));
+            return;
+        }
         if (!p.getUniqueId().equals(f.view.owner()) && f.gateClosed()
                 && lockpicks.isLockpick(p.getInventory().getItemInMainHand())) {
             lockpicks.start(p, f, at);
@@ -773,6 +784,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         Player p = event.getPlayer();
         event.setCancelled(true);
         if (p.getUniqueId().equals(f.view.owner())) {
+            return;
+        }
+        if (trusted(f.view.owner(), p)) {
+            p.sendActionBar(Msg.bad("This factory trusts you, so you can't raid it."));
             return;
         }
         if (!menus.isRaidPick(p.getInventory().getItemInMainHand())) {

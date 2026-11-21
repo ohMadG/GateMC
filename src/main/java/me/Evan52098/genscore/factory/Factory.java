@@ -89,20 +89,40 @@ final class Factory {
         final Material item;
         final long baseCents; // what this one item is worth before the belt bonus (rule 1: money from data)
         final int special;    // NORMAL, TOKEN, or CACHE + rarity: a drop that pays out at the sell point
+        final double gold;
         int display = -1;
         boolean placed; // its display has been put in place once (the first move is not animated)
 
-        BeltItem(double pos, Material item, long baseCents, int special) {
+        BeltItem(double pos, Material item, long baseCents, int special, double gold) {
             this.pos = pos;
             this.item = item;
             this.baseCents = baseCents;
             this.special = special;
+            this.gold = gold;
         }
 
-        /** What its display shows: the item, or the token / cache model. */
-        String look() {
-            return special == NORMAL ? item.name() : special == TOKEN ? "token" : "cache_" + GensPlayerRarity.name(special - CACHE);
+        boolean golden() {
+            return gold > 1;
         }
+
+        double worth() {
+            return golden() ? gold : 1;
+        }
+
+        String look() {
+            if (special != NORMAL) {
+                return special == TOKEN ? "token" : "cache_" + GensPlayerRarity.name(special - CACHE);
+            }
+            return golden() ? "golden" : item.name();
+        }
+    }
+
+    private static ItemStack goldenStack() {
+        ItemStack stack = new ItemStack(Material.GOLD_INGOT);
+        var meta = stack.getItemMeta();
+        meta.setEnchantmentGlintOverride(true);
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     static final int NORMAL = -1;
@@ -139,6 +159,7 @@ final class Factory {
     private boolean machinePulsed;  // the machine is scaled up and must settle back
     private long popupCents;        // sold this second, shown as a floating "+$X" over the sell point
     private int salesThisTick;
+    private int goldenThisTick;
 
     private final java.util.Random random = new java.util.Random();
     private final List<String> shownItem = new ArrayList<>(); // what each item display shows now
@@ -475,7 +496,7 @@ final class Factory {
     private void pushOutIntruders() {
         Location out = outsideGate();
         for (Player p : view.world().getNearbyPlayers(base, view.size())) {
-            if (p.getUniqueId().equals(view.owner()) || module.bypasses(p)) {
+            if (p.getUniqueId().equals(view.owner()) || module.bypasses(p) || module.trusted(view.owner(), p)) {
                 continue;
             }
             Location l = p.getLocation();
@@ -769,7 +790,14 @@ final class Factory {
                 } else if (roll < (ps.cacheChance() + ps.tokenChance()) * luck) {
                     special = TOKEN;
                 }
-                items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents(), special));
+                double gold = 0;
+                if (special == NORMAL) {
+                    double chance = me.Evan52098.genscore.powers.PowersModule.perk(view.owner(), "golden-chance");
+                    if (chance > 0 && random.nextDouble() < chance) {
+                        gold = 1 + me.Evan52098.genscore.powers.PowersModule.perk(view.owner(), "golden-value");
+                    }
+                }
+                items.addLast(new BeltItem(SPAWN_POS, out.item(), out.valueCents(), special, gold));
                 emitted = true;
                 genTimer -= s.genIntervalSeconds();
             } else {
@@ -815,7 +843,10 @@ final class Factory {
                 module.rewards().belt(view.owner(), sold.special);
                 continue;
             }
-            long value = Math.round(s.saleValue(sold.baseCents, length) * boost);
+            long value = Math.round(s.saleValue(sold.baseCents, length) * boost * sold.worth());
+            if (sold.golden()) {
+                goldenThisTick++;
+            }
             pendingCents += value;
             popupCents += value;
             salesThisTick++;
@@ -991,6 +1022,15 @@ final class Factory {
             }
         }
         salesThisTick = 0;
+        if (goldenThisTick > 0 && path.size() > 0) {
+            Vector end = path.at(activeLength());
+            Location at = new Location(view.world(), end.getX(), end.getY() + 0.4, end.getZ());
+            view.world().spawnParticle(org.bukkit.Particle.DUST, at, 24, 0.3, 0.3, 0.3, 0,
+                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(255, 200, 40), 1.3f));
+            view.world().spawnParticle(org.bukkit.Particle.WAX_OFF, at, 6, 0.25, 0.2, 0.25, 0.3);
+            view.world().playSound(at, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.7f, 1.6f);
+        }
+        goldenThisTick = 0;
     }
 
     /** A floating "+$X" that rises over the sell point and fades, once a second. */
@@ -1225,7 +1265,7 @@ final class Factory {
             String look = item.look();
             if (!look.equals(shownItem.get(item.display))) {
                 shownItem.set(item.display, look);
-                d.setItemStack(item.special == NORMAL ? new ItemStack(item.item) : modelItem(look));
+                d.setItemStack(item.special != NORMAL ? modelItem(look) : item.golden() ? goldenStack() : new ItemStack(item.item));
             }
             d.setInterpolationDelay(0);
             // The first placement jumps straight there; after that every move glides over one update period.
@@ -1696,7 +1736,7 @@ final class Factory {
                 it.remove();
                 releaseDisplay(item);
                 view.world().spawnParticle(org.bukkit.Particle.ITEM, at, 10, 0.3, 0.3, 0.3, 0.08,
-                        new ItemStack(item.special == NORMAL ? item.item : Material.SUNFLOWER));
+                        new ItemStack(item.special != NORMAL ? Material.SUNFLOWER : item.golden() ? Material.GOLD_INGOT : item.item));
                 if (item.special == TOKEN) {
                     tokens++;
                 } else if (item.special >= CACHE) {
@@ -1705,7 +1745,7 @@ final class Factory {
                         raiderData.addCache(item.special - CACHE, 1);
                     }
                 } else {
-                    loot += Math.round(s.saleValue(item.baseCents, length) * share);
+                    loot += Math.round(s.saleValue(item.baseCents, length) * share * item.worth());
                 }
             }
         }
@@ -1820,6 +1860,7 @@ final class Factory {
 
     private boolean intruder(Player p) {
         return !p.getUniqueId().equals(view.owner()) && !module.bypasses(p) && !p.isDead()
+                && !module.trusted(view.owner(), p)
                 && !me.Evan52098.genscore.hub.HubModule.cloaked(p)
                 && (p.getGameMode() == org.bukkit.GameMode.SURVIVAL || p.getGameMode() == org.bukkit.GameMode.ADVENTURE);
     }
