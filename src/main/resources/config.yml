@@ -2013,8 +2013,10 @@ polls:
 leaderboards:
   # How long a board is cached before it is read again.
   cache-seconds: 60
-  # Rows per board (at most 10).
+  # Rows per page (at most 10).
   size: 10
+  # How many players each board loads; pages are size rows each.
+  rows: 100
 
 # Anti x-ray: ore-watch vein alerts plus the "Nightwatch" anti-autominer (BlockvilleCore's ore-watch: and anti-miner:).
 antihack:
