@@ -109,11 +109,7 @@ final class PetFollower {
         for (int i = 0; i < s.displays().size(); i++) {
             ItemDisplay d = s.displays().get(i);
             Location to = target(base, i, t);
-            if (Tasks.owns(d)) {
-                d.teleport(to);
-            } else {
-                d.teleportAsync(to);
-            }
+            d.teleportAsync(to);
         }
     }
 
