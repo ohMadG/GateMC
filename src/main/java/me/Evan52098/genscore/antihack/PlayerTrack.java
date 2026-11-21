@@ -28,7 +28,9 @@ final class PlayerTrack {
     double speedDistance;
     int fastSurfaceUntilTick;
     Location lastSafe;
+    Location speedStart;
     int lastSetbackTick = -1000;
+    boolean settingBack;
 
     final double[] historyX = new double[HISTORY];
     final double[] historyY = new double[HISTORY];
@@ -50,6 +52,7 @@ final class PlayerTrack {
         this.hover = 0;
         this.speedSamples = 0;
         this.speedDistance = 0.0;
+        this.speedStart = null;
     }
 
     void recordPosition(double x, double y, double z) {

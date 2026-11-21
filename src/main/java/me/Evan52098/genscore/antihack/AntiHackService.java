@@ -104,6 +104,7 @@ public final class AntiHackService implements Listener {
     private volatile boolean enabled;
     private volatile boolean strict;
     private volatile boolean kick;
+    private volatile java.util.Set<AntiHackCheck> enforced = java.util.EnumSet.noneOf(AntiHackCheck.class);
     private volatile boolean setback;
     private volatile AntiHackLevel alertLevel = AntiHackLevel.MEDIUM;
 
@@ -153,6 +154,26 @@ public final class AntiHackService implements Listener {
         strict = overrides.getBoolean("strict", s);
         kick = overrides.getBoolean("kick", k);
         setback = overrides.getBoolean("setback", b);
+        java.util.Set<AntiHackCheck> en = java.util.EnumSet.noneOf(AntiHackCheck.class);
+        List<String> names = config != null && config.isList("enforce") ? config.getStringList("enforce") : List.of("speed", "fly", "reach");
+        for (String name : names) {
+            switch (name.toLowerCase(java.util.Locale.ROOT)) {
+                case "speed" -> en.add(AntiHackCheck.SPEED);
+                case "fly" -> {
+                    en.add(AntiHackCheck.FLY_HOVER);
+                    en.add(AntiHackCheck.FLY_RISE);
+                }
+                case "reach" -> en.add(AntiHackCheck.REACH);
+                default -> {
+                    try {
+                        en.add(AntiHackCheck.valueOf(name.toUpperCase(java.util.Locale.ROOT)));
+                    } catch (IllegalArgumentException ignored) {
+                        plugin.getLogger().warning("[AntiHack] Unknown check in antihack.enforce: " + name);
+                    }
+                }
+            }
+        }
+        enforced = en;
         AntiHackLevel parsed = AntiHackLevel.parse(level, AntiHackLevel.MEDIUM);
         alertLevel = parsed == AntiHackLevel.NONE ? AntiHackLevel.LOW : parsed;
     }
@@ -191,6 +212,10 @@ public final class AntiHackService implements Listener {
 
     public boolean isSetback() {
         return setback;
+    }
+
+    public boolean enforces(AntiHackCheck check) {
+        return enabled && enforced.contains(check);
     }
 
     public AntiHackLevel alertLevel() {
@@ -329,14 +354,17 @@ public final class AntiHackService implements Listener {
 
     /** Player's thread. */
     void flag(Player player, PlayerTrack track, AntiHackCheck check) {
+        flag(player, track, check, null);
+    }
+
+    void flag(Player player, PlayerTrack track, AntiHackCheck check, @Nullable Location backTo) {
         track.offenses.addLast(new PlayerTrack.Offense(System.currentTimeMillis(), check));
-        if (setback && check.isMovement()) {
-            setBack(player, track);
+        if (check.isMovement() && (setback || enforced.contains(check))) {
+            setBack(player, track, backTo != null && backTo.getWorld() == player.getWorld() ? backTo : track.lastSafe);
         }
     }
 
-    private void setBack(Player player, PlayerTrack track) {
-        Location safe = track.lastSafe;
+    private void setBack(Player player, PlayerTrack track, @Nullable Location safe) {
         if (safe == null || track.tick - track.lastSetbackTick < 20) {
             return;
         }
@@ -346,6 +374,7 @@ public final class AntiHackService implements Listener {
         Tasks.entity.run(player, () -> {
             target.setYaw(player.getLocation().getYaw());
             target.setPitch(player.getLocation().getPitch());
+            track.settingBack = true;
             player.teleportAsync(target, PlayerTeleportEvent.TeleportCause.PLUGIN);
         });
     }
@@ -497,6 +526,12 @@ public final class AntiHackService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onTeleport(PlayerTeleportEvent event) {
+        PlayerTrack track = track(event.getPlayer());
+        if (track.settingBack) {
+            track.settingBack = false;
+            grace(event.getPlayer(), 5);
+            return;
+        }
         grace(event.getPlayer(), 60);
     }
 

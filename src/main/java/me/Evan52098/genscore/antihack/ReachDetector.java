@@ -39,7 +39,7 @@ final class ReachDetector implements Listener {
             return;
         }
         this.service.flag(attacker, track, AntiHackCheck.REACH);
-        if (this.service.isSetback()) {
+        if (this.service.isSetback() || this.service.enforces(AntiHackCheck.REACH)) {
             event.setCancelled(true);
         }
     }

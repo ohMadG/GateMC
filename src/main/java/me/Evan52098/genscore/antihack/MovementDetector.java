@@ -75,7 +75,7 @@ final class MovementDetector implements Listener {
         }
 
         if ((terrain & Terrain.MEDIUM) == 0 && tick >= track.fastSurfaceUntilTick) {
-            this.checkSpeed(player, track, horizontal);
+            this.checkSpeed(player, track, from, horizontal);
         } else {
             track.speedSamples = 0;
             track.speedDistance = 0.0;
@@ -124,9 +124,12 @@ final class MovementDetector implements Listener {
         return BASE_JUMP_HEIGHT * (launch / 0.42) * (launch / 0.42);
     }
 
-    private void checkSpeed(Player player, PlayerTrack track, double horizontal) {
+    private void checkSpeed(Player player, PlayerTrack track, Location from, double horizontal) {
         if (horizontal <= 0.0) {
             return;
+        }
+        if (track.speedSamples == 0) {
+            track.speedStart = from.clone();
         }
         track.speedDistance += horizontal;
         track.speedSamples++;
@@ -138,17 +141,20 @@ final class MovementDetector implements Listener {
         track.speedSamples = 0;
         double margin = this.service.isStrict() ? 1.06 : 1.18;
         double limit = movementAttribute(player) * WALK_PER_TICK_PER_ATTRIBUTE * SPRINT_JUMP_FACTOR * margin;
+        Location start = track.speedStart;
+        track.speedStart = null;
         if (average > limit) {
-            this.service.flag(player, track, AntiHackCheck.SPEED);
+            this.service.flag(player, track, AntiHackCheck.SPEED, start);
         }
     }
 
     private static double movementAttribute(Player player) {
+        double walk = Math.max(1.0, player.getWalkSpeed() / 0.2);
         AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
         if (attribute != null) {
-            return attribute.getValue();
+            return attribute.getValue() * walk;
         }
         PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
-        return 0.13 * (1.0 + 0.2 * (speed == null ? 0 : speed.getAmplifier() + 1));
+        return 0.13 * (1.0 + 0.2 * (speed == null ? 0 : speed.getAmplifier() + 1)) * walk;
     }
 }

@@ -2021,6 +2021,8 @@ leaderboards:
 # Anti x-ray: ore-watch vein alerts plus the "Nightwatch" anti-autominer (BlockvilleCore's ore-watch: and anti-miner:).
 antihack:
   enabled: true
+  # Checks that are stopped, not just reported: speed and fly pull the player back, reach cancels the hit.
+  enforce: [speed, fly, reach]
   strict: false
   setback: false
   kick: false
