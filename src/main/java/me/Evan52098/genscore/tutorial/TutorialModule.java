@@ -80,91 +80,49 @@ public final class TutorialModule implements GensModule, Listener {
     private static final String GUIDE = "<green><bold>Guide</bold></green> <dark_gray>»</dark_gray> ";
 
     static final List<Beat> SCRIPT = List.of(
-            new Chapter("Welcome to GateMC", "Your factory tutorial"),
-            new Say("Hey! I'm the Guide. I'll walk you through everything, one step at a time."),
-            new Say("GateMC is a <gold>factory tycoon</gold>. You own a factory, it makes items, a <white>conveyor belt</white> carries them, and they sell for money."),
-            new Say("You spend that money to grow the factory, and you raid other players' factories to steal theirs. They will try to raid you too."),
-            new Say("When I give you a job, it shows in the <yellow>bar at the top</yellow>. Click any of my messages to skip ahead. <white>/tutorial</white> repeats the current step."),
+            new Chapter("Welcome to GateMC", "Quick factory tutorial"),
+            new Say("Hey, I'm the Guide! This only takes a couple of minutes. Click my messages to skip ahead."),
 
             new Chapter("1. Your Factory", "Where the money comes from"),
-            new Say("First, let's go home. Every player gets their own factory on a platform."),
             new Wait("factory", "Go to your factory", "/plot", "home"),
-            new Say("This is yours. Nobody can build here and you can't lose it."),
             new Point("gen", "GENERATOR"),
-            new Say("That's your <gold>generator</gold>. It makes an item every moment and drops it on the start of the belt."),
+            new Say("Your <gold>generator</gold> makes items and drops them on the belt."),
             new Point("belt", "CONVEYOR BELT"),
-            new Say("The <white>belt</white> carries items along. Every working belt segment adds <green>+10%</green> to the item's value, so a longer belt means more money per item."),
+            new Say("The <white>belt</white> carries them along. A longer belt makes every item worth more."),
             new Point("sell", "SELL POINT"),
-            new Say("At the end of the belt, items sell automatically and the money lands in your balance every few seconds. While I'm showing you around, sales don't pay out yet: you get a <gold>starting bonus</gold> when you finish."),
+            new Say("Items sell here. Sales don't pay during the tutorial: you get a <gold>starting bonus</gold> at the end."),
             new Wait("sale", "Watch your first item sell", "/belt", null),
             new Clear(),
-            new Say("<green>Ka-ching!</green> That's your factory working. Once the tutorial is done it keeps earning while you're online, even while you walk around."),
 
-            new Chapter("2. Upgrades", "Make more, sell faster"),
-            new Say("Open your belt menu with <white>/belt</white>. There are three main upgrades in it, and the ones I ask for are <green>free</green> during the tutorial."),
-            new Say("<gold>Gen</gold>: your generator makes better items. There are 150 tiers, from Cobblestone up to Dragon Eggs, and each tier is worth more."),
+            new Chapter("2. Upgrades", "Free during the tutorial"),
+            new Say("Open <white>/belt</white>. The upgrades I ask for are <green>free</green> right now."),
             new Wait("gen", "Upgrade your Gen once", "/belt", null),
-            new Say("Nice. <white>Length</white> adds belt segments: more items on the belt at once, and each one is worth more when it sells."),
             new Wait("length", "Buy a Length upgrade", "/belt", null),
-            new Say("<white>Speed</white> moves the belt faster, so more items sell every second. Speed is how your income really grows."),
             new Wait("speed", "Buy a Speed upgrade", "/belt", null),
-            new Say("Those were on the house. From now on upgrades cost money, and they get pricier as you go. Early ones are quick, later ones take a while. That's normal: keep the belt running and keep buying."),
+            new Say("<gold>Gen</gold> makes better items, <white>Length</white> adds belt and <white>Speed</white> sells faster. After this they cost money."),
 
-            new Chapter("3. Tokens & Caches", "The second currency"),
-            new Say("Now and then a <yellow>token</yellow> or a <light_purple>cache</light_purple> rides your belt instead of an item. You can spot them by their model."),
-            new Say("Tokens pay for the token shop, defences, powers and managers. Caches are mystery boxes: money, tokens, crate keys and pet eggs."),
-            new Say("Tokens also come from raids, daily tasks, events and the hourly playtime reward."),
+            new Chapter("3. Tokens", "The second currency"),
+            new Say("<yellow>Tokens</yellow> and <light_purple>caches</light_purple> sometimes ride your belt. Tokens buy defences, powers and shop upgrades."),
             new Wait("tokens", "Open the token shop", "/tokens", null),
-            new Say("<gold>Sell value</gold> adds to everything you sell, forever. <green>Drop luck</green> makes tokens and caches show up more often. Both are great first buys."),
 
             new Chapter("4. Your Gate", "The only way in"),
-            new Say("Here's the important part. Raiders can only get into your factory while your <red>gate is open</red>."),
+            new Say("Raiders can only get in while your <red>gate is open</red>. It's open now."),
             new Point("button", "GATE BUTTON"),
-            new Say("Press the button at your gate (or type <white>/gate</white>) to close it. It stays shut for <white>45 seconds</white>, then rolls open again."),
-            new Say("In the last few seconds you can <white>re-up</white> it to keep it closed. Clicking too early or on a perfect timer gets it locked for a bit, so play it like a person."),
+            new Say("Press the button or type <white>/gate</white> to shut it for 45 seconds. Re-up it in the last few seconds."),
             new Wait("gate", "Close your gate", "/gate", "gate"),
             new Clear(),
-            new Say("Closed! Raiders bounce off it now. Players inside get pushed out when it shuts."),
-            new Say("Brand new players get a 15 minute shield on top, so nobody can raid you while you learn."),
+            new Say("Closed! New players also get a 15 minute shield."),
 
             new Chapter("5. Defences", "Make raiders regret it"),
-            new Say("You can't keep the gate closed forever, so build defences. Open <white>/defence</white> to see them."),
-            new Say("<white>Armour</white> gives every belt segment more health. <red>Turrets</red> shoot anyone who walks in. <dark_purple>Traps</dark_purple> slow intruders and, later, throw them back out."),
-            new Say("<white>Gate time</white> keeps your gate closed longer with each level."),
             new Point("turret", "TURRET"),
-            new Wait("turret", "Buy a Turret in /defence", "/defence", null),
+            new Wait("turret", "Buy a Turret in /defence (free)", "/defence", null),
             new Clear(),
-            new Say("Your turret is up. An alarm also tells you whenever someone walks into your factory."),
+            new Say("<red>Turrets</red> shoot intruders. <white>/defence</white> also has armour, traps and longer gate time."),
 
             new Chapter("6. Raiding", "Take their money"),
-            new Say("Your turn to attack. Find a factory with an <red>open gate</red>, walk in and break its belt with a <white>Raid Pick</white>."),
-            new Say("Each belt segment takes a few hits. When it breaks, you take part of the items on it, a share of the owner's balance and a token."),
-            new Say("After you break <white>3 segments</white> the factory gets a 5 minute shield. Broken belts fix themselves after a while, so be quick."),
-            new Say("While you're raiding, money the owner earns is <gold>siphoned</gold> to you until they close their gate. Watch out for their turrets!"),
+            new Say("Walk into a factory with an <red>open gate</red> and break its belt with a <white>Raid Pick</white> to steal money."),
             new Wait("raidpick", "Grab a Raid Pick from /gear", "/gear", null),
-            new Say("Upgrading your gear in <white>/gear</white> hits harder and loots more. It costs money, not tokens."),
-            new Say("Gate closed? A <white>Lockpick</white> (10 tokens) lets you pick it with a quick minigame. <white>/cloak</white> makes you invisible to turrets for a short time."),
-            new Say("Playing with friends? <white>/trust</white> lets someone through your gate, past your turrets, and stops them raiding you."),
-
-            new Chapter("7. Growing Big", "The long game"),
-            new Say("<gold>Machines</gold> unlock as your belt gets longer. Each one multiplies everything that passes it: Smelter, Polisher, Refinery and more."),
-            new Wait("machines", "Look at /machines", "/machines", null),
-            new Say("<white>Managers</white> keep upgrading your factory for you while you play. Ranks get some for free."),
-            new Wait("managers", "Look at /managers", "/managers", null),
-            new Say("<light_purple>Powers</light_purple> are perks you buy with tokens: faster belts, better luck, stronger raids, tougher defences. Only one is active at a time."),
-            new Wait("powers", "Open /powers", "/powers", null),
-            new Say("<green>Pets</green> hatch from eggs and follow you around, each with a bonus. Three of the same pet merge into a golden one."),
-            new Wait("pets", "Open /pets", "/pets", null),
-            new Say("Once your Gen reaches tier 60, you can <light_purple>/rebirth</light_purple>. You start the factory again, but sell for <green>+50%</green> forever, and it stacks each time."),
-            new Say("Rebirth keeps everything you bought with tokens: managers, defences, powers, pets and the token shop."),
-
-            new Chapter("8. Every Day", "Free stuff"),
-            new Say("<white>/daily</white> gives you cash or a 2x money boost every day. Claim it daily to build a streak for bigger rewards."),
-            new Wait("daily", "Claim your /daily reward", "/daily", null),
-            new Say("<white>/tasks</white> has three new tasks every day. <white>/weekly</white> boards pay prizes to the top earners and raiders each week."),
-            new Say("Watch for <yellow>events</yellow> like 2x money, and the <gold>Travelling Merchant</gold> at spawn every hour with deals."),
-            new Say("Link your Discord with <white>/link</white> for a reward. Boosting the Discord gives a pet egg every month."),
-            new Say("<white>/menu</white> (the Nether Star in slot 5) has everything I showed you. <white>/tutorial book</white> has it all written down."),
+            new Say("<white>/trust</white> lets friends through your gate. <white>/menu</white> has everything else, and <white>/tutorial book</white> has the full guide."),
             new Say("That's it! Close your gate, grow your belt and go take some money. Good luck!"));
 
     private static final int GATE_STEP = gateStep();
@@ -429,11 +387,11 @@ public final class TutorialModule implements GensModule, Listener {
             case Chapter c -> {
                 r.chapter = c.title();
                 p.showTitle(Title.title(Msg.parse("<gold><bold>" + c.title()), Msg.parse("<gray>" + c.subtitle()),
-                        Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2200), Duration.ofMillis(500))));
+                        Title.Times.times(Duration.ofMillis(200), Duration.ofMillis(1300), Duration.ofMillis(300))));
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, 1.2f);
                 bar(p, r, i, "<white>" + c.title());
                 speak(r, "<gold><bold>" + c.title() + "</bold></gold>\n<gray>" + c.subtitle());
-                r.nextAt = now + 2600;
+                r.nextAt = now + 1600;
             }
             case Say s -> {
                 p.sendMessage(Msg.parse(GUIDE + "<gray>" + s.text())
@@ -499,7 +457,7 @@ public final class TutorialModule implements GensModule, Listener {
             p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.6f, 1.5f);
             p.sendActionBar(Msg.parse("<green>✔ " + Msg.escape(w.task())));
             setBeat(p, i + 1);
-            r.nextAt = now + 1200;
+            r.nextAt = now + 700;
             return;
         }
         if (now >= r.remindAt) {
@@ -701,14 +659,14 @@ public final class TutorialModule implements GensModule, Listener {
             if (bubble == null || full.isEmpty() || r.typed > full.length()) {
                 return;
             }
-            int n = Math.min(full.length(), r.typed + 2);
+            int n = Math.min(full.length(), r.typed + 4);
             boolean done = n >= full.length();
             r.typed = done ? full.length() + 1 : n;
             Component shown = done
                     ? Msg.parse("<green><bold>Guide</bold></green>\n" + r.finalText)
                     : Msg.parse("<green><bold>Guide</bold></green>\n<white>" + Msg.escape(full.substring(0, n)) + "<gray>▌");
             Tasks.onEntity(bubble, () -> bubble.text(shown));
-            if (n % 6 == 0 || done) {
+            if (n % 8 == 0 || done) {
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.25f, 1.8f);
             }
         }, 2, 2);
@@ -736,7 +694,7 @@ public final class TutorialModule implements GensModule, Listener {
 
     private static long readMillis(String text) {
         String plain = text.replaceAll("<[^>]+>", "");
-        return Math.max(3200, Math.min(10_000, plain.length() * 33L + 2200));
+        return Math.max(2000, Math.min(6000, plain.length() * 25L + 1000));
     }
 
     private void bar(Player p, Run r, int index, String text) {
