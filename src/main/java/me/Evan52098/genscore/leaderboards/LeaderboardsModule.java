@@ -99,6 +99,7 @@ public final class LeaderboardsModule implements GensModule {
     private PlayerDataService players;
     private long cacheMillis;
     private int size;
+    private int rows;
     private Holograms holograms;
 
     @Override
@@ -133,6 +134,7 @@ public final class LeaderboardsModule implements GensModule {
         }
         cacheMillis = TimeUnit.SECONDS.toMillis(Math.max(10, c.getLong("cache-seconds", 60)));
         size = Math.max(1, Math.min(10, c.getInt("size", 10)));
+        rows = Math.max(size, Math.min(500, c.getInt("rows", 100)));
     }
 
     @Override
@@ -240,6 +242,29 @@ public final class LeaderboardsModule implements GensModule {
         return 0;
     }
 
+    int pageSize() {
+        return size;
+    }
+
+    int rows() {
+        return rows;
+    }
+
+    long liveValue(Board board, UUID player) {
+        if (board.online() != null) {
+            long v = board.online().applyAsLong(player);
+            if (v >= 0) {
+                return v;
+            }
+        }
+        for (Entry e : top(board.id())) {
+            if (e.uuid().equals(player)) {
+                return e.value();
+            }
+        }
+        return 0;
+    }
+
     /** Fresh rows when the cache is stale, otherwise the cache. Completes on a database or async thread. */
     CompletableFuture<List<Entry>> topAsync(Board board) {
         Cache cache = caches.get(board.id().toLowerCase(Locale.ROOT));
@@ -257,8 +282,8 @@ public final class LeaderboardsModule implements GensModule {
         CompletableFuture<List<Entry>> done = new CompletableFuture<>();
         Tasks.async.run(() -> {
             try {
-                List<Entry> rows = board.source().load(db, size);
-                cache.entries = overlay(board, rows);
+                List<Entry> loaded = board.source().load(db, rows);
+                cache.entries = overlay(board, loaded);
                 cache.at = System.currentTimeMillis();
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "[leaderboards] Could not load the " + board.id() + " board", e);
@@ -287,7 +312,7 @@ public final class LeaderboardsModule implements GensModule {
         List<Entry> list = new ArrayList<>(byId.values());
         list.removeIf(e -> e.value() <= 0);
         list.sort(Comparator.comparingLong(Entry::value).reversed());
-        return List.copyOf(list.subList(0, Math.min(size, list.size())));
+        return List.copyOf(list.subList(0, Math.min(this.rows, list.size())));
     }
 
     static String formatDuration(long millis) {
@@ -319,7 +344,7 @@ public final class LeaderboardsModule implements GensModule {
             player.sendMessage(Msg.bad("Unknown leaderboard. Boards: " + Msg.white(String.join(", ", boardIds())) + "."));
             return;
         }
-        openBoard(player, board);
+        openBoard(player, board, 0);
     }
 
     public List<String> boardIds() {
@@ -338,37 +363,80 @@ public final class LeaderboardsModule implements GensModule {
             Board b = list.get(i);
             menu.set(Math.max(9, Math.min(17, start + i * 2)), Lore.item(b.icon(), "&6&l" + b.title(),
                     Lore.builder(Lore.Accent.WHITE).subcategory("Leaderboard").divider().description("The top " + size + " players", "by " + b.valueLabel().toLowerCase(Locale.ROOT) + ".")
-                            .clickPrompt("Click to View").build()), click -> openBoard(player, b));
+                            .clickPrompt("Click to View").build()), click -> openBoard(player, b, 0));
         }
         menu.set(22, Lore.item(Material.BARRIER, "&c&lCLOSE", List.of()), click -> player.closeInventory());
         menu.open(player);
     }
 
-    private void openBoard(Player player, Board board) {
+    private void openBoard(Player player, Board board, int requested) {
         topAsync(board).whenComplete((entries, error) -> Tasks.entity.run(player, () -> {
             if (error != null) {
                 player.sendMessage(Msg.bad("The leaderboard could not be loaded right now."));
                 return;
             }
-            Menu menu = new Menu(5, Msg.parse("<dark_gray>" + Msg.escape(board.title())));
+            int pages = Math.max(1, (entries.size() + SLOTS.length - 1) / SLOTS.length);
+            int page = Math.floorMod(requested, pages);
+            Menu menu = new Menu(5, Msg.parse("<dark_gray>" + Msg.escape(board.title()) + (pages > 1 ? " <gray>(" + (page + 1) + "/" + pages + ")" : "")));
             for (int i = 0; i < SLOTS.length; i++) {
-                if (i < entries.size()) {
-                    Entry e = entries.get(i);
-                    menu.set(SLOTS[i], head(e, i + 1, board), null);
+                int index = page * SLOTS.length + i;
+                if (index < entries.size()) {
+                    menu.set(SLOTS[i], head(entries.get(index), index + 1, board, player.getUniqueId()), null);
                 } else {
-                    menu.set(SLOTS[i], Lore.item(Material.GRAY_STAINED_GLASS_PANE, "&7#" + (i + 1) + " &8- nobody yet", List.of()), null);
+                    menu.set(SLOTS[i], Lore.item(Material.GRAY_STAINED_GLASS_PANE, "&7#" + (index + 1) + " &8- nobody yet", List.of()), null);
                 }
             }
             menu.set(36, Lore.item(Material.ARROW, "&e&lBACK", List.of()), click -> openList(player));
-            int mine = rank(board.id(), player.getUniqueId());
-            menu.set(40, Lore.item(Material.NAME_TAG, "&f&lYour rank", List.of(mine > 0 ? "&7You are &6#" + mine + "&7 on this board." : "&7You are not in the top " + size + " yet.")), null);
+            if (page > 0) {
+                menu.set(39, Lore.item(Material.SPECTRAL_ARROW, "&e&lPREVIOUS PAGE", List.of("&7Page &f" + page + "&7 of &f" + pages)), click -> openBoard(player, board, page - 1));
+            }
+            if (page < pages - 1) {
+                menu.set(41, Lore.item(Material.SPECTRAL_ARROW, "&e&lNEXT PAGE", List.of("&7Page &f" + (page + 2) + "&7 of &f" + pages)), click -> openBoard(player, board, page + 1));
+            }
+            int mine = indexOf(entries, player.getUniqueId());
+            long value = liveValue(board, player.getUniqueId());
+            List<String> lore = new ArrayList<>();
+            lore.add(mine >= 0 ? "&7You are &6#" + (mine + 1) + "&7 on this board." : "&7You are not in the top " + rows + " yet.");
+            lore.add("&7" + board.valueLabel() + ": &a" + board.format().apply(value));
+            if (mine > 0) {
+                Entry above = entries.get(mine - 1);
+                lore.add("&7Next up: &f" + safeName(above) + " &8(&a" + board.format().apply(above.value()) + "&8)");
+            }
+            if (mine >= 0 && mine / SLOTS.length != page) {
+                lore.add("");
+                lore.add("&6▸ &eClick to jump to your page");
+            }
+            ItemStack you = Lore.item(Material.PLAYER_HEAD, "&f&lYour position", lore);
+            if (you.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(player);
+                you.setItemMeta(meta);
+            }
+            menu.set(40, you, click -> {
+                if (mine >= 0) {
+                    openBoard(player, board, mine / SLOTS.length);
+                }
+            });
             menu.set(44, Lore.item(Material.BARRIER, "&c&lCLOSE", List.of()), click -> player.closeInventory());
             menu.open(player);
         }));
     }
 
-    private static ItemStack head(Entry e, int rank, Board board) {
-        ItemStack item = Lore.item(Material.PLAYER_HEAD, "&6#" + rank + " &f" + e.name().replace('&', ' '),
+    static int indexOf(List<Entry> entries, UUID player) {
+        for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).uuid().equals(player)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static String safeName(Entry e) {
+        return e.name() == null ? "Unknown" : e.name().replace('&', ' ');
+    }
+
+    private static ItemStack head(Entry e, int rank, Board board, @Nullable UUID viewer) {
+        boolean self = e.uuid().equals(viewer);
+        ItemStack item = Lore.item(Material.PLAYER_HEAD, "&6#" + rank + " " + (self ? "&e" : "&f") + safeName(e) + (self ? " &7(you)" : ""),
                 List.of("&7" + board.valueLabel() + ": &a" + board.format().apply(e.value())));
         if (item.getItemMeta() instanceof SkullMeta meta) {
             OfflinePlayer owner = Bukkit.getOfflinePlayer(e.uuid()); // by UUID: no lookup, no blocking
