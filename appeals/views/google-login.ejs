@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="login-page">
+        <div class="brand-panel">
+            <div class="brand-mark">
+                <img src="/img/logo.png" alt="GateMC">
+                <span>GATEMC APPEALS</span>
+            </div>
+            <div class="brand-copy">
+                <h1>Appeal a ban or mute on GateMC.</h1>
+                <p>Sign in with Google, then enter the ID from your disconnect or mute message to tell us why it
+                    should be lifted. Staff review every appeal.</p>
+            </div>
+            <div class="brand-foot">Sign-in is only used to keep your appeal tied to one submission.</div>
+        </div>
+        <div class="form-panel">
+            <div class="login-box">
+                <h2>Sign in</h2>
+                <p class="subtitle">Use any Google account to continue.</p>
+                <% if (error) { %><div class="error"><%= error %></div><% } %>
+                <div id="g_id_onload"
+                     data-client_id="<%= googleClientId %>"
+                     data-login_uri="<%= loginUri %>"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large" data-text="signin_with" data-width="296"></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</body>
+</html>

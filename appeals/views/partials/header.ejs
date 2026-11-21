@@ -1,0 +1,23 @@
+<div class="app-header">
+    <div class="brand">
+        <img src="/img/logo.png" alt="GateMC">
+        <span><%= (typeof applicantName !== 'undefined' && applicantName) || (typeof staffBrand !== 'undefined' && staffBrand) ? 'GATEMC STAFF' : 'GATEMC APPEALS' %></span>
+    </div>
+    <div class="who">
+        <% if (typeof playerEmail !== 'undefined' && playerEmail) { %>
+            <a href="/">Submit</a>
+            <a href="/status">My appeals</a>
+            <span><%= playerEmail %></span>
+            <form class="inline" method="post" action="/auth/logout"><button type="submit" class="ghost small">Sign out</button></form>
+        <% } else if (typeof applicantName !== 'undefined' && applicantName) { %>
+            <span><%= applicantName %></span>
+            <form class="inline" method="post" action="/apply/logout"><button type="submit" class="ghost small">Sign out</button></form>
+        <% } else if (typeof staffName !== 'undefined' && staffName) { %>
+            <a href="/staff">Queue</a>
+            <a href="/staff/resolved">Resolved</a>
+            <a href="/staff/stats">Stats</a>
+            <span><%= staffName %></span>
+            <form class="inline" method="post" action="/staff/logout"><button type="submit" class="ghost small">Log out</button></form>
+        <% } %>
+    </div>
+</div>

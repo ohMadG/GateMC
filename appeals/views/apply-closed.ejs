@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Staff Application</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261114b">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: applicant ? applicant.name : null, staffBrand: true }) %>
+    <div class="page">
+        <div class="card notice">
+            <div class="notice-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="40" height="40">
+                    <path d="M10.3 3.9 1.8 18.6A2 2 0 0 0 3.5 21.6h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" fill="currentColor"/>
+                    <rect x="11" y="8.5" width="2" height="7" rx="1" fill="var(--panel)"/>
+                    <circle cx="12" cy="18" r="1.25" fill="var(--panel)"/>
+                </svg>
+            </div>
+            <% if (openAt) { %>
+                <p class="notice-text">Staff applications open soon.</p>
+                <div class="countdown" id="countdown" data-open-at="<%= openAt %>" data-now="<%= Date.now() %>">
+                    <div><span data-unit="d">0</span><small>days</small></div>
+                    <div><span data-unit="h">00</span><small>hours</small></div>
+                    <div><span data-unit="m">00</span><small>minutes</small></div>
+                    <div><span data-unit="s">00</span><small>seconds</small></div>
+                </div>
+                <p class="muted notice-sub">Opens <%= openAtText %></p>
+                <script>
+                    (function () {
+                        var el = document.getElementById('countdown');
+                        var target = Number(el.getAttribute('data-open-at'));
+                        var skew = Number(el.getAttribute('data-now')) - Date.now();
+                        function pad(n) { return n < 10 ? '0' + n : String(n); }
+                        function tick() {
+                            var left = Math.max(0, target - (Date.now() + skew));
+                            var s = Math.floor(left / 1000);
+                            el.querySelector('[data-unit="d"]').textContent = Math.floor(s / 86400);
+                            el.querySelector('[data-unit="h"]').textContent = pad(Math.floor(s % 86400 / 3600));
+                            el.querySelector('[data-unit="m"]').textContent = pad(Math.floor(s % 3600 / 60));
+                            el.querySelector('[data-unit="s"]').textContent = pad(s % 60);
+                            if (left <= 0) {
+                                setTimeout(function () { location.reload(); }, 2000);
+                                return;
+                            }
+                            setTimeout(tick, 250);
+                        }
+                        tick();
+                    })();
+                </script>
+            <% } else { %>
+                <p class="notice-text"><%= message %></p>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

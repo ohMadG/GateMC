@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <% if (hcaptchaSiteKey) { %><script src="https://hcaptcha.com/1/api.js" async defer></script><% } %>
+</head>
+<body>
+    <%- include('partials/header', { playerEmail }) %>
+    <div class="page">
+        <div class="card">
+            <h1>Submit an appeal</h1>
+            <p class="muted">
+                Use this form to appeal a punishment you believe was issued incorrectly, or to request
+                reconsideration of a permanent punishment.
+            </p>
+            <p class="muted">
+                <strong>Temporary punishments that were issued correctly cannot be appealed for early removal.</strong>
+                If you received a temporary punishment and agree it was valid, you'll need to wait for it to expire.
+                If you believe a temporary punishment was issued incorrectly, you may still submit an appeal.
+            </p>
+            <p class="muted"><a href="/status">Check the status of an appeal you already submitted &rarr;</a></p>
+            <% if (error) { %>
+                <div class="error"><%= error %></div>
+            <% } %>
+            <form method="post" action="/submit" enctype="multipart/form-data">
+                <label for="banId">Punishment ID</label>
+                <input id="banId" name="banId" placeholder="#ABC123" value="<%= old.banId || '' %>" required>
+
+                <label for="username">Minecraft username</label>
+                <input id="username" name="username" value="<%= old.username || '' %>" required>
+
+                <label for="platform">Which platform do you play on?</label>
+                <select id="platform" name="platform" required>
+                    <option value="" disabled <%= !old.platform ? 'selected' : '' %>>Select one...</option>
+                    <option value="Java" <%= old.platform === 'Java' ? 'selected' : '' %>>Java</option>
+                    <option value="Bedrock" <%= old.platform === 'Bedrock' ? 'selected' : '' %>>Bedrock</option>
+                </select>
+
+                <label for="appealType">Which best describes why you are appealing?</label>
+                <select id="appealType" name="appealType" required>
+                    <option value="" disabled <%= !old.appealType ? 'selected' : '' %>>Select one...</option>
+                    <option value="incorrect" <%= old.appealType === 'incorrect' ? 'selected' : '' %>>I believe my punishment was issued incorrectly.</option>
+                    <option value="reconsideration" <%= old.appealType === 'reconsideration' ? 'selected' : '' %>>My punishment is permanent and I am requesting reconsideration.</option>
+                    <option value="other" <%= old.appealType === 'other' ? 'selected' : '' %>>Other.</option>
+                </select>
+
+                <label for="message">Please explain your appeal.</label>
+                <p class="muted" style="margin:0 0 8px; font-size:12px;">
+                    If you believe your punishment was issued incorrectly, explain why. If you are requesting
+                    reconsideration of a permanent punishment, explain why you believe you should be given another
+                    opportunity.
+                </p>
+                <textarea id="message" name="message" required><%= old.message || '' %></textarea>
+
+                <label for="screenshots">Screenshots (optional, up to <%= maxFiles %>)</label>
+                <input id="screenshots" name="screenshots" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+
+                <% if (hcaptchaSiteKey) { %>
+                    <div class="h-captcha" data-sitekey="<%= hcaptchaSiteKey %>" style="margin-top:16px;"></div>
+                <% } %>
+
+                <button type="submit" style="width:100%; margin-top:20px;">Submit appeal</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

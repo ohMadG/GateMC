@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <%- include('partials/header', { playerEmail }) %>
+    <div class="page">
+        <div class="card wide">
+            <h1>Your appeals</h1>
+
+            <% if (appeals.length === 0) { %>
+                <p class="muted">You haven't submitted any appeals with this account.</p>
+            <% } %>
+
+            <% appeals.forEach(a => { %>
+                <div class="appeal-item">
+                    <div class="meta">
+                        <strong>#<%= a.ban_short_id %></strong> for <strong><%= a.target_name %></strong>
+                        - submitted <%= new Date(Number(a.created_at)).toLocaleString() %><br>
+                        <span class="badge <%= a.status %>"><%= statusLabels[a.status] || a.status %></span>
+                        <% if (a.status === 'reduced' && a.ban_expires_at) { %>
+                            <span class="muted">now expires <%= new Date(Number(a.ban_expires_at)).toLocaleString() %></span>
+                        <% } %>
+                        <% if (a.reviewed_at && a.status !== 'pending') { %>
+                            <br>Last updated <%= new Date(Number(a.reviewed_at)).toLocaleString() %>
+                        <% } %>
+                    </div>
+                    <div class="message"><%= a.request_reason %></div>
+                    <% if (a.staff_reason) { %>
+                        <div class="message">
+                            <span class="muted" style="display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Staff response</span>
+                            <%= a.staff_reason %>
+                        </div>
+                    <% } %>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+</body>
+</html>

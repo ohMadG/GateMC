@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals - Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261115b">
+</head>
+<body>
+    <%- include('partials/header', { staffName }) %>
+    <div class="page">
+        <div class="card wide">
+            <div class="topbar">
+                <h1 style="margin:0;">Pending appeals</h1>
+                <form method="get" action="/staff" class="inline">
+                    <input type="search" name="q" value="<%= q %>" placeholder="Search by player name" style="width:220px;">
+                </form>
+            </div>
+
+            <% if (error) { %>
+                <div class="error"><%= error %></div>
+            <% } %>
+
+            <% if (isAdmin) { %>
+                <div class="apply-toggle">
+                    <% const st = applicationsStatus; const live = st.state !== 'closed'; %>
+                    <span>
+                        Staff applications are
+                        <% if (st.state === 'scheduled') { %><strong class="ok">scheduled</strong>: open <%= st.openAtText %><% if (st.closeAtText) { %>, close <%= st.closeAtText %><% } %>
+                        <% } else if (st.state === 'open') { %><strong class="ok">open</strong><% if (st.closeAtText) { %> until <%= st.closeAtText %><% } %>
+                        <% } else { %><strong class="closed">closed</strong><% } %>
+                    </span>
+                    <form class="inline" method="post" action="/staff/applications">
+                        <input type="hidden" name="open" value="<%= live ? '0' : '1' %>">
+                        <button type="submit" class="<%= live ? 'danger' : 'success' %> small"><%= live ? 'Close applications' : 'Open applications' %></button>
+                    </form>
+                </div>
+            <% } %>
+
+            <% if (appeals.length === 0) { %>
+                <p class="muted">No pending appeals<%= q ? ' matching "' + q + '"' : '' %>.</p>
+            <% } %>
+
+            <% appeals.forEach(a => { %>
+                <% const adminOnly = adminOnlyTypes.includes(a.ban_type); %>
+                <% const ageMs = Date.now() - Number(a.created_at); %>
+                <% const stale = ageMs > 48 * 60 * 60 * 1000; %>
+                <% const ageH = Math.floor(ageMs / 3600000); %>
+                <% const lines = String(a.request_reason || '').split('\n'); %>
+                <% const tags = []; let bodyStart = 0; %>
+                <% for (let i = 0; i < lines.length && i < 3; i++) { const m = /^(Platform|Appeal type):\s*(.+)$/.exec(lines[i]); if (m) { tags.push({ k: m[1], v: m[2] }); bodyStart = i + 1; } else { break; } } %>
+                <% const body = lines.slice(bodyStart).join('\n').replace(/^\s+/, ''); %>
+                <div class="appeal-item ap-item<%= stale ? ' stale' : '' %>">
+                    <% if (a.target_name.toLowerCase() === staffName.toLowerCase()) { %>
+                        <div class="error ap-alert">
+                            This appeal's player name matches your own staff name - have another staff member review it instead.
+                        </div>
+                    <% } %>
+                    <% if (adminOnly && !canLiftSevere) { %>
+                        <div class="error ap-alert">
+                            This is a <%= a.ban_type %> - only an admin or Senior Staff can approve or reduce it. You can still deny it or change its status.
+                        </div>
+                    <% } %>
+
+                    <div class="ap-head">
+                        <div class="ap-who">
+                            <div class="ap-name"><%= a.target_name %></div>
+                            <code class="ap-uuid"><%= a.target_uuid %></code>
+                        </div>
+                        <div class="ap-tags">
+                            <span class="ap-type"><%= a.ban_type %> #<%= a.ban_short_id %></span>
+                            <span class="badge <%= a.status %>"><%= statusLabels[a.status] || a.status %></span>
+                            <span class="age-pill"><%= ageH < 1 ? 'new' : ageH + 'h old' %></span>
+                        </div>
+                    </div>
+
+                    <dl class="ap-facts">
+                        <div><dt>Reason</dt><dd><%= a.ban_reason %><%= a.ban_category ? ' (' + a.ban_category + ')' : '' %></dd></div>
+                        <div><dt>Issued by</dt><dd><%= a.ban_issued_by %></dd></div>
+                        <div><dt>Issued</dt><dd><%= new Date(Number(a.ban_created_at)).toLocaleString() %></dd></div>
+                        <div><dt>Expires</dt><dd><%= a.ban_expires_at ? new Date(Number(a.ban_expires_at)).toLocaleString() : 'Never' %></dd></div>
+                        <div><dt>Submitted</dt><dd><%= new Date(Number(a.created_at)).toLocaleString() %></dd></div>
+                        <% if (a.submitter_email) { %><div><dt>Signed in as</dt><dd><%= a.submitter_email %></dd></div><% } %>
+                    </dl>
+
+                    <div class="ap-claimbar">
+                        <% if (a.claimed_by_name) { %>
+                            <span class="claim-note">Claimed by <strong><%= a.claimed_by_name %></strong> since <%= new Date(Number(a.claimed_at)).toLocaleString() %></span>
+                            <form class="inline" method="post" action="/staff/<%= a.id %>/unclaim">
+                                <button type="submit" class="ghost small">Unclaim</button>
+                            </form>
+                        <% } else { %>
+                            <span class="claim-note">Nobody is handling this yet.</span>
+                            <form method="post" action="/staff/<%= a.id %>/claim">
+                                <button type="submit" class="ghost small">Claim</button>
+                            </form>
+                        <% } %>
+                        <a class="ap-link" href="/staff/history/<%= a.target_uuid %>">View punishment history &rarr;</a>
+                    </div>
+
+                    <div class="ap-section-title">Their appeal</div>
+                    <% if (tags.length) { %>
+                        <div class="ap-msg-tags"><% tags.forEach(t => { %><span><b><%= t.k %>:</b> <%= t.v %></span><% }) %></div>
+                    <% } %>
+                    <div class="message"><%= tags.length ? body : a.request_reason %></div>
+                    <% let shots = []; try { shots = JSON.parse(a.screenshots || '[]'); } catch (e) {} %>
+                    <% if (shots.length) { %>
+                        <div class="thumbs">
+                            <% shots.forEach(name => { %>
+                                <a href="/staff/uploads/<%= name %>" target="_blank">
+                                    <img src="/staff/uploads/<%= name %>" alt="screenshot">
+                                </a>
+                            <% }) %>
+                        </div>
+                    <% } %>
+
+                    <div class="ap-section-title">Decision</div>
+                    <div class="ap-actions">
+                        <form class="ap-act" method="post" action="/staff/<%= a.id %>/approve" onsubmit="return confirm('Approve this appeal and lift the punishment on ' + '<%= a.target_name %>' + '?');">
+                            <span class="ap-act-name">Approve</span>
+                            <span class="ap-act-note">lifts it completely</span>
+                            <button type="submit" class="success" <%= (adminOnly && !canLiftSevere) ? 'disabled title="Only an admin can approve this"' : '' %>>Approve</button>
+                        </form>
+                        <form class="ap-act" method="post" action="/staff/<%= a.id %>/reduce" onsubmit="return confirm('Shorten this punishment?');">
+                            <span class="ap-act-name">Reduce to</span>
+                            <span class="ap-act-fields">
+                                <input type="number" name="amount" min="1" step="1" placeholder="0" required <%= (adminOnly && !canLiftSevere) ? 'disabled' : '' %>>
+                                <select name="unit" <%= (adminOnly && !canLiftSevere) ? 'disabled' : '' %>>
+                                    <option value="hours">hours</option>
+                                    <option value="days">days</option>
+                                </select>
+                                <input type="text" name="reason" placeholder="reason, player sees this" <%= (adminOnly && !canLiftSevere) ? 'disabled' : '' %>>
+                            </span>
+                            <button type="submit" class="ghost" <%= (adminOnly && !canLiftSevere) ? 'disabled title="Only an admin can reduce this"' : '' %>>Reduce</button>
+                        </form>
+                        <form class="ap-act" method="post" action="/staff/<%= a.id %>/deny" onsubmit="return confirm('Deny this appeal?');">
+                            <span class="ap-act-name">Deny</span>
+                            <span class="ap-act-fields">
+                                <input type="text" name="reason" placeholder="reason, player sees this">
+                            </span>
+                            <button type="submit" class="danger">Deny</button>
+                        </form>
+                    </div>
+
+                    <div class="ap-footer">
+                        <form class="inline ap-status" method="post" action="/staff/<%= a.id %>/status">
+                            <div class="ap-section-title">Status</div>
+                            <div class="ap-pair">
+                                <select name="status">
+                                    <% triageStatuses.forEach(s => { %>
+                                        <option value="<%= s %>" <%= a.status === s ? 'selected' : '' %>><%= statusLabels[s] %></option>
+                                    <% }) %>
+                                </select>
+                                <button type="submit" class="ghost">Set status</button>
+                            </div>
+                        </form>
+                        <form class="ap-notes" method="post" action="/staff/<%= a.id %>/notes">
+                            <input type="hidden" name="back" value="/staff">
+                            <label for="notes-<%= a.id %>" class="ap-section-title">Private staff notes <span>(never shown to the player)</span></label>
+                            <textarea id="notes-<%= a.id %>" name="notes"><%= a.staff_notes || '' %></textarea>
+                            <button type="submit" class="ghost small">Save notes</button>
+                        </form>
+                    </div>
+                    <% const hist = Array.isArray(a.status_history) ? a.status_history : []; %>
+                    <% if (hist.length) { %>
+                        <details class="history">
+                            <summary>Status history (<%= hist.length %>)</summary>
+                            <ul>
+                                <% hist.forEach(h => { %>
+                                    <li><%= statusLabels[h.status] || h.status %> by <%= h.by %> on <%= new Date(Number(h.at)).toLocaleString() %><%= h.reason ? ' - ' + h.reason : '' %></li>
+                                <% }) %>
+                            </ul>
+                        </details>
+                    <% } %>
+                </div>
+            <% }) %>
+
+            <% if (totalPages > 1) { %>
+                <div class="row" style="justify-content:center;">
+                    <% if (page > 1) { %><a href="/staff?page=<%= page - 1 %>&q=<%= encodeURIComponent(q) %>">&larr; Prev</a><% } %>
+                    <span class="muted">Page <%= page %> of <%= totalPages %></span>
+                    <% if (page < totalPages) { %><a href="/staff?page=<%= page + 1 %>&q=<%= encodeURIComponent(q) %>">Next &rarr;</a><% } %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

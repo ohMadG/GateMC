@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Apply for Staff · GateMC Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261114c">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: applicant.name }) %>
+    <div class="apply-wrap">
+        <div class="page-head">
+            <div class="eyebrow">Join the team</div>
+            <h1>Apply for Staff (Guide)</h1>
+            <p>Signed in as <strong><%= applicant.username %></strong> &middot; <a href="/apply/history">View application history</a></p>
+        </div>
+
+        <% if (link && playtimeSeconds !== null) {
+            const ptDays = Math.floor(playtimeSeconds / 86400);
+            const ptHours = Math.floor((playtimeSeconds % 86400) / 3600);
+            const recDays = Math.floor(recommendedSeconds / 86400);
+            const pct = Math.min(100, Math.round((playtimeSeconds / recommendedSeconds) * 100));
+            const met = playtimeSeconds >= recommendedSeconds;
+        %>
+        <div class="card full">
+            <div class="stat-line"><span>Playtime</span><b><%= ptDays %>d <%= ptHours %>h <% if (met) { %><span class="pill ok"><%- icon('check') %> Recommendation met</span><% } else { %><span class="muted">/ <%= recDays %>d recommended</span><% } %></b></div>
+            <div class="meter"><i class="<%= met ? 'met' : '' %>" style="width: <%= pct %>%;"></i></div>
+        </div>
+        <% } %>
+
+        <% if (!member) { %>
+            <div class="alert info"><%- icon('info') %><div>You need to be in the GateMC <a href="https://discord.gatemc.org" target="_blank" rel="noopener">Discord server</a> to apply. Join it, then come back and refresh this page.</div></div>
+        <% } else if (!link) { %>
+            <div class="alert info"><%- icon('info') %><div>Your Minecraft account isn't linked yet. In-game, run <code>/link</code>, then run <code>/link &lt;code&gt;</code> here in Discord. Come back and refresh this page once that's done.</div></div>
+        <% } else if (pending && existing) { %>
+            <div class="alert pending">
+                <%- icon('clock') %>
+                <div>
+                    You already have a pending application (submitted <%= fmtDate(existing.created_at) %>). Staff will review it soon.
+                    <form method="post" action="/apply/<%= existing.id %>/withdraw" class="withdraw" onsubmit="return confirm('Withdraw this application? You can apply again right away if you change your mind.');">
+                        <button type="submit" class="danger small">Withdraw application</button>
+                    </form>
+                </div>
+            </div>
+        <% } else if (cooldownUntil) { %>
+            <div class="alert warn"><%- icon('alert') %><div>Your last application wasn't accepted. You can apply again on <%= fmtDate(cooldownUntil) %>.</div></div>
+        <% } else if (existing && existing.status === 'denied') { %>
+            <div class="alert warn"><%- icon('alert') %><div>Your last application wasn't accepted. You're welcome to apply again below.</div></div>
+        <% } %>
+
+        <% if (member && link && !pending && !cooldownUntil) { %>
+        <form method="post" action="/apply" class="card full">
+            <div class="card-head"><span class="ico-tile gold"><%- icon('pen') %></span><div><h2>Your application</h2><p class="muted">Applying as <strong><%= link.player_name %></strong></p></div></div>
+            <% if (error) { %><div class="error"><%= error %></div><% } %>
+            <% questions.forEach(function (q, i) { %>
+                <div class="field">
+                    <label for="q-<%= q.id %>"><%= i + 1 %>. <%= q.label %></label>
+                    <textarea id="q-<%= q.id %>" name="<%= q.id %>" required maxlength="<%= q.max %>" rows="4"><%= values[q.id] || '' %></textarea>
+                    <span class="hint">Up to <%= q.max %> characters.</span>
+                </div>
+            <% }); %>
+            <div class="form-actions"><button type="submit" class="lg">Submit application <%- icon('arrowRight') %></button></div>
+        </form>
+        <% } %>
+    </div>
+</body>
+</html>

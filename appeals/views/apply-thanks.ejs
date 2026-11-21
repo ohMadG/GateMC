@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Application submitted · GateMC Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261114c">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: applicant.name }) %>
+    <div class="page">
+        <div class="card notice">
+            <% if (alreadyPending) { %>
+                <span class="ico-tile lg gold"><%- icon('clock') %></span>
+                <h1>You already have a pending application</h1>
+                <p class="muted">Sit tight - staff will review it soon.</p>
+            <% } else { %>
+                <span class="ico-tile lg green"><%- icon('check') %></span>
+                <h1>Application submitted!</h1>
+                <p class="muted">Thanks for applying. Staff will review it and you'll see the result reflected in your Discord roles if accepted.</p>
+            <% } %>
+            <div class="form-actions center">
+                <a href="/apply" class="btn">Back to the application</a>
+                <a href="/apply/history" class="btn ghost-btn">View history</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

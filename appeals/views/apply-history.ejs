@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Application history · GateMC Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261114c">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: applicant.name }) %>
+    <div class="apply-wrap">
+        <div class="page-head">
+            <div class="eyebrow">Applications</div>
+            <h1>Application history</h1>
+            <p>Every application you've submitted. <a href="/apply">Back to the application</a></p>
+        </div>
+
+        <div class="card full">
+            <% if (applications.length === 0) { %>
+                <div class="empty">
+                    <span class="ico-tile blue"><%- icon('clock') %></span>
+                    <h3>Nothing yet</h3>
+                    <p class="muted">You haven't submitted any applications yet.</p>
+                    <p><a href="/apply" class="btn small">Start an application</a></p>
+                </div>
+            <% } else { %>
+                <% var STATUS = { pending: ['warn', 'clock', 'gold', 'Pending'], accepted: ['ok', 'check', 'green', 'Accepted'], denied: ['bad', 'x', 'red', 'Rejected'], withdrawn: ['muted', 'x', 'blue', 'Withdrawn'] }; %>
+                <div class="rows">
+                    <% applications.forEach(function (app) { var st = STATUS[app.status] || STATUS.withdrawn; %>
+                        <div class="row">
+                            <span class="ico-tile <%= st[2] %>"><%- icon(st[1]) %></span>
+                            <span class="grow">
+                                <b>Guide application</b>
+                                <span class="sub">Submitted <%= fmtDate(app.created_at) %><% if (app.status === 'denied' && app.review_note) { %> &middot; &ldquo;<%= app.review_note %>&rdquo;<% } %></span>
+                            </span>
+                            <span class="pill <%= st[0] %>"><%= st[3] %></span>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

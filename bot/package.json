@@ -1,0 +1,14 @@
+{
+  "name": "hawkeye-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HawkEye Discord bot: presence, Minecraft account linking and Nitro boost tracking.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "pg": "^8.13.1"
+  }
+}

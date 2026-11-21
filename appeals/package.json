@@ -1,0 +1,22 @@
+{
+  "name": "gatemc-appeals",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Public ban appeal form for appeals.gatemc.org, plus a staff review queue",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "clamscan": "^2.4.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.1",
+    "express-rate-limit": "^8.7.4",
+    "express-session": "^1.18.1",
+    "file-type": "^22.3.0",
+    "google-auth-library": "^9.15.0",
+    "multer": "^2.0.0",
+    "pg": "^8.13.1"
+  }
+}

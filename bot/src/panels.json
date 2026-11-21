@@ -1,0 +1,45 @@
+[
+  {
+    "key": "rules",
+    "channelId": "1562533932002451466",
+    "embed": {
+      "color": 15906352,
+      "title": "<:red_X:1562468884874006528> GATEMC RULES",
+      "description": "__*Welcome to GateMC! Please follow all the\nrules to prevent any types of punishments!*__\n\n<:discord:1562469215741550664> **DISCORD RULES**\n**- Follow the Discord TOS & Community Guidelines\n- No unnecessary pings to staff members\n- Respectful behavior towards staff & other users\n- No discrimination, racism or hate speech\n- No NSFW, sexual, self-harm or drug-related topics\n- No jokes about race, sexuality or gender\n- No spamming or flooding in chat\n- No scam links\n- No inappropriate avatars, usernames or statuses\n- No sharing personal data, not even your own\n- No DDoS, DoX or raid threats (we take this seriously)\n- No punishment evading**\n\n<:red_X:1562468884874006528> **IN-GAME RULES**\n**- Respectful behavior towards staff & other players\n- No discrimination, racism or hate speech\n- No spamming or advertising in chat\n- No hacked, cheat clients or unfair modifications\n- No exploiting or duping of any kind\n- No IRL trading or cross-trading\n- No DDoS or DoX threats of any kind\n- No punishment evading\n- Auto Reconnect is ALLOWED**"
+    }
+  },
+  {
+    "key": "store",
+    "channelId": "1562533951548039238",
+    "embed": {
+      "color": 15906352,
+      "title": "<:store:1562469154559098881> https://store.gatemc.org/",
+      "url": "https://store.gatemc.org/",
+      "description": "• Visit our store to support GateMC.\n• Unlock ranks, credits, super powers and crate keys.\n• Help us keep the server online and growing."
+    }
+  },
+  {
+    "key": "info",
+    "channelId": "1562533936322580540",
+    "embed": {
+      "color": 15906352,
+      "title": "<:HXSMP:1562471548445659276> WELCOME TO GATEMC",
+      "description": "__*The #1 Factory Tycoon. Build your factory, grow your belt, guard your gate and raid everyone else!*__\n\n<:fire:1562469845365166111> **YOUR FACTORY**\n**- Every player gets a factory with a conveyor belt\n- Upgrade your generator, belt speed and belt length\n- Buy machines that multiply what your belt sells\n- `/rebirth` for a permanent sale bonus and start again stronger**\n\n<:crystal:1562469495245901874> **RAID & DEFEND**\n**- Open gates can be raided: grab a Raid Pick with `/gear`\n- Close your gate with `/gate` and build turrets, traps and armour in `/defence`\n- `/trust` friends so they can come in without raiding you\n- Cloak, lockpicks and powers for the bold**\n\n<:money:1562469633611796571> **TOKENS & POWERS**\n**- Tokens and caches drop off your belt\n- Spend tokens on powers, managers and upgrades\n- Hatch and level pets that boost your factory**\n\n<:gift:1562469369991135282> **FREE REWARDS**\n**- `/daily` rewards and `/tasks` every day\n- Weekly leaderboards with prizes\n- Random events and the travelling merchant**\n\n<:store:1562469154559098881> **SUPPORT THE SERVER**\n**- Ranks, credits and super powers at https://store.gatemc.org**\n\n<:server:1562469780622020638> **QUICK LINKS**\n**- How to join: <#1562533937778270352>\n- Rules: <#1562533932002451466>\n- Announcements: <#1562533942765293630>\n- Help: <#1562533962293706779>**",
+      "footer": {
+        "text": "GateMC • play.gatemc.org"
+      }
+    }
+  },
+  {
+    "key": "join",
+    "channelId": "1562533937778270352",
+    "embed": {
+      "color": 15906352,
+      "title": "<:server:1562469780622020638> HOW TO JOIN GATEMC",
+      "description": "__*Hop on and play! GateMC supports both Java and Bedrock Edition.*__\n\n<:crystal:1562469495245901874> **JAVA EDITION**\n**- Open Minecraft and click Multiplayer\n- Click Add Server\n- Server Address: `play.gatemc.org`\n- Click Done, then join!**\n*Minecraft 1.21.5 or newer. Latest version recommended.*\n\n<:bedrock:1562469015270723634> **BEDROCK EDITION**\n**- Open Minecraft and go to Play, then Servers\n- Scroll down and tap Add Server\n- Server Address: `play.gatemc.org`\n- Port: `19132`\n- Tap Save, then join!**\n*Works on mobile, Windows and Xbox. On PlayStation or Switch, ask in tickets for help.*\n\n<:green_tick:1562468689515774003> **AFTER YOU JOIN**\n**- Read the rules in <#1562533932002451466>\n- Open `/menu` to find everything\n- Claim `/daily` for free rewards**\n\n<:wrench:1562468972593414298> Can't connect? Open a ticket in <#1562533962293706779>.",
+      "footer": {
+        "text": "GateMC • play.gatemc.org"
+      }
+    }
+  }
+]

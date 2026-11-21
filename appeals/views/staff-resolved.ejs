@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals - Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <%- include('partials/header', { staffName }) %>
+    <div class="page">
+        <div class="card wide">
+            <div class="topbar">
+                <h1 style="margin:0;">Resolved appeals<%= status ? ': ' + statusLabels[status] : '' %></h1>
+                <a href="/staff">&larr; Back to pending</a>
+            </div>
+            <form method="get" action="/staff/resolved" class="row">
+                <input type="hidden" name="status" value="<%= status %>">
+                <input type="search" name="q" value="<%= q %>" placeholder="Search by player name" style="width:220px;">
+                <% if (status) { %><a href="/staff/resolved?q=<%= encodeURIComponent(q) %>">Clear filter</a><% } %>
+            </form>
+
+            <% if (appeals.length === 0) { %>
+                <p class="muted">No resolved appeals<%= q ? ' matching "' + q + '"' : '' %>.</p>
+            <% } %>
+
+            <% appeals.forEach(a => { %>
+                <div class="appeal-item">
+                    <div class="meta">
+                        <strong><%= a.target_name %></strong> <code><%= a.target_uuid %></code>
+                        - <a href="/staff/history/<%= a.target_uuid %>">View history</a>
+                        &middot; <span class="badge <%= a.status %>"><%= statusLabels[a.status] || a.status %></span><br>
+                        <strong>#<%= a.ban_short_id %></strong> &middot; <%= a.ban_type %><%= a.ban_category ? ' &middot; ' + a.ban_category : '' %>
+                        &middot; <%= a.ban_reason %><br>
+                        Submitted <%= new Date(Number(a.created_at)).toLocaleString() %>
+                        <% if (a.submitter_email) { %>by <%= a.submitter_email %><% } %><br>
+                        Reviewed by <%= a.reviewed_by_name %> on <%= new Date(Number(a.reviewed_at)).toLocaleString() %>
+                    </div>
+                    <div class="message"><%= a.request_reason %></div>
+                    <% if (a.staff_reason) { %>
+                        <div class="message">
+                            <span class="muted" style="display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Staff reason (shown to player)</span>
+                            <%= a.staff_reason %>
+                        </div>
+                    <% } %>
+                    <% let shots = []; try { shots = JSON.parse(a.screenshots || '[]'); } catch (e) {} %>
+                    <% if (shots.length) { %>
+                        <div class="thumbs">
+                            <% shots.forEach(name => { %>
+                                <a href="/staff/uploads/<%= name %>" target="_blank">
+                                    <img src="/staff/uploads/<%= name %>" alt="screenshot">
+                                </a>
+                            <% }) %>
+                        </div>
+                    <% } %>
+                    <% if (['denied', 'reduced'].includes(a.status)) { %>
+                        <div class="row">
+                            <form class="inline" method="post" action="/staff/<%= a.id %>/reopen" onsubmit="return confirm('Send this appeal back to pending for another look?');">
+                                <button type="submit" class="ghost small">Reopen</button>
+                            </form>
+                        </div>
+                    <% } %>
+                    <form method="post" action="/staff/<%= a.id %>/notes" style="margin-top:12px;">
+                        <input type="hidden" name="back" value="/staff/resolved">
+                        <label for="notes-<%= a.id %>" style="margin-top:0;">Private staff notes (never shown to the player)</label>
+                        <textarea id="notes-<%= a.id %>" name="notes" style="min-height:60px;"><%= a.staff_notes || '' %></textarea>
+                        <button type="submit" class="ghost small" style="margin-top:8px;">Save notes</button>
+                    </form>
+                    <% const hist = Array.isArray(a.status_history) ? a.status_history : []; %>
+                    <% if (hist.length) { %>
+                        <details class="history">
+                            <summary>Status history (<%= hist.length %>)</summary>
+                            <ul>
+                                <% hist.forEach(h => { %>
+                                    <li><%= statusLabels[h.status] || h.status %> by <%= h.by %> on <%= new Date(Number(h.at)).toLocaleString() %><%= h.reason ? ' - ' + h.reason : '' %></li>
+                                <% }) %>
+                            </ul>
+                        </details>
+                    <% } %>
+                </div>
+            <% }) %>
+
+            <% if (totalPages > 1) { %>
+                <div class="row" style="justify-content:center;">
+                    <% if (page > 1) { %><a href="/staff/resolved?page=<%= page - 1 %>&q=<%= encodeURIComponent(q) %>&status=<%= status %>">&larr; Prev</a><% } %>
+                    <span class="muted">Page <%= page %> of <%= totalPages %></span>
+                    <% if (page < totalPages) { %><a href="/staff/resolved?page=<%= page + 1 %>&q=<%= encodeURIComponent(q) %>&status=<%= status %>">Next &rarr;</a><% } %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

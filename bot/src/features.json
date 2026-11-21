@@ -1,0 +1,197 @@
+{
+  "staffRoleIds": [
+    "1562533870841237615",
+    "1562533869650190518",
+    "1562533866156335205",
+    "1563516872018890843",
+    "1562533862083662055"
+  ],
+  "tickets": {
+    "panelChannelId": "1562533962293706779",
+    "categoryId": "1562540434805493882",
+    "logChannelId": "1562533996993323070",
+    "transcriptChannelId": "1562540428396335249",
+    "closeDelaySeconds": 10,
+    "keepDays": 30,
+    "panelUrl": "https://admin.hawkmc.org",
+    "categories": {
+      "general": {
+        "label": "General Support",
+        "emoji": "🎫",
+        "style": "Primary",
+        "color": 15906352,
+        "line": "Questions, bugs or anything else",
+        "prompt": "Let us know what you need help with. A staff member will be with you shortly."
+      },
+      "report": {
+        "label": "Report a Player",
+        "emoji": "🚩",
+        "style": "Danger",
+        "color": 15548997,
+        "line": "Rule breakers or cheaters, bring screenshots or clips",
+        "prompt": "Please include the player's username, what rule was broken, when and where it happened, and any evidence (screenshots or clips) you have."
+      },
+      "appeal": {
+        "label": "Punishment Appeal",
+        "emoji": "⚖️",
+        "style": "Secondary",
+        "color": 16038185,
+        "line": "Think a ban or mute was a mistake? Tell us why",
+        "prompt": "Please include your Minecraft username, the punishment you're appealing, and why you believe it should be reconsidered. You can also appeal at http://appeals.gatemc.org"
+      },
+      "store": {
+        "label": "Store Support",
+        "emoji": "💎",
+        "style": "Primary",
+        "color": 12946431,
+        "line": "Purchases that didn't arrive, payment or rank issues",
+        "prompt": "Please include your Minecraft username, what you bought, your transaction ID (from the receipt email), and what went wrong. Never share card details or passwords."
+      },
+      "application": {
+        "label": "Staff Application Question",
+        "emoji": "📋",
+        "style": "Success",
+        "color": 5763719,
+        "line": "Ask anything about joining the staff team",
+        "prompt": "Ask your question about the staff application process below."
+      }
+    }
+  },
+  "welcome": {
+    "enabled": true,
+    "channelId": "1562533930693951639",
+    "autoRoleIds": [
+      "1562533895067541625"
+    ],
+    "color": 15906352,
+    "title": "Welcome to GateMC!",
+    "description": "Hey {user}, welcome to **GateMC**!\n\n<:server:1562469780622020638> **IP:** `play.gatemc.org`\n<:bedrock:1562469015270723634> **Bedrock:** `play.gatemc.org` port `19132`\n\nRead the <#1562533932002451466>, then come say hi in <#1562533954635042976>.",
+    "footer": "You are member #{membercount}",
+    "dmEnabled": false,
+    "dmMessage": "Welcome to GateMC, {username}! Join us at play.gatemc.org",
+    "leaveEnabled": false,
+    "leaveChannelId": "",
+    "leaveMessage": "{username} left the server."
+  },
+  "giveaways": {
+    "hostRoleIds": [
+      "1563516872018890843",
+      "1562533866156335205",
+      "1562533862083662055"
+    ],
+    "requireLink": true,
+    "maxWinners": 20,
+    "pingRoleId": "",
+    "claimChannelId": "1562533962293706779"
+  },
+  "applications": {
+    "panelChannelId": "1562567944649707663",
+    "reviewChannelId": "1562534000403284099",
+    "reviewerRoleIds": [
+      "1563516872018890843",
+      "1562533866156335205",
+      "1562533862083662055"
+    ],
+    "acceptRoleIds": [
+      "1562533884040585337",
+      "1562533882559991928"
+    ],
+    "reapplyDays": 14,
+    "applyUrl": "https://staff.hawkmc.org/apply",
+    "agreementUrl": "https://staff.hawkmc.org/agreement"
+  },
+  "staffServer": {
+    "guildId": "1561026734957137992",
+    "guideRoleId": ""
+  },
+  "moderation": {
+    "enabled": true,
+    "wordFilter": true,
+    "linkGuard": true,
+    "alertBannedWords": false,
+    "alertChannelId": "1571046751123673209",
+    "pingRoleId": "",
+    "exemptRoleIds": [
+      "1562533882559991928",
+      "1562533884040585337",
+      "1562562451738853436",
+      "1562562971027116042",
+      "1562533884913123350",
+      "1562533874024583322",
+      "1570589136820240394",
+      "1568453842717114449",
+      "1563516872018890843"
+    ],
+    "ignoreChannelIds": [],
+    "holdUnknownForNew": true,
+    "newMemberDays": 3,
+    "newAccountDays": 30,
+    "blockedDomains": [
+      "grabify.link"
+    ],
+    "safeDomains": [
+      "youtube.com",
+      "youtu.be",
+      "youtube-nocookie.com",
+      "twitch.tv",
+      "tenor.com",
+      "giphy.com",
+      "imgur.com",
+      "discord.com",
+      "discordapp.com",
+      "discordapp.net",
+      "discord.media",
+      "discord.gift",
+      "reddit.com",
+      "redd.it",
+      "twitter.com",
+      "x.com",
+      "tiktok.com",
+      "instagram.com",
+      "wikipedia.org",
+      "minecraft.net",
+      "minecraft.wiki",
+      "mojang.com",
+      "github.com",
+      "spotify.com",
+      "google.com",
+      "modrinth.com",
+      "curseforge.com",
+      "planetminecraft.com",
+      "namemc.com",
+      "steamcommunity.com",
+      "steampowered.com",
+      "medal.tv",
+      "streamable.com",
+      "gyazo.com",
+      "prnt.sc",
+      "imgflip.com",
+      "soundcloud.com",
+      "apple.com",
+      "microsoft.com",
+      "xbox.com",
+      "roblox.com",
+      "epicgames.com",
+      "pinterest.com",
+      "facebook.com",
+      "kick.com",
+      "hawkmc.org",
+      "tebex.io",
+      "tebex.store",
+      "gatemc.org"
+    ]
+  },
+  "roleSync": {
+    "intervalSeconds": 120,
+    "rankRoles": {},
+    "rankRolesHawkMC": {
+      "talon": "1571048930555334706",
+      "falcon": "1571048931335610400",
+      "hawk": "1571048932748828732"
+    }
+  },
+  "appealAlerts": {
+    "roleId": "1570258838345617480",
+    "reviewUrl": "http://appeals.gatemc.org/staff"
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Apply for Staff · GateMC Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css?v=20261114c">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: null, staffBrand: true }) %>
+    <%
+        var CHECK = function (text, kind) {
+            return '<li><span class="tick' + (kind ? ' ' + kind : '') + '">' + icon(kind ? 'alert' : 'check') + '</span><span>' + text + '</span></li>';
+        };
+    %>
+    <div class="apply-wrap">
+        <div class="page-head">
+            <div class="eyebrow">Join the team</div>
+            <h1>Guide application</h1>
+            <p>GateMC Guide &amp; Moderation team</p>
+        </div>
+
+        <% if (error) { %><div class="error"><%= error %></div><% } %>
+
+        <div class="card full prose">
+            <p>We are looking for worthy individuals who are eager to contribute to our network!</p>
+            <p>GateMC Staff are responsible for community moderation. This includes monitoring chat and maintaining gameplay integrity. Staff are expected to be knowledgeable about the network and accurately apply our internal guidelines when performing their duties.</p>
+            <p>Our Administration Staff reviews applications on an ongoing basis. All applicants, whether accepted or denied, will receive a status notification via Discord private message. Please ensure your DMs are enabled, or check back on this page anytime to view your update.</p>
+            <p class="last">If you aren't selected right away, we'll keep your application on file for future opportunities. Should you wish to withdraw your application or if you have any questions, feel free to open a ticket on our <a href="https://discord.gatemc.org" target="_blank" rel="noopener">Discord server</a>.</p>
+        </div>
+
+        <div class="apply-grid">
+            <div class="card full">
+                <div class="card-head"><span class="ico-tile green"><%- icon('shieldCheck') %></span><h2>Eligibility</h2></div>
+                <ul class="checklist">
+                    <%- CHECK('You must be 14 years of age or older.') %>
+                    <%- CHECK('You must be familiar with basic server commands and systems.') %>
+                    <%- CHECK('You must be an upstanding member of the community with no recent punishments.') %>
+                    <%- CHECK('You should act mature, professional, and respectful at all times.') %>
+                    <%- CHECK('You must be fluent in English, with proper grammar and spelling.') %>
+                </ul>
+                <p class="muted small"><em>Guide is an entry-level position that focuses on safety, trust, guiding community members, and helping with everyday questions. Aspiring Moderators are required to be a Guide to be considered for future Moderator positions.</em></p>
+            </div>
+            <div class="card full">
+                <div class="card-head"><span class="ico-tile gold"><%- icon('alert') %></span><h2>Before you apply</h2></div>
+                <ul class="checklist">
+                    <%- CHECK('<em>All applications can take up to 7 days to review.</em>', 'warn') %>
+                    <%- CHECK('It is recommended that you have at least ' + recommendedPlaytimeDays + (recommendedPlaytimeDays === 1 ? ' day' : ' days') + ' of play time on the server before applying. You can view your play time with <code>/playtime</code>.') %>
+                    <%- CHECK('We recommend all players who are interested to always be helpful to other players, by answering questions others on the server may have, and directing new players around the server.') %>
+                    <%- CHECK('Inquiring about your application status, whether through a ticket, staff direct message, email, public chat on Discord, or the Minecraft server, will result in an <strong>immediate denial</strong>.', 'bad') %>
+                    <%- CHECK('The staff manager will check all of your player information on our server, such as your chat logs, play time, and AFK time, after you submit your application. Please take this information into consideration before applying.', 'warn') %>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card full center">
+            <p class="muted">Ready? Sign in with Discord so we can link your application to your account.</p>
+            <a href="<%= discordAuthUrl %>" class="btn discord lg"><%- discordGlyph(20) %> Sign in with Discord to apply</a>
+        </div>
+    </div>
+</body>
+</html>

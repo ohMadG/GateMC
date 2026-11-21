@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals - Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <%- include('partials/header', { staffName }) %>
+    <div class="page">
+        <div class="card wide">
+            <div class="topbar">
+                <h1 style="margin:0;">Punishment history: <%= targetName %></h1>
+                <a href="/staff">&larr; Back to appeals</a>
+            </div>
+            <p class="muted"><code><%= targetUuid %></code> &middot; <%= punishments.length %> record(s)</p>
+
+            <% if (punishments.length === 0) { %>
+                <p class="muted">No punishment history for this player.</p>
+            <% } %>
+
+            <% punishments.forEach(p => { %>
+                <div class="appeal-item">
+                    <div class="meta">
+                        <strong>#<%= p.short_id %></strong> &middot; <%= p.type %><%= p.category ? ' &middot; ' + p.category : '' %>
+                        <% if (!p.active) { %> <span class="badge inactive">inactive</span><% } %>
+                        <br>
+                        By <%= p.staff_name %> on <%= new Date(Number(p.created_at)).toLocaleString() %>
+                        &middot; expires <%= p.expires_at ? new Date(Number(p.expires_at)).toLocaleString() : 'never' %>
+                        <% if (p.removed_at) { %><br>Removed by <%= p.remove_admin %> on <%= new Date(Number(p.removed_at)).toLocaleString() %>: <%= p.remove_reason %><% } %>
+                    </div>
+                    <div class="message"><%= p.reason %></div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Staff Application</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <%- include('partials/header', { applicantName: applicant.name }) %>
+    <div class="page">
+        <div class="card">
+            <h1 class="<%= tone === 'ok' ? 'ok' : '' %>"><%= title %></h1>
+            <% if (tone === 'error') { %><div class="error"><%= message %></div><% } else { %><p class="muted"><%= message %></p><% } %>
+        </div>
+    </div>
+</body>
+</html>

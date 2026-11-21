@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GateMC Appeals - Staff</title>
+    <link rel="icon" href="/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <%- include('partials/header', { staffName }) %>
+    <div class="page">
+        <div class="card wide">
+            <div class="topbar">
+                <h1 style="margin:0;">Stats</h1>
+                <a href="/staff/export.csv">Export resolved appeals (CSV) &darr;</a>
+            </div>
+
+            <a class="appeal-item" href="/staff">
+                <div class="meta" style="font-size: 1rem;">
+                    <strong style="color: var(--gold); font-size: 1.4rem;"><%= pendingCount %></strong> pending right now &rarr;
+                </div>
+            </a>
+
+            <% terminalStatuses.forEach(status => { %>
+                <a class="appeal-item" href="/staff/resolved?status=<%= status %>">
+                    <div class="meta">
+                        <span class="badge <%= status %>"><%= statusLabels[status] %></span>
+                    </div>
+                    <div class="meta" style="font-size: 1rem; margin-top: 8px;">
+                        <strong style="color: var(--text); font-size: 1.3rem;"><%= stats[status].last7 %></strong> in the last 7 days
+                        &middot; <strong style="color: var(--text);"><%= stats[status].allTime %></strong> all time &rarr;
+                    </div>
+                </a>
+            <% }) %>
+        </div>
+    </div>
+</body>
+</html>
