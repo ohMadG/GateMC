@@ -287,7 +287,11 @@ final class Factory {
     // ------------------------------------------------------------------ queries (any thread)
 
     boolean gateClosed() {
-        return System.currentTimeMillis() < closedUntil;
+        return System.currentTimeMillis() < closedUntil || tutorialHold();
+    }
+
+    boolean tutorialHold() {
+        return me.Evan52098.genscore.tutorial.TutorialModule.holdsGate(view.owner());
     }
 
     static final int CLOSE_COOLDOWN = 5;
@@ -307,6 +311,9 @@ final class Factory {
     }
 
     String gateStatus() {
+        if (tutorialHold()) {
+            return "<green>Gate closed</green> <gray>(tutorial)</gray>";
+        }
         if (gateClosed()) {
             long left = gateSecondsLeft();
             return left <= REUP_WINDOW
@@ -652,6 +659,8 @@ final class Factory {
             sb.append("<aqua>🛡 Shielded ").append(shield >= 60 ? shield / 60 + "m " + shield % 60 + "s" : shield + "s").append("</aqua>");
         } else if (!hasGate()) {
             sb.append("<gray>No gate</gray>");
+        } else if (tutorialHold()) {
+            sb.append("<green>■ Gate closed</green> <gray>(tutorial)</gray>");
         } else if (gateClosed()) {
             sb.append("<green>■ Gate closed</green> <white>").append(gateSecondsLeft()).append("s</white>");
         } else {
@@ -672,6 +681,10 @@ final class Factory {
         }
         String name = Bukkit.getOfflinePlayer(view.owner()).getName();
         String who = "<gray>" + Msg.escape(name == null ? "?" : name) + "'s gate</gray>";
+        if (tutorialHold()) {
+            gateLabel.text(Msg.parse(who + "\n<green><bold>CLOSED</bold></green>\n<gray>Opens at the tutorial's Gate step</gray>"));
+            return;
+        }
         gateLabel.text(gateClosed()
                 ? Msg.parse(who + "\n<green><bold>CLOSED</bold></green> <white>" + gateSecondsLeft() + "s</white>\n"
                 + (canReup() ? "<yellow>Right-click: re-up now!</yellow>" : "<gray>Re-up in the last " + REUP_WINDOW + "s</gray>")
@@ -944,15 +957,17 @@ final class Factory {
     private void updateBar(Player owner, FactorySettings s) {
         boolean shut = gateClosed();
         long left = gateSecondsLeft();
-        Component title = shut ? Msg.parse("<green>Gate closed</green> <white>" + left + "s</white> <gray>- re-up in the last " + REUP_WINDOW + "s</gray>")
+        boolean held = tutorialHold();
+        Component title = held ? Msg.parse("<green>Gate closed</green> <gray>- it opens at the tutorial's Gate step</gray>")
+                : shut ? Msg.parse("<green>Gate closed</green> <white>" + left + "s</white> <gray>- re-up in the last " + REUP_WINDOW + "s</gray>")
                 : Msg.parse("<red><bold>GATE OPEN</bold></red> <gray>- press the gate button or /gate</gray>");
-        float progress = shut ? Math.min(1f, Math.max(0f, left / (float) module.gateSeconds(view.owner()))) : 1f;
+        float progress = held ? 1f : shut ? Math.min(1f, Math.max(0f, left / (float) module.gateSeconds(view.owner()))) : 1f;
         if (bar == null) {
             bar = BossBar.bossBar(title, progress, shut ? BossBar.Color.GREEN : BossBar.Color.RED, BossBar.Overlay.PROGRESS);
         } else {
             bar.name(title);
             bar.progress(progress);
-            bar.color(shut ? (left <= 10 ? BossBar.Color.YELLOW : BossBar.Color.GREEN) : BossBar.Color.RED);
+            bar.color(shut ? (!held && left <= 10 ? BossBar.Color.YELLOW : BossBar.Color.GREEN) : BossBar.Color.RED);
         }
         if (!barShown) {
             barShown = true;

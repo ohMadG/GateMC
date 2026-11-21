@@ -432,11 +432,38 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         return staffMode != null && staffMode.inStaffMode(p.getUniqueId());
     }
 
+    public static void tutorialReleased(UUID owner) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(owner);
+        if (f != null) {
+            f.requestOpen();
+        }
+    }
+
+    private boolean leavingDuringTutorial(Player p, Location from, Location to) {
+        if (!me.Evan52098.genscore.tutorial.TutorialModule.holdsGate(p.getUniqueId()) || bypasses(p)) {
+            return false;
+        }
+        Factory own = byOwner.get(p.getUniqueId());
+        if (own == null || !from.getWorld().equals(own.view.world()) || own.view.inside(to.getBlockX(), to.getBlockZ())
+                && to.getWorld().equals(own.view.world())) {
+            return false;
+        }
+        return own.view.inside(from.getBlockX(), from.getBlockZ()) || own.isGateCell(from.getBlockX(), from.getBlockY(), from.getBlockZ());
+    }
+
+    private static final String TUTORIAL_HOLD = "Your gate stays shut until the tutorial's Gate step.";
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Location to = event.getTo();
         Location from = event.getFrom();
         if (to.getBlockX() == from.getBlockX() && to.getBlockZ() == from.getBlockZ()) {
+            return;
+        }
+        if (leavingDuringTutorial(event.getPlayer(), from, to)) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Msg.bad(TUTORIAL_HOLD + " Keep following the Guide."));
             return;
         }
         Factory f = at(to);
@@ -463,6 +490,12 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return; // our own moves (plot spawn, pushing intruders out)
         }
         Location to = event.getTo();
+        if (leavingDuringTutorial(event.getPlayer(), event.getFrom(), to)) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(Msg.bad("You can't leave your factory yet. " + TUTORIAL_HOLD
+                    + " (" + Msg.white("/tutorial skip") + " to stop the tutorial)"));
+            return;
+        }
         Factory f = at(to);
         if (f != null && blockedFrom(event.getPlayer(), f) && f.view.inside(to.getBlockX(), to.getBlockZ())) {
             event.setCancelled(true);
@@ -556,6 +589,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         if (!p.getUniqueId().equals(f.view.owner())) {
             p.sendActionBar(Msg.bad(f.gateClosed() ? "This gate is closed." : "This is not your gate."));
+            return;
+        }
+        if (f.tutorialHold()) {
+            p.sendActionBar(Msg.bad(TUTORIAL_HOLD));
             return;
         }
         if (sneaking) {
@@ -765,6 +802,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         Factory f = byOwner.get(p.getUniqueId());
         if (f == null) {
             p.sendMessage(Msg.bad("Your factory is not ready yet."));
+            return;
+        }
+        if (f.tutorialHold()) {
+            p.sendMessage(Msg.bad(TUTORIAL_HOLD));
             return;
         }
         if ("open".equalsIgnoreCase(action)) {
@@ -1292,7 +1333,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             menu.set(20, Lore.item(Material.SUGAR, c + "Speed", (speedPrice < 0
                     ? Lore.builder(Lore.Accent.WHITE).stat("Speed", mult(s, level)).description("Top speed.")
                     : Lore.builder(Lore.Accent.WHITE).stat("Level", level + " / " + s.speedLevels().size())
-                    .stat("Now", mult(s, level)).stat("Next", mult(s, level + 1)).stat("Price", Money.compact(speedPrice))
+                    .stat("Now", mult(s, level)).stat("Next", mult(s, level + 1)).stat("Price", me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "speed") ? "FREE (tutorial)" : Money.compact(speedPrice))
                     .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
                     .build()), e -> buySpeed(p, f, e.isShiftClick()));
             menu.set(21, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), c + "Gen", (tierPrice < 0
@@ -1300,7 +1341,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                     : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.mix())
                     .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).mix())
                     .stat("Average item then", Money.compact(s.itemValue(length, tier + 1)))
-                    .stat("Price", Money.compact(tierPrice))
+                    .stat("Price", me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "gen") ? "FREE (tutorial)" : Money.compact(tierPrice))
                     .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
                     .build()), e -> buyTier(p, f, e.isShiftClick()));
             menu.set(22, Lore.item(Material.IRON_CHAIN, c + "Length", (maxed
@@ -1308,7 +1349,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                     : Lore.builder(Lore.Accent.WHITE).stat("Now", length + " segments")
                     .stat("Next", Math.min(f.path.size(), data.beltLength() + s.lengthStep()) + " segments")
                     .stat("Item value then", Money.compact(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
-                    .stat("Price", Money.compact(s.lengthPrice(done)))
+                    .stat("Price", me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "length") ? "FREE (tutorial)" : Money.compact(s.lengthPrice(done)))
                     .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
                     .build()), e -> buyLength(p, f, e.isShiftClick()));
             menu.set(23, Lore.item(Material.BLAST_FURNACE, c + "Machines", machines.clickPrompt("see your machines").build()),
@@ -1370,6 +1411,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         int bought = 0;
+        boolean freeUsed = false;
         while (true) {
             int level = data.speedLevel();
             long price = settings.nextSpeedPrice(level);
@@ -1379,11 +1421,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                 }
                 break;
             }
-            if (!withdraw(p, price, "belt speed level " + (level + 1), bought == 0)) {
+            boolean free = bought == 0 && me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "speed");
+            if (!free && !withdraw(p, price, "belt speed level " + (level + 1), bought == 0)) {
                 break;
             }
             data.setSpeedLevel(level + 1); // checklist 1: the money is taken first
             bought++;
+            if (free) {
+                me.Evan52098.genscore.tutorial.TutorialModule.usedFree(p, "speed");
+                freeUsed = true;
+                break;
+            }
             if (!many) {
                 break;
             }
@@ -1393,7 +1441,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         plugin.playerData().saveSoon(p.getUniqueId());
         p.sendMessage(Msg.good("Belt speed upgraded" + (bought > 1 ? " " + bought + " times" : "") + " to "
-                + Msg.white(mult(settings, data.speedLevel())) + "."));
+                + Msg.white(mult(settings, data.speedLevel())) + "." + (freeUsed ? " Free for the tutorial!" : "")));
         celebrate(p, "<aqua><bold>SPEED UP", "<white>" + mult(settings, data.speedLevel()) + " belt speed", false);
         openMenu(p, f);
     }
@@ -1425,6 +1473,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         int bought = 0;
+        boolean freeUsed = false;
         int startLevel = data.genLevel();
         while (true) {
             int tier = data.genLevel();
@@ -1435,11 +1484,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                 }
                 break;
             }
-            if (!withdraw(p, price, "gen tier " + (tier + 2), bought == 0)) {
+            boolean free = bought == 0 && me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "gen");
+            if (!free && !withdraw(p, price, "gen tier " + (tier + 2), bought == 0)) {
                 break;
             }
             data.setGenLevel(tier + 1); // checklist 1: the money is taken first
             bought++;
+            if (free) {
+                me.Evan52098.genscore.tutorial.TutorialModule.usedFree(p, "gen");
+                freeUsed = true;
+                break;
+            }
             if (!many) {
                 break;
             }
@@ -1459,7 +1514,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_USE, 0.6f, 1.2f);
         }
         p.sendMessage(Msg.good("Gen upgraded" + (bought > 1 ? " " + bought + " tiers" : "") + " to tier " + (now + 1) + ": it now makes "
-                + Msg.white(settings.tier(now).mix()) + "."));
+                + Msg.white(settings.tier(now).mix()) + "." + (freeUsed ? " Free for the tutorial!" : "")));
         celebrate(p, "<gold><bold>GEN TIER " + (now + 1), "<yellow>" + Msg.escape(settings.tier(now).mix()), bought > 1 || now % 10 == 0);
         openMenu(p, f);
     }
@@ -1470,6 +1525,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         int bought = 0;
+        boolean freeUsed = false;
         while (true) {
             if (data.beltLength() >= f.path.size()) {
                 if (bought == 0) {
@@ -1479,11 +1535,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             }
             int done = Math.max(0, (data.beltLength() - plots.defaultBeltLength()) / Math.max(1, settings.lengthStep()));
             long price = settings.lengthPrice(done);
-            if (!withdraw(p, price, "belt length upgrade " + (done + 1), bought == 0)) {
+            boolean free = bought == 0 && me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, "length");
+            if (!free && !withdraw(p, price, "belt length upgrade " + (done + 1), bought == 0)) {
                 break;
             }
             data.setBeltLength(Math.min(f.path.size(), data.beltLength() + settings.lengthStep()));
             bought++;
+            if (free) {
+                me.Evan52098.genscore.tutorial.TutorialModule.usedFree(p, "length");
+                freeUsed = true;
+                break;
+            }
             if (!many) {
                 break;
             }
@@ -1493,7 +1555,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         plugin.playerData().saveSoon(p.getUniqueId());
         p.sendMessage(Msg.good("Belt extended" + (bought > 1 ? " " + bought + " times" : "") + " to "
-                + Msg.white(data.beltLength() + " segments") + "."));
+                + Msg.white(data.beltLength() + " segments") + "." + (freeUsed ? " Free for the tutorial!" : "")));
         celebrate(p, "<green><bold>BELT EXTENDED", "<white>" + data.beltLength() + " segments", data.beltLength() >= f.path.size());
         openMenu(p, f);
     }

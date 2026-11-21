@@ -101,7 +101,7 @@ public final class TutorialModule implements GensModule, Listener {
             new Say("<green>Ka-ching!</green> That's your factory working. It keeps earning while you're online, even while you walk around."),
 
             new Chapter("2. Upgrades", "Make more, sell faster"),
-            new Give("cash", 35_000, 0, "Here's some starter cash so you can try each upgrade."),
+            new Give("cash", 35_000, 0, "Here's some starter cash. The upgrades I show you next are free, so keep this for later."),
             new Say("Open your belt menu with <white>/belt</white>. There are three main upgrades in it."),
             new Say("<gold>Gen</gold>: your generator makes better items. There are 150 tiers, from Cobblestone up to Dragon Eggs, and each tier is worth more."),
             new Wait("gen", "Upgrade your Gen once", "/belt", null),
@@ -109,7 +109,7 @@ public final class TutorialModule implements GensModule, Listener {
             new Wait("length", "Buy a Length upgrade", "/belt", null),
             new Say("<white>Speed</white> moves the belt faster, so more items sell every second. Speed is how your income really grows."),
             new Wait("speed", "Buy a Speed upgrade", "/belt", null),
-            new Say("Upgrades get pricier as you go. Early ones are quick, later ones take a while. That's normal: keep the belt running and keep buying."),
+            new Say("Those were on the house. From now on upgrades cost money, and they get pricier as you go. Early ones are quick, later ones take a while. That's normal: keep the belt running and keep buying."),
 
             new Chapter("3. Tokens & Caches", "The second currency"),
             new Say("Now and then a <yellow>token</yellow> or a <light_purple>cache</light_purple> rides your belt instead of an item. You can spot them by their model."),
@@ -132,7 +132,7 @@ public final class TutorialModule implements GensModule, Listener {
             new Say("You can't keep the gate closed forever, so build defences. Open <white>/defence</white> to see them."),
             new Say("<white>Armour</white> gives every belt segment more health. <red>Turrets</red> shoot anyone who walks in. <dark_purple>Traps</dark_purple> slow intruders and, later, throw them back out."),
             new Say("<white>Gate time</white> keeps your gate closed longer with each level."),
-            new Give("turret", 0, 15, "Here are 15 tokens. Let's buy your first turret."),
+            new Give("turret", 0, 15, "Here are 15 tokens. Your first turret is free, so save these for later."),
             new Point("turret", "TURRET"),
             new Wait("turret", "Buy a Turret in /defence", "/defence", null),
             new Clear(),
@@ -169,6 +169,9 @@ public final class TutorialModule implements GensModule, Listener {
             new Say("<white>/menu</white> (the Nether Star in slot 5) has everything I showed you. <white>/tutorial book</white> has it all written down."),
             new Say("That's it! Close your gate, grow your belt and go take some money. Good luck!"));
 
+    private static final int GATE_STEP = gateStep();
+    private static final Set<UUID> HELD = ConcurrentHashMap.newKeySet();
+
     private static volatile TutorialModule instance;
 
     private GensCore plugin;
@@ -184,7 +187,7 @@ public final class TutorialModule implements GensModule, Listener {
         final BossBar bar = BossBar.bossBar(Component.empty(), 0f, BossBar.Color.GREEN, BossBar.Overlay.PROGRESS);
         final Set<String> events = ConcurrentHashMap.newKeySet();
         long nextAt;
-        int waitingFor = -1;
+        volatile int waitingFor = -1;
         long baseline;
         long remindAt;
         String chapter = "";
@@ -234,6 +237,7 @@ public final class TutorialModule implements GensModule, Listener {
     @Override
     public void disable() {
         instance = null;
+        HELD.clear();
         for (Map.Entry<UUID, Run> e : runs.entrySet()) {
             Player p = Bukkit.getPlayer(e.getKey());
             if (p != null) {
@@ -255,6 +259,51 @@ public final class TutorialModule implements GensModule, Listener {
         Run r = m.runs.get(p.getUniqueId());
         if (r != null) {
             r.events.add(event);
+        }
+    }
+
+    public static boolean freeUpgrade(Player p, String id) {
+        TutorialModule m = instance;
+        Run r = m == null ? null : m.runs.get(p.getUniqueId());
+        if (r == null) {
+            return false;
+        }
+        int w = r.waitingFor;
+        return w >= 0 && w < SCRIPT.size() && SCRIPT.get(w) instanceof Wait wait && wait.id().equals(id)
+                && !r.events.contains("free:" + id);
+    }
+
+    public static void usedFree(Player p, String id) {
+        TutorialModule m = instance;
+        Run r = m == null ? null : m.runs.get(p.getUniqueId());
+        if (r != null) {
+            r.events.add("free:" + id);
+        }
+    }
+
+    public static boolean holdsGate(UUID owner) {
+        return HELD.contains(owner);
+    }
+
+    private static int gateStep() {
+        for (int i = 0; i < SCRIPT.size(); i++) {
+            if (SCRIPT.get(i) instanceof Wait w && "gate".equals(w.id())) {
+                for (int j = i; j >= 0; j--) {
+                    if (SCRIPT.get(j) instanceof Chapter) {
+                        return j;
+                    }
+                }
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private void hold(Player p, int beat) {
+        if (beat < GATE_STEP) {
+            HELD.add(p.getUniqueId());
+        } else if (HELD.remove(p.getUniqueId())) {
+            FactoryModule.tutorialReleased(p.getUniqueId());
         }
     }
 
@@ -330,6 +379,7 @@ public final class TutorialModule implements GensModule, Listener {
 
     private void stop(Player p, String newState) {
         setState(p, newState);
+        HELD.remove(p.getUniqueId());
         Run r = runs.remove(p.getUniqueId());
         if (r != null) {
             p.hideBossBar(r.bar);
@@ -345,6 +395,7 @@ public final class TutorialModule implements GensModule, Listener {
         }
         long now = System.currentTimeMillis();
         int i = beat(p);
+        hold(p, i);
         if (i >= SCRIPT.size()) {
             finish(p);
             return;
@@ -894,6 +945,7 @@ public final class TutorialModule implements GensModule, Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        HELD.remove(event.getPlayer().getUniqueId());
         Run r = runs.remove(event.getPlayer().getUniqueId());
         if (r != null) {
             removeLabel(r);

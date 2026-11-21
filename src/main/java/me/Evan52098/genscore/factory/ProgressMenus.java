@@ -68,6 +68,12 @@ final class ProgressMenus {
     /** A token-priced upgrade button. Shift-click buys as many levels as the tokens cover. */
     private void tokenUpgrade(Menu menu, int slot, Player p, Material icon, String name, ProgressSettings.Upgrade up,
                               IntSupplier level, IntConsumer setLevel, java.util.function.IntFunction<String> effect) {
+        tokenUpgrade(menu, slot, p, icon, name, up, null, level, setLevel, effect);
+    }
+
+    private void tokenUpgrade(Menu menu, int slot, Player p, Material icon, String name, ProgressSettings.Upgrade up,
+                              @org.jetbrains.annotations.Nullable String tutorialId,
+                              IntSupplier level, IntConsumer setLevel, java.util.function.IntFunction<String> effect) {
         GensPlayer g = module.gensPlayer(p.getUniqueId());
         int l = level.getAsInt();
         long price = up.price(l);
@@ -75,18 +81,26 @@ final class ProgressMenus {
         if (price < 0) {
             lore.description("Fully upgraded.");
         } else {
-            lore.stat("Next", effect.apply(l + 1)).stat("Price", price + " tokens").clickPrompt("buy")
+            boolean freeNow = tutorialId != null && me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, tutorialId);
+            lore.stat("Next", effect.apply(l + 1)).stat("Price", freeNow ? "FREE (tutorial)" : price + " tokens").clickPrompt("buy")
                     .description("Shift-click: buy as many as you can afford.");
         }
         menu.set(slot, Lore.item(icon, name, lore.build()), e -> {
             int bought = 0;
             while (g != null) {
                 long cost = up.price(level.getAsInt());
-                if (cost < 0 || !g.takeTokens(cost)) { // take first
+                boolean free = bought == 0 && cost >= 0 && tutorialId != null
+                        && me.Evan52098.genscore.tutorial.TutorialModule.freeUpgrade(p, tutorialId);
+                if (cost < 0 || !free && !g.takeTokens(cost)) { // take first
                     break;
                 }
                 setLevel.accept(level.getAsInt() + 1);
                 bought++;
+                if (free) {
+                    me.Evan52098.genscore.tutorial.TutorialModule.usedFree(p, tutorialId);
+                    p.sendMessage(Msg.good("Free for the tutorial!"));
+                    break;
+                }
                 if (!e.isShiftClick()) {
                     break;
                 }
@@ -182,7 +196,7 @@ final class ProgressMenus {
                 l -> ps.gateSeconds(baseGate, l) + "s closed per click");
         tokenUpgrade(menu, 12, p, Material.IRON_CHESTPLATE, "&7Belt armour", ps.armor(), d::armorLevel, d::setArmorLevel,
                 l -> ps.segmentHealth(l) + " hits to break a segment (no gear)");
-        tokenUpgrade(menu, 14, p, Material.DISPENSER, "&cTurrets", ps.turrets(), d::turretLevel, d::setTurretLevel,
+        tokenUpgrade(menu, 14, p, Material.DISPENSER, "&cTurrets", ps.turrets(), "turret", d::turretLevel, d::setTurretLevel,
                 l -> l == 0 ? "none" : Math.min(l, 4) + " turret" + (Math.min(l, 4) == 1 ? "" : "s") + ", "
                         + String.format(java.util.Locale.ROOT, "%.1f", (ps.turretDamage() + ps.turretDamagePerLevel() * (l - 1)) / 2) + " hearts a shot");
         tokenUpgrade(menu, 16, p, Material.COBWEB, "&5Traps", ps.traps(), d::trapLevel, d::setTrapLevel,
