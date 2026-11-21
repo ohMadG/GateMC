@@ -74,7 +74,9 @@ final class PetFollower {
             stop(p.getUniqueId());
             return;
         }
-        List<Material> want = p.getGameMode() == GameMode.SPECTATOR || p.isInvisible() ? List.of() : icons.apply(p);
+        List<Material> want = p.getGameMode() == GameMode.SPECTATOR || p.isInvisible()
+                || p.hasPotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY)
+                || me.Evan52098.genscore.hub.HubModule.cloaked(p) ? List.of() : icons.apply(p);
         if (want.size() > OFFSETS.length) {
             want = want.subList(0, OFFSETS.length);
         }

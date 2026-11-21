@@ -833,6 +833,8 @@ public final class HubModule implements GensModule, Listener {
         cooldowns.start(p.getUniqueId(), "cloak", cloakCooldown * 1000L);
         cloakedUntil.put(p.getUniqueId(), System.currentTimeMillis() + cloakSeconds * 1000L);
         p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, cloakSeconds * 20, 0, false, false, true));
+        p.removePotionEffect(PotionEffectType.GLOWING);
+        p.setGlowing(false);
         for (Player o : Bukkit.getOnlinePlayers()) {
             if (!o.equals(p) && !o.hasPermission("genscore.vanish.see")) {
                 Tasks.entity.run(o, () -> o.hidePlayer(plugin, p));

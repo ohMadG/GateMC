@@ -478,8 +478,8 @@ public final class CosmeticsModule implements GensModule, Listener {
         if (t.ownershipCountdown <= 0) {
             t.ownershipCountdown = 100;
             refreshCaches(p, data);
-            applyGlow(p, t, data);
         }
+        applyGlow(p, t, data);
         Cosmetic aura = data.active(CosmeticCategory.AURA) == null ? null : activeOwned(p, data, CosmeticCategory.AURA);
         if (aura != null && aura.effect() != null && visible(p, cfg)) {
             t.auraStep++;
@@ -504,7 +504,7 @@ public final class CosmeticsModule implements GensModule, Listener {
     }
 
     private static boolean visible(Player p, CosmeticsConfig cfg) {
-        if (p.isDead() || p.getGameMode() == GameMode.SPECTATOR) {
+        if (p.isDead() || p.getGameMode() == GameMode.SPECTATOR || me.Evan52098.genscore.hub.HubModule.cloaked(p)) {
             return false;
         }
         return !cfg.hideWhenInvisible || !(p.isInvisible() || p.hasPotionEffect(PotionEffectType.INVISIBILITY));
