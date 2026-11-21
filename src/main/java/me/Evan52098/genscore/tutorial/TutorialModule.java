@@ -41,8 +41,6 @@ import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import io.papermc.paper.datacomponent.item.ResolvableProfile;
-import io.papermc.paper.entity.TeleportFlag;
-import org.bukkit.event.player.PlayerTeleportEvent;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.jetbrains.annotations.Nullable;
 import revxrsal.commands.annotation.Command;
@@ -498,58 +496,81 @@ public final class TutorialModule implements GensModule, Listener {
 
     // ------------------------------------------------------------------ guide npc
 
-    private static Location guideSpot(Player p) {
-        Location eye = p.getLocation();
-        Vector forward = eye.getDirection().setY(0);
-        if (forward.lengthSquared() < 1.0E-4) {
-            forward = new Vector(0, 0, 1);
+    private @Nullable Location factoryMiddle(Player p) {
+        PlotsModule plots = plugin.modules().get(PlotsModule.class);
+        PlotService service = plots == null ? null : plots.service();
+        Plot plot = service == null ? null : service.plotOf(p.getUniqueId());
+        return plot == null ? null : service.view(plot).center();
+    }
+
+    private static Location clearSpot(Location middle) {
+        org.bukkit.World w = middle.getWorld();
+        int cx = middle.getBlockX();
+        int cz = middle.getBlockZ();
+        int y = middle.getBlockY();
+        for (int radius = 0; radius <= 8; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) {
+                        continue;
+                    }
+                    for (int dy = 0; dy <= 2; dy++) {
+                        int x = cx + dx;
+                        int z = cz + dz;
+                        int by = y + dy;
+                        if (w.getBlockAt(x, by - 1, z).isSolid() && w.getBlockAt(x, by, z).isPassable() && w.getBlockAt(x, by + 1, z).isPassable()
+                                && !w.getBlockAt(x, by, z).isLiquid()) {
+                            return new Location(w, x + 0.5, by, z + 0.5);
+                        }
+                    }
+                }
+            }
         }
-        forward.normalize();
-        Vector right = new Vector(-forward.getZ(), 0, forward.getX());
-        Location spot = eye.clone().add(forward.multiply(1.8)).add(right.multiply(1.6));
-        spot.setY(eye.getY());
-        Vector look = eye.toVector().subtract(spot.toVector());
-        spot.setDirection(look.lengthSquared() < 1.0E-4 ? new Vector(0, 0, -1) : look);
-        spot.setPitch(0);
-        return spot;
+        return middle.clone();
     }
 
     private void follow(Player p, Run r) {
         Mannequin npc = r.npc;
         if (npc == null) {
-            if (!r.spawning) {
+            Location middle = r.spawning ? null : factoryMiddle(p);
+            if (middle != null && middle.getWorld() == p.getWorld() && middle.distanceSquared(p.getLocation()) < 100 * 100) {
                 spawnNpc(p, r);
             }
             return;
         }
-        Location want = guideSpot(p);
+        Location viewer = p.getLocation();
         Tasks.onEntity(npc, () -> {
             if (!npc.isValid()) {
                 r.npc = null;
                 return;
             }
             Location at = npc.getLocation();
-            boolean far = at.getWorld() != want.getWorld() || at.distanceSquared(want) > 2.25;
-            Location face = far ? want : at.clone();
-            if (!far) {
-                Vector look = p.getLocation().toVector().subtract(at.toVector()).setY(0);
-                if (look.lengthSquared() > 1.0E-4) {
-                    face.setDirection(look);
-                    face.setPitch(0);
-                }
-                if (Math.abs(face.getYaw() - at.getYaw()) < 5) {
-                    return;
-                }
+            if (at.getWorld() != viewer.getWorld() || at.distanceSquared(viewer) > 64 * 64) {
+                return;
             }
-            npc.teleportAsync(face, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.EntityState.RETAIN_PASSENGERS);
+            Vector look = viewer.toVector().subtract(at.toVector()).setY(0);
+            if (look.lengthSquared() < 1.0E-4) {
+                return;
+            }
+            Location face = at.clone();
+            face.setDirection(look);
+            face.setPitch(0);
+            float diff = Math.abs(((face.getYaw() - at.getYaw()) % 360 + 540) % 360 - 180);
+            if (diff > 6) {
+                npc.setRotation(face.getYaw(), 0);
+            }
         });
     }
 
     private void spawnNpc(Player p, Run r) {
+        Location middle = factoryMiddle(p);
+        if (middle == null) {
+            return;
+        }
         r.spawning = true;
-        Location at = guideSpot(p);
         UUID viewer = p.getUniqueId();
-        Tasks.region.run(at, () -> {
+        Tasks.region.run(middle, () -> {
+            Location at = clearSpot(middle);
             Mannequin m = at.getWorld().spawn(at, Mannequin.class, n -> {
                 n.setPersistent(false);
                 n.setVisibleByDefault(false);
