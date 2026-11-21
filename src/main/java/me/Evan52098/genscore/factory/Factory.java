@@ -862,11 +862,17 @@ final class Factory {
                 * (1 + ps.value().perLevel() * (gp == null ? 0 : gp.valueLevel()))
                 * (1 + me.Evan52098.genscore.powers.PowersModule.perk(view.owner(), "sale-value"))
                 * RankPerks.sale(view.owner());
+        boolean tutorial = me.Evan52098.genscore.tutorial.TutorialModule.noIncome(view.owner());
         while (!items.isEmpty() && items.peekFirst().pos >= length) {
             BeltItem sold = items.pollFirst();
             releaseDisplay(sold);
             if (sold.special != NORMAL) {
                 module.rewards().belt(view.owner(), sold.special);
+                continue;
+            }
+            if (tutorial) {
+                me.Evan52098.genscore.tutorial.TutorialModule.sold(view.owner());
+                salesThisTick++;
                 continue;
             }
             long value = Math.round(s.saleValue(sold.baseCents, length) * boost * sold.worth());

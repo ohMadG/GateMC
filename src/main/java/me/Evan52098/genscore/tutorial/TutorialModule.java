@@ -95,14 +95,13 @@ public final class TutorialModule implements GensModule, Listener {
             new Point("belt", "CONVEYOR BELT"),
             new Say("The <white>belt</white> carries items along. Every working belt segment adds <green>+10%</green> to the item's value, so a longer belt means more money per item."),
             new Point("sell", "SELL POINT"),
-            new Say("At the end of the belt, items sell automatically. The money lands in your balance every few seconds. Check it on the scoreboard on the right."),
+            new Say("At the end of the belt, items sell automatically and the money lands in your balance every few seconds. While I'm showing you around, sales don't pay out yet: you get a <gold>starting bonus</gold> when you finish."),
             new Wait("sale", "Watch your first item sell", "/belt", null),
             new Clear(),
-            new Say("<green>Ka-ching!</green> That's your factory working. It keeps earning while you're online, even while you walk around."),
+            new Say("<green>Ka-ching!</green> That's your factory working. Once the tutorial is done it keeps earning while you're online, even while you walk around."),
 
             new Chapter("2. Upgrades", "Make more, sell faster"),
-            new Give("cash", 35_000, 0, "Here's some starter cash. The upgrades I show you next are free, so keep this for later."),
-            new Say("Open your belt menu with <white>/belt</white>. There are three main upgrades in it."),
+            new Say("Open your belt menu with <white>/belt</white>. There are three main upgrades in it, and the ones I ask for are <green>free</green> during the tutorial."),
             new Say("<gold>Gen</gold>: your generator makes better items. There are 150 tiers, from Cobblestone up to Dragon Eggs, and each tier is worth more."),
             new Wait("gen", "Upgrade your Gen once", "/belt", null),
             new Say("Nice. <white>Length</white> adds belt segments: more items on the belt at once, and each one is worth more when it sells."),
@@ -132,7 +131,6 @@ public final class TutorialModule implements GensModule, Listener {
             new Say("You can't keep the gate closed forever, so build defences. Open <white>/defence</white> to see them."),
             new Say("<white>Armour</white> gives every belt segment more health. <red>Turrets</red> shoot anyone who walks in. <dark_purple>Traps</dark_purple> slow intruders and, later, throw them back out."),
             new Say("<white>Gate time</white> keeps your gate closed longer with each level."),
-            new Give("turret", 0, 15, "Here are 15 tokens. Your first turret is free, so save these for later."),
             new Point("turret", "TURRET"),
             new Wait("turret", "Buy a Turret in /defence", "/defence", null),
             new Clear(),
@@ -180,6 +178,7 @@ public final class TutorialModule implements GensModule, Listener {
     private NamespacedKey paidKey;
     private final Map<UUID, Run> runs = new ConcurrentHashMap<>();
     private volatile int finalTokens;
+    private volatile long finalCents;
     private volatile List<String> finalCommands = List.of();
     private volatile boolean autoStart;
 
@@ -230,7 +229,8 @@ public final class TutorialModule implements GensModule, Listener {
     public void reload() {
         ConfigurationSection c = plugin.getConfig().getConfigurationSection("tutorial");
         autoStart = c == null || c.getBoolean("auto-start", true);
-        finalTokens = c == null ? 10 : Math.max(0, c.getInt("final-tokens", 10));
+        finalTokens = c == null ? 25 : Math.max(0, c.getInt("final-tokens", 25));
+        finalCents = Math.max(0, Math.round((c == null ? 350 : c.getDouble("final-cash", 350)) * 100));
         finalCommands = c == null || !c.isList("final-commands") ? List.of("crate give {player} vote 2") : c.getStringList("final-commands");
     }
 
@@ -278,6 +278,19 @@ public final class TutorialModule implements GensModule, Listener {
         Run r = m == null ? null : m.runs.get(p.getUniqueId());
         if (r != null) {
             r.events.add("free:" + id);
+        }
+    }
+
+    public static boolean noIncome(UUID owner) {
+        TutorialModule m = instance;
+        return m != null && m.runs.containsKey(owner);
+    }
+
+    public static void sold(UUID owner) {
+        TutorialModule m = instance;
+        Run r = m == null ? null : m.runs.get(owner);
+        if (r != null) {
+            r.events.add("sale");
         }
     }
 
@@ -501,7 +514,6 @@ public final class TutorialModule implements GensModule, Listener {
         PlotsModule plots = plugin.modules().get(PlotsModule.class);
         PlotData d = plots == null ? null : plots.data(u);
         return switch (id) {
-            case "sale" -> balance(u);
             case "gen" -> d == null ? 0 : d.genLevel();
             case "speed" -> d == null ? 0 : d.speedLevel();
             case "length" -> d == null ? 0 : d.beltLength();
@@ -516,7 +528,6 @@ public final class TutorialModule implements GensModule, Listener {
         PlotData d = plots == null ? null : plots.data(u);
         return switch (id) {
             case "factory" -> inOwnFactory(p, plots);
-            case "sale" -> balance(u) > r.baseline;
             case "gen" -> d != null && d.genLevel() > r.baseline;
             case "speed" -> d != null && d.speedLevel() > r.baseline;
             case "length" -> d != null && d.beltLength() > r.baseline;
@@ -534,12 +545,13 @@ public final class TutorialModule implements GensModule, Listener {
                 Title.Times.times(Duration.ofMillis(300), Duration.ofSeconds(3), Duration.ofMillis(600))));
         if (first) {
             markPaid(p, "final");
-            give(p, 0, finalTokens);
+            give(p, finalCents, finalTokens);
             for (String cmd : finalCommands) {
                 String line = cmd.replace("{player}", p.getName());
                 Tasks.global.run(() -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), line));
             }
-            p.sendMessage(Msg.good("Tutorial complete! Reward: " + Msg.white(finalTokens + " tokens") + " and crate keys."));
+            p.sendMessage(Msg.good("Tutorial complete! Starting bonus: " + Msg.white(Money.compact(finalCents)) + ", "
+                    + Msg.white(finalTokens + " tokens") + " and crate keys. Your factory now earns money."));
         } else {
             p.sendMessage(Msg.good("Tutorial complete!"));
         }
