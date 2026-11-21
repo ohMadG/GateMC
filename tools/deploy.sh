@@ -9,7 +9,7 @@ case "$target" in
     server_id=9
     ;;
   production)
-    branch=production
+    branch=master
     volume=bd69a4bd-4b61-4a5d-938b-40038a260c27
     server_id=
     ;;
