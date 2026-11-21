@@ -164,6 +164,7 @@ final class ProgressMenus {
     // ------------------------------------------------------------------ defences (tokens)
 
     void defence(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "defence");
         GensPlayer g = module.gensPlayer(p.getUniqueId());
         PlotData d = module.plotData(p.getUniqueId());
         if (g == null || d == null) {
@@ -193,6 +194,7 @@ final class ProgressMenus {
     // ------------------------------------------------------------------ raid gear (money)
 
     void gear(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "gear");
         GensPlayer g = module.gensPlayer(p.getUniqueId());
         if (g == null) {
             return;

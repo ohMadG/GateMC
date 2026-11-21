@@ -157,6 +157,12 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
 
     private static volatile FactoryModule powerHooks;
 
+    public static @Nullable Location gateFront(UUID owner) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(owner);
+        return f == null || !f.hasGate() ? null : f.outsideGate();
+    }
+
     public static long incomePerMinute(UUID uuid) {
         FactoryModule m = powerHooks;
         Factory f = m == null ? null : m.byOwner.get(uuid);
@@ -710,6 +716,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         g.remember(at, now);
         f.requestClose();
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "gate");
         if (wasClosed) {
             p.sendMessage(Msg.good("Gate timer reset to " + Msg.white(settings.gateCloseSeconds() + "s") + "."));
         }

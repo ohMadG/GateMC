@@ -426,6 +426,7 @@ public final class HubModule implements GensModule, Listener {
     }
 
     private void hubMenu(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "menu");
         if (tiles != null && tileMenu(p)) {
             return;
         }
@@ -587,6 +588,9 @@ public final class HubModule implements GensModule, Listener {
             claimed = today.equals(d.lastClaim);
             streak = claimed ? d.streak : (yesterday.equals(d.lastClaim) ? d.streak + 1 : 1);
         }
+        if (claimed) {
+            me.Evan52098.genscore.tutorial.TutorialModule.done(p, "daily");
+        }
         int s = Math.min(streak, 10);
         long cashMinutes = 15 + 5L * s;
         long cash = Math.max(rewardFloorCents * 2, FactoryModule.incomePerMinute(p.getUniqueId()) * cashMinutes);
@@ -634,6 +638,7 @@ public final class HubModule implements GensModule, Listener {
         }
         plugin.playerData().saveSoon(p.getUniqueId());
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.2f);
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "daily");
     }
 
     private void worldsMenu(Player p) {

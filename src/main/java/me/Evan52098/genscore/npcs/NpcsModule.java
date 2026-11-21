@@ -230,7 +230,9 @@ public final class NpcsModule implements GensModule, Listener {
             if (def.id().equals(id)) {
                 p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_TRADE, 0.7f, 1.2f);
                 if ("tutorial".equals(def.command())) {
-                    openTutorial(p);
+                    if (!me.Evan52098.genscore.tutorial.TutorialModule.openFor(p)) {
+                        openTutorial(p);
+                    }
                 } else {
                     p.performCommand(def.command());
                 }
@@ -251,7 +253,7 @@ public final class NpcsModule implements GensModule, Listener {
 
     // ------------------------------------------------------------------ tutorial
 
-    @Command({"tutorial", "guide"})
+    @Command("guidebook")
     @Description("How to play GateMC")
     public void tutorialCommand(BukkitCommandActor actor) {
         Player p = actor.requirePlayer();
@@ -417,7 +419,7 @@ public final class NpcsModule implements GensModule, Listener {
                     Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2500), Duration.ofMillis(700))));
             p.sendMessage(Msg.parse("<gold><bold>Welcome to GateMC!</bold></gold> <gray>Open the menu with the</gray> <white>Nether Star</white> <gray>in slot 5. Your gate is shut for your first 2 minutes.</gray>"));
         }, 20L);
-        Tasks.entity.later(p, () -> openTutorial(p), 70L);
+        Tasks.entity.later(p, () -> me.Evan52098.genscore.tutorial.TutorialModule.introFinished(p), 70L);
     }
 
     private static Location along(List<Shot> shots, int[] starts, double time) {
