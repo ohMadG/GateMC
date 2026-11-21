@@ -104,6 +104,7 @@ public final class GensCore extends JavaPlugin {
         modules.register(new me.Evan52098.genscore.discord.DiscordModule());
         modules.register(new me.Evan52098.genscore.tutorial.TutorialModule());
         modules.register(new me.Evan52098.genscore.retention.RetentionModule());
+        modules.register(new me.Evan52098.genscore.media.MediaModule());         // join addresses for media.gatemc.org
         modules.enableAll();
         connectModules();
 

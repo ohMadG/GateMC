@@ -2713,6 +2713,7 @@ modules:
   wipe: true
   lagwatch: true
   retention: true
+  media: true
   antihack: true
   settings: true
   trade: false        # player trading is after launch
