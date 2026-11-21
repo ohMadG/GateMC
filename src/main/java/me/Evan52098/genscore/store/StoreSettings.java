@@ -54,7 +54,7 @@ record StoreSettings(
                        String title, String subtitle, String bossbar, String ggWaveBroadcast) {
     }
 
-    record KeyAll(boolean enabled, long stepCents, String bossbar, String reachedBroadcast, Reward reward) {
+    record KeyAll(boolean enabled, long stepCents, String scoreboard, String reachedBroadcast, Reward reward) {
     }
 
     record Party(boolean enabled, int countdownSeconds, boolean onePerIp, String startBroadcast, String doneBroadcast,
@@ -117,7 +117,7 @@ record StoreSettings(
     private static KeyAll keyAll(ConfigurationSection k, Logger log) {
         long step = cents(k.getDouble("every", 25.0));
         return new KeyAll(k.getBoolean("enabled", true) && step > 0, step,
-                k.getString("bossbar", "&6&lKEY ALL &8» &f{current} &7/ &f{step} &8- &7every &f{step} &7spent gives everyone a key"),
+                k.getString("scoreboard", "&f{current}&7/&f{step}"),
                 k.getString("reached-broadcast", "&6&lKEY ALL &8» &7The store hit &f{step}&7! Everyone online gets a key."),
                 reward(sub(k, "reward"), "store.key-all.reward", log));
     }

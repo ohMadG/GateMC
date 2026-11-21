@@ -23,7 +23,6 @@ import io.papermc.paper.event.player.PlayerCustomClickEvent;
 import net.kyori.adventure.key.Key;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.jetbrains.annotations.Nullable;
@@ -91,7 +90,7 @@ public final class StoreModule implements GensModule {
     private volatile YearMonth monthShown = YearMonth.now();
     private volatile long lastCelebration;
     private volatile long keyAllTotalCents = -1;
-    private final BossBar keyAllBar = BossBar.bossBar(Component.empty(), 0f, BossBar.Color.YELLOW, BossBar.Overlay.NOTCHED_10);
+    private static volatile String keyAllLine = "";
 
     @Override
     public String id() {
@@ -140,14 +139,6 @@ public final class StoreModule implements GensModule {
             }
 
             @EventHandler
-            public void onJoin(PlayerJoinEvent event) {
-                Player p = event.getPlayer();
-                if (settings.keyAll().enabled() && keyAllTotalCents >= 0) {
-                    p.showBossBar(keyAllBar);
-                }
-            }
-
-            @EventHandler
             public void onQuit(PlayerQuitEvent event) {
                 packLoaded.remove(event.getPlayer().getUniqueId());
                 menu.forget(event.getPlayer().getUniqueId());
@@ -163,9 +154,7 @@ public final class StoreModule implements GensModule {
 
     @Override
     public void disable() {
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            p.hideBossBar(keyAllBar);
-        }
+        keyAllLine = "";
     }
 
     @Override
@@ -398,9 +387,7 @@ public final class StoreModule implements GensModule {
         StoreSettings.KeyAll k = s.keyAll();
         if (!k.enabled()) {
             keyAllTotalCents = -1;
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                Tasks.onEntity(p, () -> p.hideBossBar(keyAllBar));
-            }
+            keyAllLine = "";
             return;
         }
         payments.claim("key-all", "start");
@@ -419,17 +406,15 @@ public final class StoreModule implements GensModule {
             }
         }
         long into = total % k.stepCents();
-        keyAllBar.name(Text.legacy(k.bossbar().replace("{current}", s.formatMoney(into))
+        keyAllLine = k.scoreboard().replace("{current}", s.formatMoney(into))
                 .replace("{step}", s.formatMoney(k.stepCents()))
-                .replace("{left}", s.formatMoney(k.stepCents() - into))));
-        keyAllBar.progress(Math.max(0f, Math.min(1f, into / (float) k.stepCents())));
-        boolean first = keyAllTotalCents < 0;
+                .replace("{left}", s.formatMoney(k.stepCents() - into));
         keyAllTotalCents = total;
-        if (first) {
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                Tasks.onEntity(p, () -> p.showBossBar(keyAllBar));
-            }
-        }
+    }
+
+    public static String keyAllPlaceholder() {
+        String line = keyAllLine;
+        return line.isEmpty() ? "&7Off" : line;
     }
 
     private void celebrate(String buyer) {

@@ -2242,11 +2242,11 @@ store:
     bossbar: '&6&lGG WAVE &8- &fthank &e{player}'
     gg-wave-broadcast: '&6&lGG WAVE! &fType &a&lGG &fin chat to thank &e{player}&f! &7({seconds}s)'
   # Every "every" dollars of completed store payments (counted from when this was first turned on) gives everyone
-  # online the reward once. Progress always shows on a boss bar: {current} into this step, {step}, {left}.
+  # online the reward once. Progress shows on the scoreboard (%genscore_keyall%): {current} into this step, {step}, {left}.
   key-all:
     enabled: true
     every: 25.0
-    bossbar: '&6&lKEY ALL &8» &f{current} &7/ &f{step} &8- &7every &f{step} &7spent gives everyone a key'
+    scoreboard: '&f{current}&7/&f{step}'
     reached-broadcast: '&6&lKEY ALL &8» &7The store hit &f{step}&7! Everyone online gets a key.'
     reward:
       money: 0
