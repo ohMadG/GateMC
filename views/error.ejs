@@ -1,0 +1,12 @@
+<%- include('partials/head', { title: title, active: '' }) %>
+<div class="container tight">
+    <div class="card center-card">
+        <span class="ico-tile lg c-red"><%- icon('alert', 26) %></span>
+        <h1 class="h2"><%= title %></h1>
+        <p class="muted"><%= message %></p>
+        <div class="form-actions center">
+            <a href="/" class="btn primary"><%- icon('home', 16) %> Back to home</a>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

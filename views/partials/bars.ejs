@@ -1,0 +1,18 @@
+<%
+    const _rows = months.slice(0, 12).reverse();
+    const _key = typeof barKey !== 'undefined' ? barKey : 'revenue';
+    const _max = Math.max(1, ..._rows.map((m) => Number(m[_key] || 0)));
+%>
+<% if (_rows.length === 0) { %>
+    <div class="empty muted">No data yet. It fills in once referred players join and buy.</div>
+<% } else { %>
+    <div class="bars">
+        <% _rows.forEach(function (m) { const val = Number(m[_key] || 0); %>
+            <div class="bar" title="<%= monthLabel(m.month) %>: <%= _key === 'joins' ? num(val) + ' joins' : money(val) %>">
+                <b><%= _key === 'joins' ? num(val) : money(val) %></b>
+                <i class="<%= _key === 'earned' ? 'earn' : '' %>" style="height: <%= Math.max(1, Math.round(val / _max * 100)) %>%;"></i>
+                <span><%= monthLabel(m.month).replace(' 20', " '") %></span>
+            </div>
+        <% }); %>
+    </div>
+<% } %>

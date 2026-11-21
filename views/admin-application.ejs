@@ -1,0 +1,102 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container narrow">
+    <div class="crumbs"><a href="/admin/applications">Applications</a><%- icon('chevronRight', 14) %><span>#<%= a.id %></span></div>
+    <div class="page-head">
+        <span class="eyebrow"><%- icon(a.kind === 'creator' ? 'video' : 'percent', 13) %> <%= a.kind === 'creator' ? 'Creator application' : 'Cut increase request' %></span>
+        <h1><%= a.kind === 'creator' ? a.discord_name : (a.creator_name + ' wants ' + pct(a.requested_percent)) %></h1>
+        <p class="lead">Submitted <%= fmtDateTime(a.created_at) %> by <%= a.discord_name %> (<%= a.discord_id %>)</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <div class="card">
+            <dl class="kv">
+                <% if (a.kind === 'increase') { %>
+                    <dt>Current cut</dt><dd><%= pct(a.current_percent) %><%= c && Number(c.cut_percent) !== Number(a.current_percent) ? ' (now ' + pct(c.cut_percent) + ')' : '' %></dd>
+                    <dt>Asking for</dt><dd><b><%= pct(a.requested_percent) %></b></dd>
+                    <% if (c) { %><dt>Their numbers</dt><dd><%= num(c.referred) %> players, <%= num(c.buyers) %> buyers, <%= money(c.revenue) %> revenue, <%= money(c.earned) %> earned</dd><% } %>
+                <% } else { %>
+                    <dt>Platform</dt><dd><%= a.platform %></dd>
+                <% } %>
+                <dt>Channel</dt><dd><% if (a.channel_url) { %><a href="<%= a.channel_url %>" target="_blank" rel="noopener noreferrer"><%= a.channel_url %></a><% } else { %>-<% } %></dd>
+                <dt>Minecraft</dt><dd><%= a.minecraft_name || '-' %></dd>
+                <dt>Followers</dt><dd><%= a.followers || '-' %></dd>
+                <dt>Views / viewers</dt><dd><%= a.avg_viewers || '-' %></dd>
+                <% if (a.schedule) { %><dt>Schedule</dt><dd><%= a.schedule %></dd><% } %>
+            </dl>
+            <% if (a.content) { %><h3 style="margin-top: 20px;">Their content</h3><p class="answer"><%= a.content %></p><% } %>
+            <% if (a.why) { %><h3 style="margin-top: 20px;"><%= a.kind === 'creator' ? 'Why they want to partner' : 'Why the increase' %></h3><p class="answer"><%= a.why %></p><% } %>
+        </div>
+
+        <% const titleCase = (t) => t[0].toUpperCase() + t.slice(1); %>
+        <% if (a.offered_at) { %>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-gold"><%- icon('star', 18) %></span><div class="grow"><h3>Offer</h3><p>Sent <%= fmtDateTime(a.offered_at) %> by <%= a.offered_by %><%= a.offer_final ? ' · final' : '' %></p></div></div>
+                <dl class="kv">
+                    <dt>Cut</dt><dd><b><%= pct(a.offer_percent) %></b><%= a.offer_window_days ? ', first ' + a.offer_window_days + ' days' : ', lifetime' %>, <%= a.offer_hold_days %> day hold</dd>
+                    <dt>Address</dt><dd><%= a.offer_host || '-' %></dd>
+                    <dt>Code</dt><dd><%= a.offer_code || '-' %></dd>
+                    <% if (a.offer_note) { %><dt>Note</dt><dd><%= a.offer_note %></dd><% } %>
+                    <% if (a.counter_percent !== null) { %><dt>Their counter</dt><dd><b><%= pct(a.counter_percent) %></b> on <%= fmtDateTime(a.countered_at) %><%= a.counter_note ? ': ' + a.counter_note : '' %></dd><% } %>
+                </dl>
+            </div>
+        <% } %>
+
+        <% if (['accepted', 'denied', 'declined', 'withdrawn'].includes(a.status)) { %>
+            <div class="alert <%= a.status === 'accepted' ? 'ok' : 'bad' %>"><%- icon(a.status === 'accepted' ? 'check' : 'x') %><div><b><%= titleCase(a.status) %></b><%= a.status === 'declined' ? ' by the applicant' : a.status === 'withdrawn' ? ' by the applicant' : a.reviewed_by ? ' by ' + a.reviewed_by : '' %><%= (a.responded_at || a.reviewed_at) ? ' on ' + fmtDate(a.responded_at || a.reviewed_at) : '' %><%= a.granted_percent !== null && a.status === 'accepted' ? ' at ' + pct(a.granted_percent) : '' %><%= a.review_note && a.status === 'denied' ? '. ' + a.review_note : '' %></div></div>
+        <% } else if (a.status === 'offered') { %>
+            <div class="alert pending"><%- icon('clock') %><div>Waiting for <%= a.discord_name %> to <%= a.offer_final ? 'accept or decline the final offer' : 'accept, decline or counter' %>.</div></div>
+        <% } else if (a.status === 'countered') { %>
+            <form method="post" action="/admin/applications/<%= a.id %>/counter" class="card">
+                <div class="card-head"><span class="ico-tile c-violet"><%- icon('percent', 18) %></span><div class="grow"><h3>They countered with <%= pct(a.counter_percent) %></h3><p>Your answer is final. If you don't accept their rate they can only accept or decline.</p></div></div>
+                <div class="form-grid">
+                    <div class="field"><label><input type="radio" name="action" value="accept" required> Accept <%= pct(a.counter_percent) %> (they become a creator now)</label></div>
+                    <div class="field"><label><input type="radio" name="action" value="keep"> Keep the <%= pct(a.offer_percent) %> offer</label></div>
+                    <div class="field"><label><input type="radio" name="action" value="final"> Send a final offer of</label><input type="number" name="cut_percent" min="0" max="100" step="0.5" value="<%= ((Number(a.offer_percent) + Number(a.counter_percent)) / 2).toFixed(1) %>"></div>
+                    <div class="field"><label for="c-note">Note to them</label><input id="c-note" name="note" maxlength="500" placeholder="Optional"></div>
+                </div>
+                <div class="form-actions"><button class="btn primary" type="submit">Send answer</button></div>
+            </form>
+        <% } else if (a.kind === 'increase') { %>
+            <form method="post" action="/admin/applications/<%= a.id %>/accept" class="card">
+                <div class="card-head"><span class="ico-tile c-green"><%- icon('check', 18) %></span><div class="grow"><h3>Approve</h3></div></div>
+                <div class="form-grid">
+                    <div class="field"><label for="cut_percent">New cut (%)</label><input type="number" id="cut_percent" name="cut_percent" required min="0" max="100" step="0.5" value="<%= a.requested_percent %>"></div>
+                    <div class="field"><label for="note">Note to them</label><input id="note" name="note" maxlength="500" placeholder="Optional"></div>
+                </div>
+                <div class="form-actions"><button class="btn success" type="submit"><%- icon('check', 16) %> Approve</button></div>
+            </form>
+        <% } else { %>
+            <% const slug = String(a.minecraft_name || a.discord_name).toLowerCase().replace(/[^a-z0-9-]/g, ''); %>
+            <form method="post" action="/admin/applications/<%= a.id %>/accept" class="card">
+                <div class="card-head"><span class="ico-tile c-green"><%- icon('check', 18) %></span><div class="grow"><h3>Accept and send an offer</h3><p>They get a Discord DM and can accept, decline, or counter once.</p></div></div>
+                <div class="form-grid">
+                    <div class="field"><label for="cut_percent">Cut (%)</label><input type="number" id="cut_percent" name="cut_percent" required min="0" max="100" step="0.5" value="<%= defaultCut %>"></div>
+                    <div class="field"><label for="name">Creator name</label><input id="name" name="name" maxlength="64" value="<%= a.minecraft_name || a.discord_name %>"></div>
+                    <div class="field"><label for="host">Server address</label><input id="host" name="host" maxlength="120" value="<%= slug %>"><span class="hint">Becomes name.<%= baseDomain %>. Add the Cloudflare A record before they accept.</span></div>
+                    <div class="field"><label for="code">Creator code</label><input id="code" name="code" maxlength="20" value="<%= String(a.minecraft_name || a.discord_name).replace(/[^A-Za-z0-9_]/g, '') %>"></div>
+                    <div class="field"><label for="window_days">Attribution window (days)</label><input type="number" id="window_days" name="window_days" min="0" max="3650" value="60"></div>
+                    <div class="field"><label for="hold_days">Hold period (days)</label><input type="number" id="hold_days" name="hold_days" min="0" max="180" value="30"></div>
+                    <div class="field span-2"><label for="note">Note to them</label><input id="note" name="note" maxlength="500" placeholder="Optional"></div>
+                </div>
+                <div class="form-actions"><button class="btn success" type="submit"><%- icon('check', 16) %> Send offer</button></div>
+            </form>
+        <% } %>
+
+        <% if (['pending', 'offered', 'countered'].includes(a.status)) { %>
+            <form method="post" action="/admin/applications/<%= a.id %>/deny" class="card" onsubmit="return confirm('Deny this application? They get a Discord DM with the reason.');">
+                <div class="card-head"><span class="ico-tile c-red"><%- icon('x', 18) %></span><div class="grow"><h3>Deny</h3><p>The reason is sent to them on Discord.</p></div></div>
+                <div class="form-grid">
+                    <div class="field span-2"><label for="preset">Reason</label>
+                        <select id="preset" name="preset">
+                            <option value="">Write my own</option>
+                            <% denyReasons.forEach(function (r, i) { %><option value="<%= i %>"><%= r %></option><% }); %>
+                        </select>
+                    </div>
+                    <div class="field span-2"><label for="deny-note">Extra detail</label><input id="deny-note" name="note" maxlength="500" placeholder="Added after the reason, or used on its own"></div>
+                </div>
+                <div class="form-actions"><button class="btn danger" type="submit"><%- icon('x', 16) %> Deny</button></div>
+            </form>
+        <% } %>
+    </div>
+</div>
+<%- include('partials/foot') %>

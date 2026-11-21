@@ -1,0 +1,47 @@
+<%
+    const _r = retention;
+    const _mineLabel = typeof mineLabel !== 'undefined' ? mineLabel : 'Your players';
+    const _rate = function (hit, n) { return n ? Math.round(hit / n * 1000) / 10 : null; };
+    const _ready = function (days) { return _r.mine.first ? fmtDate(new Date(Number(_r.mine.first) + days * 86400000)) : null; };
+    const _metrics = [
+        { label: 'Came back after 1 day', sub: 'Played again 24+ hours after their first join', key: 'd1', n: 'd1_n', days: 1 },
+        { label: 'Came back after 7 days', sub: 'Still playing a week after their first join', key: 'd7', n: 'd7_n', days: 7 },
+        { label: 'Came back after 30 days', sub: 'Still playing a month after their first join', key: 'd30', n: 'd30_n', days: 30 },
+        { label: 'Played 1+ hour', sub: 'Total playtime of at least an hour', key: 'hour', n: 'players' },
+        { label: 'Active this week', sub: 'Played in the last 7 days', key: 'week', n: 'players' },
+    ];
+%>
+<div class="card" style="margin-top: 18px;">
+    <div class="card-head"><span class="ico-tile c-green"><%- icon('trending', 18) %></span><div class="grow"><h3>Retention</h3><p>How many new players stick around, compared with players who found GateMC on their own.</p></div></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead><tr><th>Metric</th><th><%= _mineLabel %></th><th class="num">Joined on their own</th></tr></thead>
+            <tbody>
+                <% _metrics.forEach(function (m) {
+                    const mine = _rate(_r.mine[m.key], _r.mine[m.n]);
+                    const base = _rate(_r.organic[m.key], _r.organic[m.n]);
+                    const tone = mine === null || base === null ? '' : mine >= base ? 'ok' : 'bad';
+                %>
+                    <tr>
+                        <td><b><%= m.label %></b><br><span class="muted small"><%= m.sub %></span></td>
+                        <td style="min-width: 180px;">
+                            <% if (mine === null) { %>
+                                <span class="muted small"><%= m.days ? (_ready(m.days) ? 'Not enough time yet. First results around ' + _ready(m.days) + '.' : 'No players yet.') : 'No players yet.' %></span>
+                            <% } else { %>
+                                <div class="stat-line"><b><%= pct(mine) %></b><span class="muted small"><%= num(_r.mine[m.key]) %> of <%= num(_r.mine[m.n]) %><% if (tone) { %> <span class="pill <%= tone %>"><%= mine >= base ? '+' : '' %><%= Math.round((mine - base) * 10) / 10 %> pts</span><% } %></span></div>
+                                <div class="meter" style="margin-top: 6px;"><i class="<%= tone === 'ok' ? 'met' : '' %>" style="width: <%= Math.max(1, Math.min(100, mine)) %>%;"></i></div>
+                            <% } %>
+                        </td>
+                        <td class="num"><%= base === null ? '-' : pct(base) %><br><span class="muted small"><%= base === null ? '' : num(_r.organic[m.key]) + ' of ' + num(_r.organic[m.n]) %></span></td>
+                    </tr>
+                <% }); %>
+                <tr>
+                    <td><b>Median playtime</b><br><span class="muted small">Half of new players played more than this</span></td>
+                    <td><b><%= _r.mine.players ? duration(_r.mine.median_ms) : '-' %></b></td>
+                    <td class="num"><%= _r.organic.players ? duration(_r.organic.median_ms) : '-' %></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="muted small" style="margin: 12px 0 0;">A player counts for "came back after N days" if they were seen again at least N days after their first join. Only players who joined at least N days ago are included, so recent joins don't pull the numbers down. Tracking started <%= _r.since ? fmtDate(new Date(_r.since)) : 'recently' %>. Small groups swing a lot, so treat a handful of players as a rough signal.</p>
+</div>

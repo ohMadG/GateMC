@@ -1,0 +1,10 @@
+<div class="form-grid">
+    <div class="field"><label for="name">Creator name</label><input id="name" name="name" required maxlength="64" value="<%= values.name || '' %>"></div>
+    <div class="field"><label for="discord_id">Discord user ID</label><input id="discord_id" name="discord_id" maxlength="25" inputmode="numeric" value="<%= values.discord_id || '' %>"><span class="hint">Lets them sign in and see their dashboard. Right-click them in Discord, Copy User ID.</span></div>
+    <div class="field"><label for="minecraft_name">Minecraft username</label><input id="minecraft_name" name="minecraft_name" maxlength="32" value="<%= values.minecraft_name || '' %>"><span class="hint">Their own account and alts on its IP never count.</span></div>
+    <div class="field"><label for="channel_url">Channel link</label><input id="channel_url" name="channel_url" maxlength="300" value="<%= values.channel_url || '' %>"></div>
+    <div class="field"><label for="code">Creator code</label><input id="code" name="code" maxlength="20" value="<%= values.code || '' %>"><span class="hint">Players enter it at store.gatemc.org checkout. The code beats their join address for that purchase.</span></div>
+    <div class="field"><label for="window_days">Attribution window (days)</label><input type="number" id="window_days" name="window_days" min="0" max="3650" value="<%= values.window_days === undefined || values.window_days === null ? 60 : values.window_days %>"><span class="hint">How long after a player's first join their purchases count. 0 means forever.</span></div>
+    <div class="field"><label for="hold_days">Hold period (days)</label><input type="number" id="hold_days" name="hold_days" min="0" max="180" value="<%= values.hold_days === undefined || values.hold_days === null ? 30 : values.hold_days %>"><span class="hint">Earnings stay pending this long so refunds and chargebacks can come in.</span></div>
+    <div class="field span-2"><label for="notes">Private notes</label><textarea id="notes" name="notes" rows="3" maxlength="1000"><%= values.notes || '' %></textarea><span class="hint">Only admins see this.</span></div>
+</div>

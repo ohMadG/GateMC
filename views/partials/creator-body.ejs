@@ -1,0 +1,129 @@
+<%
+    const holdMs = c.hold_days * 86400000;
+    const purchaseState = function (p) {
+        if (p.status !== 'Complete') { return { label: p.status === 'Chargeback' ? 'Charged back' : p.status === 'Refund' ? 'Refunded' : p.status, tone: 'bad' }; }
+        const until = new Date(new Date(p.paid_at).getTime() + holdMs);
+        return until > new Date() ? { label: 'Pending until ' + fmtDate(until), tone: 'warn' } : { label: 'Confirmed', tone: 'ok' };
+    };
+    const _admin = typeof adminView !== 'undefined' && adminView;
+    const _preview = typeof preview !== 'undefined' && preview;
+%>
+<div class="stats">
+    <div class="stat"><div class="stat-label"><%- icon('users', 14) %> Players referred</div><div class="stat-value"><%= num(c.referred) %></div><div class="stat-sub">New players through your address</div></div>
+    <div class="stat"><div class="stat-label"><%- icon('zap', 14) %> Active this week</div><div class="stat-value"><%= num(c.active_week) %></div><div class="stat-sub">Played in the last 7 days</div></div>
+    <div class="stat"><div class="stat-label"><%- icon('star', 14) %> Buyers</div><div class="stat-value"><%= num(c.buyers) %></div><div class="stat-sub"><%= num(c.purchases) %> purchases counted</div></div>
+    <div class="stat"><div class="stat-label"><%- icon('dollar', 14) %> Revenue generated</div><div class="stat-value"><%= money(c.revenue) %></div><div class="stat-sub">Spend that counts toward your cut</div></div>
+</div>
+<div class="stats" style="margin-top: 14px;">
+    <div class="stat gold"><div class="stat-label"><%- icon('percent', 14) %> <%= _admin ? 'Cut' : 'Your cut' %></div><div class="stat-value"><%= pct(c.cut_percent) %></div><div class="stat-sub"><%= c.window_days ? 'First ' + c.window_days + ' days per player' : 'Lifetime per player' %></div></div>
+    <div class="stat"><div class="stat-label"><%- icon('trending', 14) %> Total earned</div><div class="stat-value"><%= money(c.earned) %></div><div class="stat-sub"><%= money(c.pending) %> still pending</div></div>
+    <div class="stat"><div class="stat-label"><%- icon('wallet', 14) %> Paid out</div><div class="stat-value"><%= money(c.paid) %></div><div class="stat-sub"><%= c.reversed ? money(c.reversed) + ' reversed by refunds' : 'All time' %></div></div>
+    <div class="stat accent"><div class="stat-label"><%- icon('check', 14) %> <%= _admin ? 'Owed now' : 'Owed to you' %></div><div class="stat-value"><%= money(c.owed) %></div><div class="stat-sub">Confirmed and not yet paid</div></div>
+</div>
+
+<%- include('retention', { retention, mineLabel: _admin ? 'Their players' : 'Your players' }) %>
+
+<div class="grid cols-2" style="margin-top: 18px;">
+    <div class="card">
+        <div class="card-head"><span class="ico-tile c-green"><%- icon('chart', 18) %></span><div class="grow"><h3>Earnings by month</h3><p>Last 12 months</p></div></div>
+        <%- include('bars', { months, barKey: 'earned' }) %>
+    </div>
+    <div class="card">
+        <div class="card-head"><span class="ico-tile c-violet"><%- icon('users', 18) %></span><div class="grow"><h3>New players by month</h3><p>First joins through <%= c.hosts.length === 1 ? c.hosts[0] : 'your addresses' %></p></div></div>
+        <%- include('bars', { months, barKey: 'joins' }) %>
+    </div>
+</div>
+
+<div class="section" style="margin-top: 22px;">
+    <div class="section-head"><h2>Monthly totals</h2></div>
+    <div class="card" style="padding: 0;">
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Month</th><th class="num">New players</th><th class="num">Buyers</th><th class="num">Purchases</th><th class="num">Revenue</th><th class="num">Earned</th></tr></thead>
+                <tbody>
+                    <% if (!months.length) { %><tr><td colspan="6" class="muted">Nothing yet.</td></tr><% } %>
+                    <% months.forEach(function (m) { %>
+                        <tr><td><%= monthLabel(m.month) %></td><td class="num"><%= num(m.joins) %></td><td class="num"><%= num(m.buyers) %></td><td class="num"><%= num(m.purchases) %></td><td class="num"><%= money(m.revenue) %></td><td class="num"><b><%= money(m.earned) %></b></td></tr>
+                    <% }); %>
+                    <% if (months.length > 1) { %>
+                        <tr><td><b>Total</b></td><td class="num"><b><%= num(months.reduce((a, m) => a + m.joins, 0)) %></b></td><td class="num">-</td><td class="num"><b><%= num(months.reduce((a, m) => a + m.purchases, 0)) %></b></td><td class="num"><b><%= money(months.reduce((a, m) => a + m.revenue, 0)) %></b></td><td class="num"><b><%= money(months.reduce((a, m) => a + m.earned, 0)) %></b></td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section-head"><h2>Players you brought in</h2><span class="muted small"><%= num(players.length) %> players</span></div>
+    <div class="card" style="padding: 0;">
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Player</th><th>First joined</th><th>Last seen</th><th class="num">Playtime</th><th class="num">Purchases</th><th class="num">Counted spend</th><th class="num">Earned</th></tr></thead>
+                <tbody>
+                    <% if (!players.length) { %><tr><td colspan="7" class="muted">No players yet. Share your address and they'll show up here after their first join.</td></tr><% } %>
+                    <% players.forEach(function (p) { %>
+                        <tr>
+                            <td><div class="player-cell"><img src="<%= headUrl(p.uuid, 24) %>" alt="" width="24" height="24" loading="lazy"><span><%= p.player_name %></span></div></td>
+                            <td><%= fmtDate(Number(p.first_seen)) %></td>
+                            <td><%= timeAgo(Number(p.last_seen)) %></td>
+                            <td class="num"><%= duration(Number(p.playtime_ms)) %></td>
+                            <td class="num"><%= num(p.purchases) %></td>
+                            <td class="num"><%= money(p.counted) %></td>
+                            <td class="num"><b><%= money(p.earned) %></b></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section-head"><h2>Purchases</h2><span class="muted small">Most recent 100</span></div>
+    <div class="card" style="padding: 0;">
+        <div class="table-wrap">
+            <table class="data">
+                <thead><tr><th>Date</th><th>Player</th><th>Item</th><th class="num">Amount</th><th class="num">Cut</th><th class="num">Earned</th><th>Status</th></tr></thead>
+                <tbody>
+                    <% if (!purchases.length) { %><tr><td colspan="7" class="muted">No purchases yet.</td></tr><% } %>
+                    <% purchases.forEach(function (p) { const s = purchaseState(p); %>
+                        <tr>
+                            <td class="nowrap"><%= fmtDate(p.paid_at) %></td>
+                            <td><%= p.player_name || '-' %></td>
+                            <td><%= p.packages %><% if (p.source === 'code') { %> <span class="muted small">· code</span><% } %></td>
+                            <td class="num"><%= money(p.amount_usd) %><% if (p.currency !== 'USD') { %><br><span class="muted small"><%= Number(p.amount).toFixed(2) %> <%= p.currency %></span><% } %></td>
+                            <td class="num"><%= pct(p.cut_percent) %></td>
+                            <td class="num"><b><%= money(p.earning_usd) %></b></td>
+                            <td><span class="pill <%= s.tone %>"><%= s.label %></span></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="section" id="content">
+    <div class="section-head"><h2>Content</h2><span class="muted small"><%= c.active ? (activity.left + ' of ' + activity.days + ' days left on the activity clock') : 'Inactive' %></span></div>
+    <div class="card">
+        <p class="muted" style="margin-top: 0;">Partners need at least one GateMC video or stream every <%= activity.days %> days. <%= activity.last ? 'Last activity ' + fmtDate(activity.last) + '.' : '' %><% if (c.active && activity.deadline) { %> Next content due by <b><%= fmtDate(activity.deadline) %></b>.<% } %></p>
+        <% if (!_admin && !_preview && c.active) { %>
+            <form method="post" action="/me/content" class="form-grid" style="margin-bottom: 16px;">
+                <div class="field span-2"><label for="content-url">Link to the video or stream</label><input id="content-url" name="url" required maxlength="300" placeholder="youtube.com/watch?v=..."></div>
+                <div class="field"><label for="content-title">Title</label><input id="content-title" name="title" maxlength="120" placeholder="Optional"></div>
+                <div class="field"><label for="content-date">Date it went up</label><input type="date" id="content-date" name="posted_on" required value="<%= new Date().toISOString().slice(0, 10) %>"></div>
+                <div class="form-actions span-2" style="margin-top: 0;"><button class="btn primary" type="submit"><%- icon('video', 16) %> Log content</button></div>
+            </form>
+        <% } %>
+        <div class="rows">
+            <% if (!content.length) { %><p class="muted">Nothing logged yet.</p><% } %>
+            <% content.forEach(function (x) { %>
+                <div class="row">
+                    <div class="grow"><a href="<%= x.url %>" target="_blank" rel="noopener noreferrer"><b><%= x.title || x.url %></b></a><span class="muted small"><%= fmtDate(x.posted_on) %><%= _admin ? ' · added by ' + x.added_by : '' %></span></div>
+                    <% if (!_admin && !_preview) { %><form method="post" action="/me/content/<%= x.id %>/delete" onsubmit="return confirm('Remove this entry?');"><button class="icon-btn" type="submit" aria-label="Remove"><%- icon('x', 15) %></button></form><% } %>
+                </div>
+            <% }); %>
+        </div>
+    </div>
+</div>

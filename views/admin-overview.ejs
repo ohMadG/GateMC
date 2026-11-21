@@ -1,0 +1,101 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('crown', 13) %> Admin</span>
+        <h1>Media overview</h1>
+        <p class="lead">Every creator, every referred player and what they've spent, totalled across the whole program.</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <% if (pending.total) { %>
+            <a href="/admin/applications" class="alert pending" style="text-decoration: none;"><%- icon('userPlus') %><div><b><%= pending.creator %></b> creator application<%= pending.creator === 1 ? '' : 's' %> and <b><%= pending.increase %></b> increase request<%= pending.increase === 1 ? '' : 's' %> waiting for review.</div></a>
+        <% } %>
+        <div class="stats">
+            <div class="stat"><div class="stat-label"><%- icon('video', 14) %> Creators</div><div class="stat-value"><%= num(totals.activeCreators) %></div><div class="stat-sub"><%= num(totals.creators) %> total, <%= num(totals.creators - totals.activeCreators) %> paused</div></div>
+            <div class="stat"><div class="stat-label"><%- icon('users', 14) %> Players referred</div><div class="stat-value"><%= num(totals.referred) %></div><div class="stat-sub"><%= num(totals.active_week) %> played this week</div></div>
+            <div class="stat"><div class="stat-label"><%- icon('star', 14) %> Buyers</div><div class="stat-value"><%= num(totals.buyers) %></div><div class="stat-sub"><%= num(totals.purchases) %> purchases counted</div></div>
+            <div class="stat"><div class="stat-label"><%- icon('dollar', 14) %> Referred revenue</div><div class="stat-value"><%= money(totals.revenue) %></div><div class="stat-sub">Inside each creator's window</div></div>
+        </div>
+        <div class="stats">
+            <div class="stat"><div class="stat-label"><%- icon('trending', 14) %> Creator earnings</div><div class="stat-value"><%= money(totals.earned) %></div><div class="stat-sub"><%= totals.revenue ? Math.round(totals.earned / totals.revenue * 1000) / 10 : 0 %>% of referred revenue</div></div>
+            <div class="stat gold"><div class="stat-label"><%- icon('clock', 14) %> Pending</div><div class="stat-value"><%= money(totals.pending) %></div><div class="stat-sub">Still inside the hold period</div></div>
+            <div class="stat"><div class="stat-label"><%- icon('wallet', 14) %> Paid out</div><div class="stat-value"><%= money(totals.paid) %></div><div class="stat-sub"><%= money(totals.reversed) %> reversed by refunds</div></div>
+            <div class="stat accent"><div class="stat-label"><%- icon('check', 14) %> Owed now</div><div class="stat-value"><%= money(totals.owed) %></div><div class="stat-sub">Confirmed, not yet paid</div></div>
+        </div>
+
+        <div class="grid cols-2">
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-violet"><%- icon('chart', 18) %></span><div class="grow"><h3>Referred revenue by month</h3></div></div>
+                <%- include('partials/bars', { months, barKey: 'revenue' }) %>
+            </div>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-green"><%- icon('trending', 18) %></span><div class="grow"><h3>Creator earnings by month</h3></div></div>
+                <%- include('partials/bars', { months, barKey: 'earned' }) %>
+            </div>
+        </div>
+
+        <%- include('partials/retention', { retention, mineLabel: 'All creators\' players' }) %>
+
+        <div class="section" id="creators">
+            <div class="section-head"><h2>Creators</h2><a href="/admin/creators/new" class="btn primary sm"><%- icon('userPlus', 15) %> Add creator</a></div>
+            <div class="card" style="padding: 0;">
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Creator</th><th>Address</th><th class="num">Cut</th><th class="num">Players</th><th class="num">Back day 1</th><th class="num">Back day 7</th><th class="num">Buyers</th><th class="num">Revenue</th><th class="num">Earned</th><th class="num">Pending</th><th class="num">Paid</th><th class="num">Owed</th></tr></thead>
+                        <tbody>
+                            <% if (!creators.length) { %><tr><td colspan="12" class="muted">No creators yet. Add one, or accept an application.</td></tr><% } %>
+                            <% creators.forEach(function (c) { %>
+                                <tr>
+                                    <td><a class="rowlink" href="/admin/creators/<%= c.id %>"><%= c.name %></a> <% if (!c.active) { %><span class="pill">paused</span><% } %></td>
+                                    <td class="small"><%= c.hosts.join(', ') || '-' %></td>
+                                    <td class="num"><%= pct(c.cut_percent) %></td>
+                                    <td class="num"><%= num(c.referred) %></td>
+                                    <td class="num"><%= c.d1_n ? pct(Math.round(c.d1 / c.d1_n * 100)) : '-' %></td>
+                                    <td class="num"><%= c.d7_n ? pct(Math.round(c.d7 / c.d7_n * 100)) : '-' %></td>
+                                    <td class="num"><%= num(c.buyers) %></td>
+                                    <td class="num"><%= money(c.revenue) %></td>
+                                    <td class="num"><%= money(c.earned) %></td>
+                                    <td class="num"><%= money(c.pending) %></td>
+                                    <td class="num"><%= money(c.paid) %></td>
+                                    <td class="num"><b><%= money(c.owed) %></b></td>
+                                </tr>
+                            <% }); %>
+                            <% if (creators.length > 1) { %>
+                                <tr><td><b>All creators</b></td><td></td><td></td><td class="num"><b><%= num(totals.referred) %></b></td><td class="num"><b><%= totals.d1_n ? pct(Math.round(totals.d1 / totals.d1_n * 100)) : '-' %></b></td><td class="num"><b><%= totals.d7_n ? pct(Math.round(totals.d7 / totals.d7_n * 100)) : '-' %></b></td><td class="num"><b><%= num(totals.buyers) %></b></td><td class="num"><b><%= money(totals.revenue) %></b></td><td class="num"><b><%= money(totals.earned) %></b></td><td class="num"><b><%= money(totals.pending) %></b></td><td class="num"><b><%= money(totals.paid) %></b></td><td class="num"><b><%= money(totals.owed) %></b></td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-head"><h2>Recent referred purchases</h2><a href="/admin/players" class="btn sm">All players <%- icon('arrowRight', 14) %></a></div>
+            <div class="card" style="padding: 0;">
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Date</th><th>Player</th><th>Creator</th><th>Item</th><th class="num">Amount</th><th class="num">Creator cut</th><th>Status</th></tr></thead>
+                        <tbody>
+                            <% if (!recent.length) { %><tr><td colspan="7" class="muted">No referred purchases yet.</td></tr><% } %>
+                            <% recent.forEach(function (p) { %>
+                                <tr><td class="nowrap"><%= fmtDate(p.paid_at) %></td><td><%= p.player_name %></td><td><a href="/admin/creators/<%= p.creator_id %>"><%= p.creator_name %></a></td><td><%= p.packages %></td><td class="num"><%= money(p.amount_usd) %></td><td class="num"><%= money(p.earning_usd) %> <span class="muted small">(<%= pct(p.cut_percent) %>)</span></td><td><span class="pill <%= p.status === 'Complete' ? 'ok' : 'bad' %>"><%= p.status %></span></td></tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="row-flex">
+                <span class="ico-tile c-slate sm"><%- icon('refresh', 16) %></span>
+                <div class="grow" style="flex: 1;">
+                    <b>Tebex sync</b>
+                    <div class="muted small"><%= sync.at ? (sync.ok ? 'Last synced ' + timeAgo(sync.at) : 'Failed ' + timeAgo(sync.at) + ': ' + sync.message) : 'Waiting for the first sync' %>. Runs every 10 minutes.</div>
+                </div>
+                <form method="post" action="/admin/sync"><button class="btn sm" type="submit"><%- icon('refresh', 14) %> Sync now</button></form>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

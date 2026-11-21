@@ -1,0 +1,46 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('wallet', 13) %> Admin</span>
+        <h1>Payouts</h1>
+        <p class="lead">What each creator is owed right now and everything paid so far. Record a payout from the creator's page.</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <div class="stats cols-3">
+            <div class="stat accent"><div class="stat-label">Owed now</div><div class="stat-value"><%= money(totals.owed) %></div><div class="stat-sub">Confirmed earnings not yet paid</div></div>
+            <div class="stat gold"><div class="stat-label">Pending</div><div class="stat-value"><%= money(totals.pending) %></div><div class="stat-sub">Becomes owed after the hold</div></div>
+            <div class="stat"><div class="stat-label">Paid out</div><div class="stat-value"><%= money(totals.paid) %></div><div class="stat-sub">All time</div></div>
+        </div>
+        <div class="card" style="padding: 0;">
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Creator</th><th class="num">Earned</th><th class="num">Pending</th><th class="num">Paid</th><th class="num">Owed</th><th></th></tr></thead>
+                    <tbody>
+                        <% creators.forEach(function (c) { %>
+                            <tr><td><a class="rowlink" href="/admin/creators/<%= c.id %>"><%= c.name %></a></td><td class="num"><%= money(c.earned) %></td><td class="num"><%= money(c.pending) %></td><td class="num"><%= money(c.paid) %></td><td class="num"><b><%= money(c.owed) %></b></td><td><a href="/admin/creators/<%= c.id %>#payouts" class="btn sm">Pay</a></td></tr>
+                        <% }); %>
+                        <% if (!creators.length) { %><tr><td colspan="6" class="muted">No creators yet.</td></tr><% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-head"><h2>Payout history</h2></div>
+            <div class="card" style="padding: 0;">
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead><tr><th>Date</th><th>Creator</th><th class="num">Amount</th><th>Method</th><th>Note</th><th>By</th></tr></thead>
+                        <tbody>
+                            <% if (!payouts.length) { %><tr><td colspan="6" class="muted">No payouts yet.</td></tr><% } %>
+                            <% payouts.forEach(function (o) { %>
+                                <tr><td class="nowrap"><%= fmtDate(o.paid_at) %></td><td><a href="/admin/creators/<%= o.creator_id %>"><%= o.creator_name %></a></td><td class="num"><b><%= money(o.amount) %></b></td><td><%= o.method || '-' %></td><td><%= o.note || '-' %></td><td><%= o.paid_by %></td></tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

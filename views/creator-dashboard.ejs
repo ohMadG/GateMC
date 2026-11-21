@@ -1,0 +1,62 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('video', 13) %> Creator</span>
+        <h1><%= preview ? c.name : 'Welcome back, ' + c.name %></h1>
+        <p class="lead">Here's everything your audience has brought to GateMC, updated every few minutes from the store.</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <% if (!c.active) { %>
+            <div class="alert warn"><%- icon('alert') %><div><%= c.removed_reason ? 'Your partnership was removed (' + c.removed_reason.toLowerCase() + ').' : 'Your partnership is paused.' %> New purchases aren't counting toward your cut. Earnings you already made are still paid out.</div></div>
+        <% } else if (activity.warn) { %>
+            <div class="alert warn"><%- icon('clock') %><div>You haven't logged content in <%= activity.idle %> days. Log a video or stream by <b><%= fmtDate(activity.deadline) %></b> or your partnership will be removed.</div></div>
+        <% } %>
+        <div class="grid cols-2">
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-violet"><%- icon('globe', 18) %></span><div class="grow"><h3>Your server address</h3><p>Players who join for the first time through this are linked to you.</p></div></div>
+                <% if (c.hosts.length) { %>
+                    <div class="chips"><% c.hosts.forEach(function (h) { %><span class="chip"><%= h %></span><% }); %></div>
+                <% } else { %>
+                    <p class="muted">Your address is being set up. It'll show here once it's ready.</p>
+                <% } %>
+                <div class="card-head" style="margin-top: 16px;"><span class="ico-tile c-green"><%- icon('star', 18) %></span><div class="grow"><h3>Your creator code</h3><p>Anyone who enters it at checkout counts for you, even if they joined another way.</p></div></div>
+                <% if (c.code) { %>
+                    <div class="chips"><span class="chip"><b><%= c.code %></b></span></div>
+                    <p class="muted small" style="margin: 10px 0 0;">Store link with your code filled in: <b><%= storeUrl %>/?code=<%= c.code %></b></p>
+                <% } else { %>
+                    <p class="muted">Your code is being set up. It'll show here once it's ready.</p>
+                <% } %>
+            </div>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-gold"><%- icon('percent', 18) %></span><div class="grow"><h3>Your deal</h3></div>
+                    <% if (!preview) { %><a href="/me/increase" class="btn sm">Request increase</a><% } %></div>
+                <p style="margin: 0;">You earn <b><%= pct(c.cut_percent) %></b> of what each player you bring in spends on the store <%= c.window_days ? 'during their first ' + c.window_days + ' days' : 'for as long as they play' %>. New earnings stay pending for <%= c.hold_days %> days in case of refunds or chargebacks, then they're confirmed.</p>
+                <% const openReq = increases.find((r) => r.status === 'pending'); if (openReq) { %>
+                    <div class="alert pending" style="margin-top: 14px;"><%- icon('clock') %><div>Your request for <%= pct(openReq.requested_percent) %> from <%= fmtDate(openReq.created_at) %> is being reviewed.</div></div>
+                <% } %>
+            </div>
+        </div>
+        <%- include('partials/creator-body') %>
+        <div class="grid cols-2">
+            <div class="card" id="payouts">
+                <div class="card-head"><span class="ico-tile c-green"><%- icon('wallet', 18) %></span><div class="grow"><h3>Payouts</h3></div></div>
+                <div class="rows">
+                    <% if (!payouts.length) { %><p class="muted" style="margin: 0;">No payouts yet.</p><% } %>
+                    <% payouts.forEach(function (o) { %>
+                        <div class="row"><div class="grow"><b><%= money(o.amount) %></b><span class="muted small"><%= fmtDate(o.paid_at) %><%= o.method ? ' · ' + o.method : '' %><%= o.note ? ' · ' + o.note : '' %></span></div></div>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-gold"><%- icon('percent', 18) %></span><div class="grow"><h3>Rate history</h3></div></div>
+                <div class="rows">
+                    <% rates.forEach(function (r) { %>
+                        <div class="row"><div class="grow"><b><%= r.old_p === null ? 'Started at ' + pct(r.new_p) : pct(r.old_p) + ' → ' + pct(r.new_p) %></b><span class="muted small"><%= fmtDate(r.changed_at) %></span></div></div>
+                    <% }); %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>
