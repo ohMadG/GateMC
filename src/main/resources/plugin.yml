@@ -22,6 +22,7 @@ permissions:
   genscore.admin.plots: {default: op}
   genscore.plots.build: {default: op}
   genscore.admin.reload: {default: op}
+  genscore.admin.retention: {default: op}
   genscore.balance: {default: true}
   genscore.pay: {default: true}
   genscore.pay.toggle: {default: true}

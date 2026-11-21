@@ -2703,11 +2703,16 @@ gameplay:
     level: 5
     name: '&6&lKnockback Stick'
 
+retention:
+  # Days for /retention (who is active each day, and who comes back after their first day) use this time zone.
+  timezone: America/New_York
+
 modules:
   plots: true
   factory: true
   wipe: true
   lagwatch: true
+  retention: true
   antihack: true
   settings: true
   trade: false        # player trading is after launch
