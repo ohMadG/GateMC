@@ -165,7 +165,7 @@
       const rb = saleBadge(p, "sale-badge--corner");
       if (rb) card.appendChild(rb);
       card.appendChild(rankTag(p.name, "rank__tag"));
-      card.appendChild(el("div", "rank__price", "<strong>" + priceHtml(p) + "</strong><span>/ month</span>"));
+      card.appendChild(el("div", "rank__price", "<strong>" + priceHtml(p) + "</strong><span>one-time</span>"));
       if (info.boost) card.appendChild(el("div", "rank__monthly", esc(info.boost)));
       card.appendChild(perkList(info.perks.length ? info.perks : [descText(p)]));
       const b = addButton(p, "Get " + p.name, "btn--" + info.cls);
@@ -255,7 +255,7 @@
   }
 
   function rankList() {
-    return RANK_ORDER.map(n => [...packages.values()].find(p => p.name === n && p.type === "subscription")).filter(Boolean);
+    return RANK_ORDER.map(n => [...packages.values()].find(p => p.name === n && !bundleIds.has(p.id))).filter(Boolean);
   }
 
   function renderCompare() {
@@ -266,7 +266,7 @@
     let h = "<thead><tr><th>Perk</th>";
     RANK_ORDER.forEach((n, i) => {
       const p = byName[n];
-      h += '<th class="c-' + RANKS[n].cls + (i + 1 === hl ? " hl" : "") + '"><span class="compare__rank">' + n + "</span>" + (p ? '<span class="compare__price">' + priceHtml(p) + " / mo</span>" + (onSale(p) ? '<span class="sale-badge sale-badge--sm">&minus;' + salePct(p) + "%</span>" : "") : "") + "</th>";
+      h += '<th class="c-' + RANKS[n].cls + (i + 1 === hl ? " hl" : "") + '"><span class="compare__rank">' + n + "</span>" + (p ? '<span class="compare__price">' + priceHtml(p) + "</span>" + (onSale(p) ? '<span class="sale-badge sale-badge--sm">&minus;' + salePct(p) + "%</span>" : "") : "") + "</th>";
     });
     h += "</tr></thead><tbody>";
     for (const row of COMPARE) {
@@ -293,8 +293,7 @@
       const list = byName[e.dataset.from] || [];
       if (!list.length) { e.textContent = ""; return; }
       const min = Math.min(...list.map(p => p.total_price));
-      const sub = list.every(p => p.type === "subscription");
-      e.innerHTML = (list.length > 1 ? "From " : "") + "<strong>" + money(min) + "</strong>" + (sub ? " / month" : "");
+      e.innerHTML = (list.length > 1 ? "From " : "") + "<strong>" + money(min) + "</strong>";
       const tile = e.closest(".tile");
       const best = Math.max(0, ...list.map(salePct));
       tile.querySelectorAll(".tile__sale").forEach(x => x.remove());
@@ -333,7 +332,7 @@
     const info = RANKS[pick.name];
     host.innerHTML = "";
     host.className = "promo promo--" + info.cls;
-    const txt = el("div", "promo__text", "<strong>" + esc(line) + "</strong><span>" + esc(pick.name) + " is " + priceHtml(pick) + "/month" + (onSale(pick) ? " (" + salePct(pick) + "% off)" : "") + " with " + esc(info.boost.replace(" · ", ", ")) + (pick.name === "Overseer" ? ", a remote gate, 3 pet slots" : "") + " and more.</span>");
+    const txt = el("div", "promo__text", "<strong>" + esc(line) + "</strong><span>" + esc(pick.name) + " is " + priceHtml(pick) + " one-time" + (onSale(pick) ? " (" + salePct(pick) + "% off)" : "") + " with " + esc(info.boost.replace(" · ", ", ")) + (pick.name === "Overseer" ? ", a remote gate, 3 pet slots" : "") + " and more.</span>");
     const go = el("a", "btn btn--ghost btn--sm", "Compare ranks"); go.href = "#/ranks";
     const add = addButton(pick, "Add " + pick.name, "btn--" + info.cls);
     const btns = el("div", "promo__btns"); btns.append(go, add);
@@ -357,7 +356,7 @@
       }
       catalogue = byName;
       renderCatalogue();
-      state.items = state.items.filter(i => packages.has(i.id));
+      state.items = state.items.filter(i => packages.has(i.id)).map(i => ({ id: i.id, qty: i.qty, rank: isRank(packages.get(i.id)) }));
       save();
     } catch (e) {
       for (const id of ["#ranks-grid", "#credits-grid", "#bundles-grid"]) {
@@ -378,26 +377,30 @@
     rankPromo($("#credits-promo"), "Earn more from every belt?");
   }
 
+  function isRank(p) {
+    return RANK_ORDER.includes(p.name) && !bundleIds.has(p.id);
+  }
+
   function addToBasket(p) {
     if (!state.username) {
       openLogin(() => addToBasket(p));
       return;
     }
-    const sub = p.type === "subscription";
+    const sub = isRank(p);
     const existing = state.items.find(i => i.id === p.id);
     if (existing) {
       if (sub || p.disable_quantity) { toast(p.name + " is already in your basket"); openBasket(); return; }
       existing.qty += 1;
     } else {
-      if (sub && state.items.some(i => i.type === "subscription")) {
-        state.items = state.items.filter(i => i.type !== "subscription");
+      if (sub && state.items.some(i => i.rank)) {
+        state.items = state.items.filter(i => !i.rank);
         toast("Swapped your rank for " + p.name);
       }
-      state.items.push({ id: p.id, qty: 1, type: sub ? "subscription" : "single" });
+      state.items.push({ id: p.id, qty: 1, rank: sub });
     }
     save();
     bump();
-    if (!sub && !bundleIds.has(p.id) && !state.items.some(i => i.type === "subscription") && upsellPick() && !upsellSeen()) { openUpsell(p); return; }
+    if (!sub && !bundleIds.has(p.id) && !state.items.some(i => i.rank) && upsellPick() && !upsellSeen()) { openUpsell(p); return; }
     if (!toast.timer || $("#toast").hidden) toast(p.name + " added to your basket");
   }
 
@@ -414,7 +417,7 @@
     c.type = "button";
     if (p.name === UPSELL_PICK) c.appendChild(el("span", "upsell__flag", "RECOMMENDED"));
     c.appendChild(rankTag(p.name));
-    c.appendChild(el("div", "upsell__price", "<strong>" + priceHtml(p) + "</strong> / month"));
+    c.appendChild(el("div", "upsell__price", "<strong>" + priceHtml(p) + "</strong> one-time"));
     const ub = saleBadge(p, "sale-badge--sm");
     if (ub) c.appendChild(ub);
     c.appendChild(el("div", "upsell__monthly", esc(info.boost)));
@@ -444,10 +447,10 @@
     const host = $("#basket-upsell");
     const pick = upsellPick();
     const onlyBundles = state.items.every(i => bundleIds.has(i.id));
-    if (!pick || !state.items.length || onlyBundles || state.items.some(i => i.type === "subscription")) { host.hidden = true; return; }
+    if (!pick || !state.items.length || onlyBundles || state.items.some(i => i.rank)) { host.hidden = true; return; }
     const info = RANKS[pick.name];
     host.innerHTML = "";
-    const txt = el("div", "drawer__upsell-text", "<strong>Add " + esc(pick.name) + "</strong><span>" + priceHtml(pick) + "/mo" + (onSale(pick) ? " (" + salePct(pick) + "% off)" : "") + " &middot; " + esc(info.boost) + "</span>");
+    const txt = el("div", "drawer__upsell-text", "<strong>Add " + esc(pick.name) + "</strong><span>" + priceHtml(pick) + " one-time" + (onSale(pick) ? " (" + salePct(pick) + "% off)" : "") + " &middot; " + esc(info.boost) + "</span>");
     const b = addButton(pick, "Add", "btn--" + info.cls);
     const more = el("a", "drawer__upsell-more", "Compare"); more.href = "#/ranks";
     more.addEventListener("click", closeBasket);
@@ -481,9 +484,9 @@
       const line = el("div", "line");
       line.appendChild(el("div", "line__name", esc(p.name)));
       line.appendChild(el("div", "line__price", (onSale(p) ? "<s>" + money(regular(p) * item.qty) + "</s>" : "") + money(p.total_price * item.qty)));
-      line.appendChild(el("div", "line__meta", item.type === "subscription" ? "Renews monthly · cancel any time" : money(p.total_price) + " each"));
+      line.appendChild(el("div", "line__meta", item.rank ? "One-time · yours for good" : money(p.total_price) + " each"));
       const ctl = el("div", "line__ctl");
-      if (item.type !== "subscription" && !p.disable_quantity) {
+      if (!item.rank && !p.disable_quantity) {
         const minus = el("button", "", "&minus;"); minus.type = "button"; minus.setAttribute("aria-label", "One fewer");
         minus.addEventListener("click", () => { item.qty -= 1; if (item.qty <= 0) state.items = state.items.filter(i => i !== item); save(); });
         const qty = el("span", "mono", String(item.qty));
@@ -552,7 +555,7 @@
       for (const item of state.items) {
         last = await api("/baskets/" + basket.ident + "/packages", {
           method: "POST",
-          body: Object.assign({ package_id: item.id, quantity: item.qty }, item.type === "subscription" ? { type: "subscription" } : {})
+          body: { package_id: item.id, quantity: item.qty }
         });
       }
       const link = (last && last.links && last.links.checkout) || (basket.links && basket.links.checkout);
@@ -581,8 +584,8 @@
     catch (e) { toast("Server IP: " + text); }
   }));
 
-  const VIEWS = ["home", "ranks", "credits", "bundles", "terms", "privacy", "impressum", "refunds", "subscription"];
-  const TITLES = { home: "GateMC Store", ranks: "Ranks", credits: "Credits", bundles: "Bundles", terms: "Terms", privacy: "Privacy", impressum: "Impressum", refunds: "Refund Policy", subscription: "Manage your rank" };
+  const VIEWS = ["home", "ranks", "credits", "bundles", "terms", "privacy", "impressum", "refunds"];
+  const TITLES = { home: "GateMC Store", ranks: "Ranks", credits: "Credits", bundles: "Bundles", terms: "Terms", privacy: "Privacy", impressum: "Impressum", refunds: "Refund Policy" };
   let currentView = null;
   function route() {
     const h = location.hash;
