@@ -2101,7 +2101,7 @@ info:
   # Register /rules here. Set false if the essentials module keeps its own /rules.
   rules-command: true
   discord:
-    url: 'https://discord.gg/hxsmp'
+    url: 'https://discord.gg/gatemc'
     label: '&9&l[CLICK FOR DISCORD]'
     message:
       - '&6&lDISCORD &8» &7Join the community: {discord}'
