@@ -1,0 +1,49 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('users', 13) %> Admin</span>
+        <h1>Referred players</h1>
+        <p class="lead">Every player who first joined through a creator address, which creator they belong to and what they've spent.</p>
+    </div>
+    <div class="stack">
+        <form method="get" action="/admin/players" class="card inline-form">
+            <div class="field"><label for="creator">Creator</label>
+                <select id="creator" name="creator"><option value="">All creators</option>
+                    <% creators.forEach(function (c) { %><option value="<%= c.id %>" <%= creatorId === c.id ? 'selected' : '' %>><%= c.name %></option><% }); %>
+                </select></div>
+            <div class="field"><label for="q">Player</label><input id="q" name="q" type="search" value="<%= q %>" placeholder="Name"></div>
+            <button class="btn primary" type="submit"><%- icon('search', 15) %> Filter</button>
+        </form>
+        <% const tSpent = players.reduce((a, p) => a + p.spent, 0), tCounted = players.reduce((a, p) => a + p.counted, 0), tEarned = players.reduce((a, p) => a + p.earned, 0); %>
+        <div class="stats">
+            <div class="stat"><div class="stat-label">Players</div><div class="stat-value"><%= num(players.length) %></div></div>
+            <div class="stat"><div class="stat-label">Total spent</div><div class="stat-value"><%= money(tSpent) %></div><div class="stat-sub">Everything they've bought</div></div>
+            <div class="stat"><div class="stat-label">Counted spend</div><div class="stat-value"><%= money(tCounted) %></div><div class="stat-sub">Inside the creator's window</div></div>
+            <div class="stat accent"><div class="stat-label">Creator earnings</div><div class="stat-value"><%= money(tEarned) %></div></div>
+        </div>
+        <div class="card" style="padding: 0;">
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Player</th><th>Creator</th><th>Joined through</th><th>First joined</th><th>Last seen</th><th class="num">Purchases</th><th class="num">Total spent</th><th class="num">Counted</th><th class="num">Creator earned</th></tr></thead>
+                    <tbody>
+                        <% if (!players.length) { %><tr><td colspan="9" class="muted">No referred players yet.</td></tr><% } %>
+                        <% players.forEach(function (p) { %>
+                            <tr>
+                                <td><div class="player-cell"><img src="<%= headUrl(p.uuid, 24) %>" alt="" width="24" height="24" loading="lazy"><span><%= p.player_name %></span></div></td>
+                                <td><a href="/admin/creators/<%= p.creator_id %>"><%= p.creator_name %></a></td>
+                                <td class="small"><%= p.first_host %></td>
+                                <td class="nowrap"><%= fmtDate(Number(p.first_seen)) %></td>
+                                <td class="nowrap"><%= timeAgo(Number(p.last_seen)) %></td>
+                                <td class="num"><%= num(p.purchases) %></td>
+                                <td class="num"><%= money(p.spent) %></td>
+                                <td class="num"><%= money(p.counted) %></td>
+                                <td class="num"><b><%= money(p.earned) %></b></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

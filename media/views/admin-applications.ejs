@@ -1,0 +1,36 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('userPlus', 13) %> Admin</span>
+        <h1>Applications</h1>
+        <p class="lead">New creator applications and cut increase requests.</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <div class="tabs">
+            <% [['pending', 'Needs review (' + pending.total + ')'], ['offered', 'Offers out'], ['accepted', 'Accepted'], ['denied', 'Closed'], ['all', 'All']].forEach(function (t) { %>
+                <a href="/admin/applications?status=<%= t[0] %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a>
+            <% }); %>
+        </div>
+        <div class="card" style="padding: 0;">
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th>Type</th><th>Discord</th><th>Details</th><th>Submitted</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <% if (!apps.length) { %><tr><td colspan="5" class="muted">Nothing here.</td></tr><% } %>
+                        <% apps.forEach(function (a) { %>
+                            <tr>
+                                <td><a class="rowlink" href="/admin/applications/<%= a.id %>"><%= a.kind === 'creator' ? 'Creator' : 'Increase' %> #<%= a.id %></a></td>
+                                <td><%= a.discord_name %></td>
+                                <td class="small"><%= a.kind === 'creator' ? (a.platform + (a.followers ? ' · ' + a.followers + ' followers' : '')) : (a.creator_name + ': ' + pct(a.current_percent) + ' → ' + pct(a.requested_percent)) %></td>
+                                <td class="nowrap"><%= timeAgo(a.created_at) %></td>
+                                <td><span class="pill <%= a.status === 'accepted' ? 'ok' : ['denied', 'declined'].includes(a.status) ? 'bad' : ['pending', 'countered'].includes(a.status) ? 'warn' : '' %>"><%= a.status === 'countered' ? 'countered ' + pct(a.counter_percent) : a.status === 'offered' ? 'offered ' + pct(a.offer_percent) : a.status %></span></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

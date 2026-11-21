@@ -1,0 +1,122 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container narrow">
+    <div class="page-head">
+        <div class="eyebrow"><%- icon('video', 13) %> Media program</div>
+        <h1>Apply to partner with GateMC</h1>
+        <p class="lead">Signed in as <strong><%= viewer.username %></strong>. Tell us about your content. If you're accepted you'll get your own server address and a cut of what your players spend.</p>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <% if (thanks) { %>
+            <div class="alert ok"><%- icon('check') %><div><strong>Application sent.</strong> We read every one and will reach out on Discord.</div></div>
+        <% } %>
+        <% if (pending && pending.status === 'offered') { const o = pending; %>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-gold"><%- icon('star', 18) %></span><div class="grow"><h2><%= o.offer_final ? 'Our final offer' : "You're invited to partner with GateMC" %></h2><p>Sent <%= fmtDate(o.offered_at) %> by <%= o.offered_by %></p></div></div>
+                <% if (o.offer_final && o.counter_percent !== null) { %>
+                    <div class="alert warn" style="margin-bottom: 16px;"><%- icon('info') %><div>We couldn't do the <%= pct(o.counter_percent) %> you asked for. You can accept or decline this offer.</div></div>
+                <% } %>
+                <div class="big-pct"><%= pct(o.offer_percent) %></div>
+                <dl class="kv">
+                    <dt>Your cut</dt><dd><%= pct(o.offer_percent) %> of what your players spend <%= o.offer_window_days ? 'during their first ' + o.offer_window_days + ' days' : 'for as long as they play' %></dd>
+                    <dt>Server address</dt><dd><%= o.offer_host || 'Set up after you accept' %></dd>
+                    <dt>Creator code</dt><dd><%= o.offer_code || 'Set up after you accept' %></dd>
+                    <dt>Hold period</dt><dd>Earnings are confirmed <%= o.offer_hold_days %> days after each purchase</dd>
+                    <dt>Activity</dt><dd>At least one GateMC video or stream every <%= inactiveDays %> days</dd>
+                </dl>
+                <% if (o.offer_note) { %><p class="answer" style="margin-top: 16px;"><%= o.offer_note %></p><% } %>
+                <div class="form-actions" style="gap: 10px; flex-wrap: wrap;">
+                    <form method="post" action="/apply/<%= o.id %>/respond"><input type="hidden" name="action" value="accept"><button class="btn success lg" type="submit"><%- icon('check', 16) %> Accept <%= pct(o.offer_percent) %></button></form>
+                    <form method="post" action="/apply/<%= o.id %>/respond" onsubmit="return confirm('Decline this offer? This closes your application.');"><input type="hidden" name="action" value="decline"><button class="btn danger" type="submit"><%- icon('x', 16) %> Decline</button></form>
+                </div>
+            </div>
+            <% if (!o.offer_final && o.counter_percent === null) { %>
+                <form method="post" action="/apply/<%= o.id %>/respond" class="card">
+                    <input type="hidden" name="action" value="counter">
+                    <div class="card-head"><span class="ico-tile c-violet"><%- icon('percent', 18) %></span><div class="grow"><h3>Counter with a different rate</h3><p>You get one counter. After that you can only accept or decline.</p></div></div>
+                    <div class="form-grid">
+                        <div class="field"><label for="counter_percent">Rate you're asking for (%)</label><input type="number" id="counter_percent" name="counter_percent" required min="<%= Number(o.offer_percent) + 0.5 %>" max="100" step="0.5"></div>
+                        <div class="field span-2"><label for="counter_note">Why (optional)</label><textarea id="counter_note" name="counter_note" rows="3" maxlength="1000"></textarea></div>
+                    </div>
+                    <div class="form-actions"><button class="btn" type="submit">Send counter offer</button></div>
+                </form>
+            <% } %>
+        <% } else if (pending && pending.status === 'countered') { %>
+            <div class="alert pending"><%- icon('clock') %><div>You asked for <b><%= pct(pending.counter_percent) %></b> instead of <%= pct(pending.offer_percent) %>. The team is reviewing it and will reply on Discord.</div></div>
+        <% } else if (pending) { %>
+            <div class="alert pending">
+                <%- icon('clock') %>
+                <div>
+                    Your application from <%= fmtDate(pending.created_at) %> is waiting for review.
+                    <form method="post" action="/apply/<%= pending.id %>/withdraw" onsubmit="return confirm('Withdraw this application?');">
+                        <button type="submit" class="btn sm danger">Withdraw application</button>
+                    </form>
+                </div>
+            </div>
+        <% } else { %>
+            <% const last = history[0]; if (last && last.status === 'denied' && !flash) { %>
+                <div class="alert warn"><%- icon('alert') %><div>Your last application wasn't accepted<%= last.review_note ? ': ' + last.review_note : '.' %> You're welcome to apply again.</div></div>
+            <% } %>
+            <form method="post" action="/apply" class="card">
+                <div class="card-head"><span class="ico-tile c-violet"><%- icon('pen') %></span><div class="grow"><h2>Your application</h2><p>Takes about five minutes.</p></div></div>
+                <% if (error) { %><div class="alert bad" style="margin-bottom: 18px;"><%- icon('alert') %><div><%= error %></div></div><% } %>
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="platform">Main platform</label>
+                        <select id="platform" name="platform" required>
+                            <option value="">Choose one</option>
+                            <% platforms.forEach(function (p) { %><option value="<%= p %>" <%= values.platform === p ? 'selected' : '' %>><%= p %></option><% }); %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="channel_url">Channel link</label>
+                        <input id="channel_url" name="channel_url" required maxlength="300" placeholder="youtube.com/@you" value="<%= values.channel_url || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="followers">Followers or subscribers</label>
+                        <input id="followers" name="followers" maxlength="60" placeholder="12,000" value="<%= values.followers || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="avg_viewers">Average views or live viewers</label>
+                        <input id="avg_viewers" name="avg_viewers" maxlength="60" placeholder="2,500 views / 80 live" value="<%= values.avg_viewers || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="minecraft_name">Minecraft username</label>
+                        <% if (link) { %>
+                            <input id="minecraft_name" value="<%= link.player_name %>" disabled>
+                            <span class="hint">From your linked account.</span>
+                        <% } else { %>
+                            <input id="minecraft_name" name="minecraft_name" required maxlength="17" value="<%= values.minecraft_name || '' %>">
+                            <span class="hint">Bedrock players include the leading dot.</span>
+                        <% } %>
+                    </div>
+                    <div class="field">
+                        <label for="schedule">How often you post or stream</label>
+                        <input id="schedule" name="schedule" maxlength="200" placeholder="3 videos a week, live on weekends" value="<%= values.schedule || '' %>">
+                    </div>
+                    <div class="field span-2">
+                        <label for="content">What kind of content do you make, and what would you make on GateMC?</label>
+                        <textarea id="content" name="content" required maxlength="1500" rows="4"><%= values.content || '' %></textarea>
+                    </div>
+                    <div class="field span-2">
+                        <label for="why">Why do you want to partner with GateMC?</label>
+                        <textarea id="why" name="why" required maxlength="1500" rows="4"><%= values.why || '' %></textarea>
+                    </div>
+                </div>
+                <div class="form-actions"><button type="submit" class="btn primary lg">Submit application <%- icon('arrowRight', 16) %></button></div>
+            </form>
+        <% } %>
+        <% if (history.length) { %>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-slate"><%- icon('clock') %></span><div class="grow"><h3>Your applications</h3></div></div>
+                <div class="rows">
+                    <% history.forEach(function (a) { %>
+                        <div class="row"><div class="grow"><b><%= a.platform %></b><span class="muted small"><%= fmtDate(a.created_at) %></span></div>
+                            <span class="pill <%= a.status === 'accepted' ? 'ok' : ['denied', 'declined'].includes(a.status) ? 'bad' : ['pending', 'offered', 'countered'].includes(a.status) ? 'warn' : '' %>"><%= a.status %></span></div>
+                    <% }); %>
+                </div>
+            </div>
+        <% } %>
+    </div>
+</div>
+<%- include('partials/foot') %>

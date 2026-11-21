@@ -1,0 +1,42 @@
+<%- include('partials/head', { title: null, active: '' }) %>
+<%
+    const features = [
+        { icon: 'globe', tone: 'c-violet', title: 'Your own address', text: 'You get a personal server address like you.' + baseDomain + '. Every new player who joins through it is linked to you.' },
+        { icon: 'dollar', tone: 'c-green', title: 'A cut of every purchase', text: 'You earn a share of what your players spend on the GateMC store, tracked automatically.' },
+        { icon: 'chart', tone: 'c-blue', title: 'Live stats', text: 'See how many players you brought in, who is still playing, what they spent and what you have earned.' },
+        { icon: 'trending', tone: 'c-gold', title: 'Grow your rate', text: 'Bring in more players and request a higher cut right from your dashboard.' },
+    ];
+%>
+<section class="hero">
+    <div class="hero-inner">
+        <img src="/img/logo.png" alt="GateMC" class="hero-logo" width="84" height="84">
+        <div style="margin-top: 22px;"><span class="hero-badge"><span class="dot"></span> play.gatemc.org</span></div>
+        <h1><span class="gradient-text">GateMC Media Partners</span></h1>
+        <p class="lead">Make content on GateMC, share your own server address, and earn a cut of every store purchase from the players you bring in.</p>
+        <% if (signinFailed) { %>
+            <div class="alert bad" style="max-width: 520px; margin: 22px auto 0; text-align: left;"><%- icon('alert') %><div>Discord sign-in didn't go through. Please try again.</div></div>
+        <% } %>
+        <% if (signinClosed) { %>
+            <div class="alert info" style="max-width: 520px; margin: 22px auto 0; text-align: left;"><%- icon('info') %><div>The media portal isn't open yet. Keep an eye on our Discord for when applications open.</div></div>
+        <% } %>
+        <div class="hero-actions">
+            <a href="/auth/discord?returnTo=%2F" class="btn discord lg"><%- discordGlyph(18) %> Sign in with Discord</a>
+            <a href="/apply" class="btn lg"><%- icon('userPlus', 18) %> Apply to partner</a>
+        </div>
+    </div>
+</section>
+<div class="container" style="padding-top: 24px;">
+    <div class="section" style="margin-top: 20px;">
+        <div class="section-head"><div><span class="eyebrow">How it works</span><h2 style="margin-top: 10px;">Built for creators</h2></div></div>
+        <div class="grid cols-4">
+            <% features.forEach(function (f) { %>
+                <div class="card feature">
+                    <span class="ico-tile <%= f.tone %>"><%- icon(f.icon, 20) %></span>
+                    <h3><%= f.title %></h3>
+                    <p><%= f.text %></p>
+                </div>
+            <% }); %>
+        </div>
+    </div>
+</div>
+<%- include('partials/foot') %>

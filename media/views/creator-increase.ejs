@@ -1,0 +1,38 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container narrow">
+    <div class="crumbs"><a href="/me">Dashboard</a><%- icon('chevronRight', 14) %><span>Request increase</span></div>
+    <div class="page-head">
+        <span class="eyebrow"><%- icon('percent', 13) %> Your cut</span>
+        <h1>Request a higher cut</h1>
+        <p class="lead">You're on <b><%= pct(c.cut_percent) %></b> right now. You've brought in <%= num(c.referred) %> players and <%= money(c.revenue) %> in store revenue.</p>
+    </div>
+    <div class="stack">
+        <% if (pending) { %>
+            <div class="alert pending"><%- icon('clock') %><div>You asked for <%= pct(pending.requested_percent) %> on <%= fmtDate(pending.created_at) %>. We'll let you know once it's reviewed.</div></div>
+        <% } else { %>
+            <form method="post" action="/me/increase" class="card">
+                <% if (error) { %><div class="alert bad" style="margin-bottom: 18px;"><%- icon('alert') %><div><%= error %></div></div><% } %>
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="requested_percent">Cut you're asking for (%)</label>
+                        <input type="number" id="requested_percent" name="requested_percent" required min="0" max="100" step="0.5" value="<%= values.requested_percent || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="followers">Current followers or subscribers</label>
+                        <input id="followers" name="followers" maxlength="60" value="<%= values.followers || '' %>">
+                    </div>
+                    <div class="field span-2">
+                        <label for="avg_viewers">Average views or live viewers</label>
+                        <input id="avg_viewers" name="avg_viewers" maxlength="60" value="<%= values.avg_viewers || '' %>">
+                    </div>
+                    <div class="field span-2">
+                        <label for="why">Why should your cut go up?</label>
+                        <textarea id="why" name="why" required maxlength="2000" rows="5" placeholder="Growth, upcoming content, how you've been promoting GateMC..."><%= values.why || '' %></textarea>
+                    </div>
+                </div>
+                <div class="form-actions"><button type="submit" class="btn primary lg">Send request <%- icon('arrowRight', 16) %></button><a href="/me" class="btn ghost lg">Cancel</a></div>
+            </form>
+        <% } %>
+    </div>
+</div>
+<%- include('partials/foot') %>

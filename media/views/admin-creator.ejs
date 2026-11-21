@@ -1,0 +1,86 @@
+<%- include('partials/head', { title, active }) %>
+<div class="container">
+    <div class="crumbs"><a href="/admin">Overview</a><%- icon('chevronRight', 14) %><a href="/admin#creators">Creators</a><%- icon('chevronRight', 14) %><span><%= c.name %></span></div>
+    <div class="page-head" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <span class="eyebrow"><%- icon('video', 13) %> Creator <% if (!c.active) { %>· paused<% } %></span>
+            <h1><%= c.name %></h1>
+            <p class="lead"><%= c.discord_name || (c.discord_id ? 'Discord ' + c.discord_id : 'No Discord linked') %><%= c.minecraft_name ? ' · ' + c.minecraft_name : '' %><% if (c.channel_url) { %> · <a href="<%= c.channel_url %>" target="_blank" rel="noopener noreferrer">Channel <%- icon('external', 13) %></a><% } %></p>
+        </div>
+        <a href="/admin/creators/<%= c.id %>/preview" class="btn"><%- icon('eye', 16) %> View their dashboard</a>
+    </div>
+    <div class="stack">
+        <%- include('partials/flash') %>
+        <div class="grid cols-2">
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-gold"><%- icon('percent', 18) %></span><div class="grow"><h3>Cut</h3><p>Changes apply to purchases from now on. Past earnings keep the rate they were made at.</p></div></div>
+                <div class="row-flex" style="align-items: flex-end;">
+                    <div class="big-pct"><%= pct(c.cut_percent) %></div>
+                    <form method="post" action="/admin/creators/<%= c.id %>/rate" class="inline-form" style="flex: 1;">
+                        <div class="field" style="max-width: 120px;"><label for="cut_percent">New %</label><input type="number" id="cut_percent" name="cut_percent" min="0" max="100" step="0.5" value="<%= c.cut_percent %>" required></div>
+                        <div class="field"><label for="reason">Reason</label><input id="reason" name="reason" maxlength="200" placeholder="Optional"></div>
+                        <button class="btn primary" type="submit">Set</button>
+                    </form>
+                </div>
+                <div class="rows" style="margin-top: 14px;">
+                    <% rates.slice(0, 5).forEach(function (r) { %>
+                        <div class="row"><div class="grow"><b><%= r.old_p === null ? 'Started at ' + pct(r.new_p) : pct(r.old_p) + ' → ' + pct(r.new_p) %></b><span class="muted small"><%= fmtDate(r.changed_at) %> by <%= r.changed_by %><%= r.reason ? ' · ' + r.reason : '' %></span></div></div>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-violet"><%- icon('globe', 18) %></span><div class="grow"><h3>Server addresses</h3><p>New players joining through these are linked to <%= c.name %>.</p></div></div>
+                <div class="chips" style="margin-bottom: 14px;">
+                    <% if (!c.hosts.length) { %><span class="muted">No address yet.</span><% } %>
+                    <% c.hosts.forEach(function (h) { %>
+                        <span class="chip"><%= h %><form method="post" action="/admin/creators/<%= c.id %>/hosts/remove" onsubmit="return confirm('Remove this address? Players who joined through it will stop counting for this creator.');"><input type="hidden" name="host" value="<%= h %>"><button type="submit" aria-label="Remove"><%- icon('x', 14) %></button></form></span>
+                    <% }); %>
+                </div>
+                <form method="post" action="/admin/creators/<%= c.id %>/hosts" class="inline-form">
+                    <div class="field"><label for="host">Add address</label><input id="host" name="host" maxlength="120" placeholder="name or full domain" required></div>
+                    <button class="btn" type="submit">Add</button>
+                </form>
+                <p class="muted small" style="margin: 12px 0 0;">In Cloudflare add an A record for the name pointing at 45.85.60.126, set to DNS only (grey cloud).</p>
+            </div>
+        </div>
+
+        <%- include('partials/creator-body', { adminView: true }) %>
+
+        <div class="grid cols-2" id="payouts">
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-green"><%- icon('wallet', 18) %></span><div class="grow"><h3>Payouts</h3><p>Owed now: <b><%= money(c.owed) %></b></p></div></div>
+                <form method="post" action="/admin/creators/<%= c.id %>/payouts" class="inline-form" style="margin-bottom: 14px;">
+                    <div class="field" style="max-width: 130px;"><label for="amount">Amount ($)</label><input id="amount" name="amount" inputmode="decimal" required value="<%= c.owed > 0 ? c.owed.toFixed(2) : '' %>"></div>
+                    <div class="field" style="max-width: 140px;"><label for="method">Method</label><input id="method" name="method" maxlength="40" placeholder="PayPal"></div>
+                    <div class="field"><label for="note">Note</label><input id="note" name="note" maxlength="200" placeholder="Optional"></div>
+                    <button class="btn success" type="submit">Record payout</button>
+                </form>
+                <div class="rows">
+                    <% if (!payouts.length) { %><p class="muted" style="margin: 0;">No payouts yet.</p><% } %>
+                    <% payouts.forEach(function (o) { %>
+                        <div class="row"><div class="grow"><b><%= money(o.amount) %></b><span class="muted small"><%= fmtDate(o.paid_at) %> by <%= o.paid_by %><%= o.method ? ' · ' + o.method : '' %><%= o.note ? ' · ' + o.note : '' %></span></div>
+                            <form method="post" action="/admin/payouts/<%= o.id %>/delete" onsubmit="return confirm('Delete this payout record?');"><button class="icon-btn" type="submit" aria-label="Delete"><%- icon('x', 15) %></button></form></div>
+                    <% }); %>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-head"><span class="ico-tile c-blue"><%- icon('userPlus', 18) %></span><div class="grow"><h3>Applications and requests</h3></div></div>
+                <div class="rows">
+                    <% if (!apps.length) { %><p class="muted" style="margin: 0;">None.</p><% } %>
+                    <% apps.forEach(function (a) { %>
+                        <a class="row" href="/admin/applications/<%= a.id %>" style="color: inherit;"><div class="grow"><b><%= a.kind === 'creator' ? 'Creator application' : 'Increase to ' + pct(a.requested_percent) %></b><span class="muted small"><%= fmtDate(a.created_at) %></span></div>
+                            <span class="pill <%= a.status === 'accepted' ? 'ok' : a.status === 'denied' ? 'bad' : a.status === 'pending' ? 'warn' : '' %>"><%= a.status %></span></a>
+                    <% }); %>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="/admin/creators/<%= c.id %>" class="card">
+            <div class="card-head"><span class="ico-tile c-slate"><%- icon('settings', 18) %></span><div class="grow"><h3>Settings</h3></div></div>
+            <%- include('partials/creator-fields', { values: c }) %>
+            <label class="checkbox" style="margin-top: 16px; display: flex; gap: 10px; align-items: center;"><input type="checkbox" name="active" <%= c.active ? 'checked' : '' %>> <span>Active (new purchases count toward their cut)</span></label>
+            <div class="form-actions"><button class="btn primary" type="submit">Save settings</button></div>
+        </form>
+    </div>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,3 @@
+<% if (typeof flash !== 'undefined' && flash) { %>
+    <div class="alert <%= flash.kind === 'ok' ? 'ok' : 'bad' %>"><%- icon(flash.kind === 'ok' ? 'check' : 'alert') %><div><%= flash.text %></div></div>
+<% } %>
