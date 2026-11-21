@@ -50,6 +50,25 @@ final class StorePayments {
      * Stores one page of payments: new ones are inserted, known ones get their status (refunds, chargebacks) and name
      * updated. Returns how many were new. One transaction per page.
      */
+    private volatile long ignoreBefore;
+
+    void ignoreBefore(long millis) {
+        ignoreBefore = millis;
+    }
+
+    int purgeIgnored() throws SQLException {
+        long cutoff = ignoreBefore;
+        if (cutoff <= 0) {
+            return 0;
+        }
+        return db.sync(c -> {
+            try (PreparedStatement ps = c.prepareStatement("DELETE FROM pvp_store_payments WHERE created_at < ?")) {
+                ps.setLong(1, cutoff);
+                return ps.executeUpdate();
+            }
+        });
+    }
+
     int upsert(List<TebexClient.Payment> page) throws SQLException {
         if (page.isEmpty()) {
             return 0;
@@ -83,7 +102,7 @@ final class StorePayments {
                         upd.setString(2, p.name());
                         upd.setString(3, p.id());
                         upd.addBatch();
-                    } else {
+                    } else if (p.createdAt() >= ignoreBefore) {
                         ins.setString(1, p.id());
                         ins.setString(2, String.valueOf(p.uuid()));
                         ins.setString(3, p.name());

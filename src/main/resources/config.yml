@@ -2289,6 +2289,8 @@ store:
     # After the first full read, each refresh reads new pages plus this many to catch refunds and chargebacks.
     recheck-pages: 2
     max-pages: 200
+    # Payments made before this date (UTC) are ignored: GateMC shares its Tebex account with the old HawkMC store.
+    ignore-before: '2026-11-21'
   # The "spenders" leaderboard (/leaderboard spenders, and /lbholo place spenders). All-time completed payments.
   top-spenders:
     enabled: true

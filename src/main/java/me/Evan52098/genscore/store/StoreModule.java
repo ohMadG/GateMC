@@ -102,7 +102,12 @@ public final class StoreModule implements GensModule {
         this.plugin = plugin;
         this.settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
         this.payments = new StorePayments(plugin.database());
+        payments.ignoreBefore(ignoreBefore());
         payments.migrate(plugin.getLogger());
+        int purged = payments.purgeIgnored();
+        if (purged > 0) {
+            plugin.getLogger().info("[store] Removed " + purged + " payment(s) from before store.tebex.ignore-before.");
+        }
         this.tebex = new TebexClient(plugin.getDataFolder().getParentFile());
         this.rewards = new StoreRewards(plugin.modules(), plugin.getLogger());
         this.popup = new StorePopup(() -> settings, this::storeLine);
@@ -160,6 +165,7 @@ public final class StoreModule implements GensModule {
     @Override
     public void reload() {
         settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
+        payments.ignoreBefore(ignoreBefore());
         Tasks.async.run(() -> {
             try {
                 refreshKeyAll();
@@ -639,4 +645,15 @@ public final class StoreModule implements GensModule {
             Tasks.global.later(go, p.countdownSeconds() * 20L);
         }
     }
+
+    private long ignoreBefore() {
+        String raw = plugin.getConfig().getString("store.tebex.ignore-before", "2026-11-21");
+        try {
+            return java.time.LocalDate.parse(raw.trim()).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli();
+        } catch (RuntimeException e) {
+            plugin.getLogger().warning("[store] store.tebex.ignore-before is not a date (YYYY-MM-DD): " + raw);
+            return 0;
+        }
+    }
+
 }

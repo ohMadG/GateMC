@@ -56,6 +56,8 @@ async function fetchPage(page) {
     return res.json();
 }
 
+const PAYMENTS_SINCE = Date.parse(process.env.PAYMENTS_SINCE || '2026-11-21T00:00:00Z');
+
 async function syncPayments() {
     const map = await fxRates();
     let added = 0;
@@ -66,6 +68,9 @@ async function syncPayments() {
         const body = await fetchPage(page);
         lastPage = Math.min(Number(body.last_page || 1), 400);
         for (const p of body.data || []) {
+            if (Date.parse(p.date) < PAYMENTS_SINCE) {
+                continue;
+            }
             const amount = Number(p.amount || 0);
             const currency = (p.currency && p.currency.iso_4217) || 'USD';
             const player = p.player || {};
