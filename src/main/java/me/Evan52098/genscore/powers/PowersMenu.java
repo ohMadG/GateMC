@@ -50,6 +50,7 @@ final class PowersMenu {
     }
 
     private void open(Player p, boolean op, int page, boolean animate) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "powers");
         PowersSettings s = m.settings();
         PowerData d = m.data(p.getUniqueId());
         if (d == null) {

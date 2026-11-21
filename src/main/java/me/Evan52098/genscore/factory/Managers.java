@@ -164,6 +164,7 @@ final class Managers {
     }
 
     void open(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "managers");
         int lv = level(p);
         boolean on = on(p);
         int reserve = reserve(p);

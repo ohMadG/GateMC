@@ -28,6 +28,7 @@ final class PetsMenu {
     }
 
     void open(Player p, int page) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "pets");
         PetData d = module.data(p.getUniqueId());
         if (d == null) {
             p.sendMessage(Msg.bad("Your data is still loading, try again in a moment."));

@@ -460,6 +460,19 @@ final class Factory {
         }
     }
 
+    @org.jetbrains.annotations.Nullable Location landmark(String which) {
+        World w = view.world();
+        return switch (which) {
+            case "gen" -> path.size() == 0 ? null : path.at(0).toLocation(w).add(0, 0.6, 0);
+            case "belt" -> path.size() == 0 ? null : path.at(Math.max(0, activeLength() / 2.0)).toLocation(w).add(0, 0.6, 0);
+            case "sell" -> path.size() == 0 ? null : path.at(Math.max(0, activeLength() - 1)).toLocation(w).add(0, 0.6, 0);
+            case "gate" -> hasGate() ? gateCenter().add(0, 1, 0) : null;
+            case "button" -> view.marker("gate_button").isEmpty() ? null : view.marker("gate_button").get(0).toLocation(w).add(0.5, 0.5, 0.5);
+            case "turret" -> view.marker("turret").isEmpty() ? null : view.marker("turret").get(0).toLocation(w).add(0.5, 1.0, 0.5);
+            default -> null;
+        };
+    }
+
     private Location gateCenter() {
         double x = 0;
         double y = Double.MAX_VALUE;

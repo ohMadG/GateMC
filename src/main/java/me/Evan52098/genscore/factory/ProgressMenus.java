@@ -34,6 +34,7 @@ final class ProgressMenus {
     // ------------------------------------------------------------------ token shop
 
     void tokens(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "tokens");
         GensPlayer g = module.gensPlayer(p.getUniqueId());
         if (g == null) {
             return;

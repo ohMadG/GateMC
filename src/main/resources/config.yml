@@ -2020,10 +2020,10 @@ leaderboards:
 
 # Anti x-ray: ore-watch vein alerts plus the "Nightwatch" anti-autominer (BlockvilleCore's ore-watch: and anti-miner:).
 tutorial:
-  # New players get the guided tutorial after the intro. Others can start it with /tutorial.
+  # New players play through the tutorial after the intro. Anyone can start it with /tutorial.
+  # It hands out $350 before the upgrades and 15 tokens for the first turret, once per player.
   auto-start: true
-  # Tokens for each finished step, and for finishing the whole tutorial.
-  step-tokens: 2
+  # Tokens for finishing the whole tutorial (first time only).
   final-tokens: 10
   # Run by the console when the tutorial is finished.
   final-commands:

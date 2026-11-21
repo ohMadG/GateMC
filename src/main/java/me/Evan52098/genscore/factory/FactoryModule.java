@@ -157,6 +157,25 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
 
     private static volatile FactoryModule powerHooks;
 
+    public static @Nullable Location landmark(UUID owner, String which) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(owner);
+        return f == null ? null : f.landmark(which);
+    }
+
+    public static boolean hasRaidPick(Player p) {
+        FactoryModule m = powerHooks;
+        if (m == null || m.menus == null) {
+            return false;
+        }
+        for (org.bukkit.inventory.ItemStack it : p.getInventory().getContents()) {
+            if (it != null && m.menus.isRaidPick(it)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static @Nullable Location gateFront(UUID owner) {
         FactoryModule m = powerHooks;
         Factory f = m == null ? null : m.byOwner.get(owner);
@@ -1036,6 +1055,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     }
 
     void machinesMenu(Player p) {
+        me.Evan52098.genscore.tutorial.TutorialModule.done(p, "machines");
         PlotData data = plotData(p.getUniqueId());
         Factory f = byOwner.get(p.getUniqueId());
         if (data == null || f == null) {
