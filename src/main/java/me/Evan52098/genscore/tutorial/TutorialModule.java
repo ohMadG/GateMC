@@ -27,6 +27,7 @@ import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mannequin;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
@@ -36,6 +37,13 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
+import org.bukkit.util.Transformation;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import io.papermc.paper.datacomponent.item.ResolvableProfile;
+import io.papermc.paper.entity.TeleportFlag;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.jetbrains.annotations.Nullable;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.Description;
@@ -184,6 +192,13 @@ public final class TutorialModule implements GensModule, Listener {
         String chapter = "";
         @Nullable TextDisplay label;
         @Nullable Location pointAt;
+        volatile @Nullable Mannequin npc;
+        volatile @Nullable TextDisplay speech;
+        volatile boolean spawning;
+        volatile String typing = "";
+        volatile String finalText = "";
+        volatile int typed;
+        @Nullable ScheduledTask typer;
     }
 
     @Override
@@ -227,6 +242,7 @@ public final class TutorialModule implements GensModule, Listener {
                 p.hideBossBar(e.getValue().bar);
             }
             removeLabel(e.getValue());
+            removeNpc(e.getValue());
         }
         runs.clear();
     }
@@ -304,6 +320,7 @@ public final class TutorialModule implements GensModule, Listener {
         if (old != null) {
             p.hideBossBar(old.bar);
             removeLabel(old);
+            removeNpc(old);
         }
         Run r = new Run();
         r.nextAt = System.currentTimeMillis() + 500;
@@ -319,6 +336,7 @@ public final class TutorialModule implements GensModule, Listener {
         if (r != null) {
             p.hideBossBar(r.bar);
             removeLabel(r);
+            removeNpc(r);
         }
     }
 
@@ -334,6 +352,7 @@ public final class TutorialModule implements GensModule, Listener {
             return;
         }
         Beat b = SCRIPT.get(i);
+        follow(p, r);
         if (b instanceof Wait w) {
             waitTick(p, r, i, w, now);
             return;
@@ -351,6 +370,7 @@ public final class TutorialModule implements GensModule, Listener {
                         Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2200), Duration.ofMillis(500))));
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1f, 1.2f);
                 bar(p, r, i, "<white>" + c.title());
+                speak(r, "<gold><bold>" + c.title() + "</bold></gold>\n<gray>" + c.subtitle());
                 r.nextAt = now + 2600;
             }
             case Say s -> {
@@ -359,6 +379,7 @@ public final class TutorialModule implements GensModule, Listener {
                         .clickEvent(ClickEvent.runCommand("/tutorial next")));
                 p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_AMBIENT, 0.5f, 1.3f);
                 bar(p, r, i, "<white>" + r.chapter);
+                speak(r, "<white>" + s.text());
                 r.nextAt = now + readMillis(s.text());
             }
             case Point pt -> {
@@ -402,6 +423,7 @@ public final class TutorialModule implements GensModule, Listener {
                             .clickEvent(ClickEvent.runCommand(w.command()))
                             .hoverEvent(HoverEvent.showText(Msg.parse("<gray>Click to run " + w.command())))));
             bar(p, r, i, "<yellow>➜ " + Msg.escape(w.task()));
+            speak(r, "<yellow><bold>➜ " + Msg.escape(w.task()) + "</bold></yellow>\n<gray>" + w.command());
         }
         if (w.trail() != null) {
             Location to = "home".equals(w.trail()) ? home(p) : FactoryModule.landmark(p.getUniqueId(), w.trail());
@@ -474,11 +496,163 @@ public final class TutorialModule implements GensModule, Listener {
         }
     }
 
+    // ------------------------------------------------------------------ guide npc
+
+    private static Location guideSpot(Player p) {
+        Location eye = p.getLocation();
+        Vector forward = eye.getDirection().setY(0);
+        if (forward.lengthSquared() < 1.0E-4) {
+            forward = new Vector(0, 0, 1);
+        }
+        forward.normalize();
+        Vector right = new Vector(-forward.getZ(), 0, forward.getX());
+        Location spot = eye.clone().add(forward.multiply(1.8)).add(right.multiply(1.6));
+        spot.setY(eye.getY());
+        Vector look = eye.toVector().subtract(spot.toVector());
+        spot.setDirection(look.lengthSquared() < 1.0E-4 ? new Vector(0, 0, -1) : look);
+        spot.setPitch(0);
+        return spot;
+    }
+
+    private void follow(Player p, Run r) {
+        Mannequin npc = r.npc;
+        if (npc == null) {
+            if (!r.spawning) {
+                spawnNpc(p, r);
+            }
+            return;
+        }
+        Location want = guideSpot(p);
+        Tasks.onEntity(npc, () -> {
+            if (!npc.isValid()) {
+                r.npc = null;
+                return;
+            }
+            Location at = npc.getLocation();
+            boolean far = at.getWorld() != want.getWorld() || at.distanceSquared(want) > 2.25;
+            Location face = far ? want : at.clone();
+            if (!far) {
+                Vector look = p.getLocation().toVector().subtract(at.toVector()).setY(0);
+                if (look.lengthSquared() > 1.0E-4) {
+                    face.setDirection(look);
+                    face.setPitch(0);
+                }
+                if (Math.abs(face.getYaw() - at.getYaw()) < 5) {
+                    return;
+                }
+            }
+            npc.teleportAsync(face, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.EntityState.RETAIN_PASSENGERS);
+        });
+    }
+
+    private void spawnNpc(Player p, Run r) {
+        r.spawning = true;
+        Location at = guideSpot(p);
+        UUID viewer = p.getUniqueId();
+        Tasks.region.run(at, () -> {
+            Mannequin m = at.getWorld().spawn(at, Mannequin.class, n -> {
+                n.setPersistent(false);
+                n.setVisibleByDefault(false);
+                n.setImmovable(true);
+                n.setAI(false);
+                n.setGravity(false);
+                n.setInvulnerable(true);
+                n.setSilent(true);
+                n.setCollidable(false);
+                n.setCustomNameVisible(false);
+                n.addScoreboardTag("genscore_tutorial");
+                n.setProfile(ResolvableProfile.resolvableProfile()
+                        .skinPatch(patch -> patch.body(net.kyori.adventure.key.Key.key("genscore", "entity/npc/guide"))
+                                .model(org.bukkit.profile.PlayerTextures.SkinModel.CLASSIC))
+                        .build());
+            });
+            TextDisplay bubble = at.getWorld().spawn(at, TextDisplay.class, d -> {
+                d.setPersistent(false);
+                d.setVisibleByDefault(false);
+                d.setBillboard(Display.Billboard.CENTER);
+                d.setLineWidth(190);
+                d.setShadowed(true);
+                d.setBackgroundColor(Color.fromARGB(150, 10, 10, 10));
+                d.setTransformation(new Transformation(new Vector3f(0, 0.55f, 0), new Quaternionf(), new Vector3f(0.9f, 0.9f, 0.9f), new Quaternionf()));
+                d.text(Msg.parse("<green><bold>Guide</bold></green>"));
+                d.addScoreboardTag("genscore_tutorial");
+            });
+            m.addPassenger(bubble);
+            if (runs.get(viewer) != r) {
+                bubble.remove();
+                m.remove();
+                return;
+            }
+            r.npc = m;
+            r.speech = bubble;
+            r.spawning = false;
+            Player v = Bukkit.getPlayer(viewer);
+            if (v != null) {
+                Tasks.entity.run(v, () -> {
+                    v.showEntity(plugin, m);
+                    v.showEntity(plugin, bubble);
+                    startTyper(v, r);
+                });
+            }
+        });
+    }
+
+    private void speak(Run r, String mini) {
+        r.finalText = mini;
+        r.typing = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(Msg.parse(mini));
+        r.typed = 0;
+    }
+
+    private void startTyper(Player p, Run r) {
+        if (r.typer != null) {
+            return;
+        }
+        r.typer = Tasks.entity.timer(p, t -> {
+            if (runs.get(p.getUniqueId()) != r) {
+                t.cancel();
+                return;
+            }
+            TextDisplay bubble = r.speech;
+            String full = r.typing;
+            if (bubble == null || full.isEmpty() || r.typed > full.length()) {
+                return;
+            }
+            int n = Math.min(full.length(), r.typed + 2);
+            boolean done = n >= full.length();
+            r.typed = done ? full.length() + 1 : n;
+            Component shown = done
+                    ? Msg.parse("<green><bold>Guide</bold></green>\n" + r.finalText)
+                    : Msg.parse("<green><bold>Guide</bold></green>\n<white>" + Msg.escape(full.substring(0, n)) + "<gray>▌");
+            Tasks.onEntity(bubble, () -> bubble.text(shown));
+            if (n % 6 == 0 || done) {
+                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.25f, 1.8f);
+            }
+        }, 2, 2);
+    }
+
+    private void removeNpc(Run r) {
+        ScheduledTask t = r.typer;
+        r.typer = null;
+        if (t != null) {
+            t.cancel();
+        }
+        TextDisplay s = r.speech;
+        r.speech = null;
+        if (s != null) {
+            Tasks.onEntity(s, s::remove);
+        }
+        Mannequin m = r.npc;
+        r.npc = null;
+        if (m != null) {
+            Tasks.onEntity(m, m::remove);
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private static long readMillis(String text) {
         String plain = text.replaceAll("<[^>]+>", "");
-        return Math.max(2600, Math.min(7000, plain.length() * 55L));
+        return Math.max(3200, Math.min(10_000, plain.length() * 33L + 2200));
     }
 
     private void bar(Player p, Run r, int index, String text) {
@@ -702,6 +876,7 @@ public final class TutorialModule implements GensModule, Listener {
         Run r = runs.remove(event.getPlayer().getUniqueId());
         if (r != null) {
             removeLabel(r);
+            removeNpc(r);
         }
     }
 }
