@@ -37,6 +37,9 @@ import revxrsal.commands.bukkit.annotation.CommandPermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 /**
  * Player settings (/settings, /tptoggle) and admin preferences (/prefs). Ported from BlockvilleCore's
@@ -64,6 +67,7 @@ public final class SettingsModule implements GensModule, Listener {
     private volatile String joinFormat;
     private volatile String firstJoinFormat;
     private volatile String quitFormat;
+    private final AtomicLong totalJoins = new AtomicLong();
 
     @Override
     public String id() {
@@ -87,6 +91,8 @@ public final class SettingsModule implements GensModule, Listener {
                         + "ignore_velocity INTEGER NOT NULL DEFAULT 0, "
                         + "build_bypass INTEGER NOT NULL DEFAULT 0)");
         players.register(section);
+        countJoins();
+        Tasks.async.timer(t -> countJoins(), 600, 600, TimeUnit.SECONDS);
         plugin.commands().register(this);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         // Forcefield, every 4 ticks as in BlockvilleCore. Each source is handled on its own thread.
@@ -112,13 +118,27 @@ public final class SettingsModule implements GensModule, Listener {
         }
         joinLeaveEnabled = c.getBoolean("enabled", true);
         joinFormat = c.getString("join", "<dark_gray>[<green>+</green>]</dark_gray> <gray>{player}");
-        firstJoinFormat = c.getString("first-join", "<dark_gray>[<gold>\u2605</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC!");
+        firstJoinFormat = c.getString("first-join", "<dark_gray>[<gold>\u2605</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC! <gray>(#{joins})");
         quitFormat = c.getString("quit", "<dark_gray>[<red>-</red>]</dark_gray> <gray>{player}");
     }
 
-    private static Component format(String format, Player player) {
+    private Component format(String format, Player player) {
         MiniMessage mm = MiniMessage.miniMessage();
-        return mm.deserialize(format.replace("{player}", mm.escapeTags(player.getName())));
+        return mm.deserialize(format.replace("{player}", mm.escapeTags(player.getName()))
+                .replace("{joins}", String.format("%,d", totalJoins.get())));
+    }
+
+    private void countJoins() {
+        try {
+            long n = plugin.database().sync(c -> {
+                try (var ps = c.prepareStatement("SELECT COUNT(*) FROM pvp_players"); var rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getLong(1) : 0L;
+                }
+            });
+            totalJoins.set(n);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[settings] could not count players", e);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOW)
@@ -129,6 +149,9 @@ public final class SettingsModule implements GensModule, Listener {
         Player p = event.getPlayer();
         PlayerData data = players.get(p.getUniqueId());
         boolean first = data != null ? data.isFirstTime() : !p.hasPlayedBefore();
+        if (first) {
+            totalJoins.incrementAndGet();
+        }
         event.joinMessage(format(first ? firstJoinFormat : joinFormat, p));
     }
 

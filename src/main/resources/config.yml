@@ -312,7 +312,7 @@ essentials:
 join-leave:
   enabled: true
   join: '<dark_gray>[<green>+</green>]</dark_gray> <gray>{player}'
-  first-join: '<dark_gray>[<gold>★</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC!'
+  first-join: '<dark_gray>[<gold>★</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC! <gray>(#{joins})'
   quit: '<dark_gray>[<red>-</red>]</dark_gray> <gray>{player}'
 
 chat:
