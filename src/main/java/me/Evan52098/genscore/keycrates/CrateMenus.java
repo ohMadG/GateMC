@@ -1,6 +1,8 @@
 package me.Evan52098.genscore.keycrates;
 
 import me.Evan52098.genscore.menu.Menu;
+import me.Evan52098.genscore.shards.ShardsModule;
+import me.Evan52098.genscore.shards.ShardsService;
 import me.Evan52098.genscore.util.Msg;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -28,6 +30,7 @@ final class CrateMenus {
     private static final int PER_PAGE = 45;
 
     private final CrateService service;
+    private final Set<UUID> buying = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     CrateMenus(CrateService service) {
         this.service = service;
@@ -103,6 +106,9 @@ final class CrateMenus {
         List<String> lore = new ArrayList<>();
         lore.add("&7Your keys: " + (keys > 0 ? "&a" : "&c") + keys);
         lore.add("");
+        if (c.creditPrice() > 0) {
+            lore.add("&7Buy a key: &a" + String.format("%,d", c.creditPrice()) + " credits &8(in the preview)");
+        }
         lore.add(me.Evan52098.genscore.menu.Lore.prompt("left-click to preview rewards"));
         if (keys > 0) {
             lore.add(me.Evan52098.genscore.menu.Lore.prompt("right-click to open one"));
@@ -127,6 +133,37 @@ final class CrateMenus {
         } else {
             preview(player, c, 0, true);
         }
+    }
+
+    private void buyKeys(Player player, CrateConfig.Crate crate, int amount, int page, boolean backButton) {
+        CrateConfig.Crate live = service.config().crate(crate.id());
+        ShardsService credits = ShardsModule.service();
+        if (live == null || live.creditPrice() <= 0 || credits == null) {
+            player.sendMessage(Msg.bad("That key can't be bought right now."));
+            return;
+        }
+        if (!buying.add(player.getUniqueId())) {
+            return;
+        }
+        try {
+            long cost = live.creditPrice() * amount;
+            if (!credits.withdraw(player.getUniqueId(), cost, "bought " + amount + "x " + live.id() + " key")) {
+                player.sendMessage(Msg.bad("You need " + Msg.white(String.format("%,d", cost)) + " credits for that."));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 1f);
+                return;
+            }
+            if (!service.giveKeys(player, live.id(), amount, "bought with credits")) {
+                credits.deposit(player.getUniqueId(), cost, "refund: " + live.id() + " key purchase failed");
+                player.sendMessage(Msg.bad("Something went wrong; your credits were refunded."));
+                return;
+            }
+            player.sendMessage(Msg.good("Bought " + Msg.white(amount + "x") + " key" + (amount == 1 ? "" : "s") + " for "
+                    + Msg.white(String.format("%,d", cost)) + " credits: ").append(CrateConfig.text(live.keyName())));
+            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.4f);
+        } finally {
+            buying.remove(player.getUniqueId());
+        }
+        preview(player, live, page, backButton);
     }
 
     // ------------------------------------------------------------------ preview
@@ -164,6 +201,17 @@ final class CrateMenus {
                     e -> service.open(player, live.id(), Integer.MAX_VALUE));
         } else {
             menu.set(base + 4, item(Material.BARRIER, "&cNo keys", List.of("&7You need a " + live.keyName() + "&7.")));
+        }
+        if (live.creditPrice() > 0) {
+            ShardsService credits = ShardsModule.service();
+            long balance = credits == null ? 0 : credits.balance(player.getUniqueId());
+            menu.set(base + 1, item(Material.EMERALD, "&a&lBuy a key", List.of(
+                    "&7Price: &a" + String.format("%,d", live.creditPrice()) + " credits &7each",
+                    "&7Your credits: &f" + String.format("%,d", balance),
+                    "",
+                    me.Evan52098.genscore.menu.Lore.prompt("click to buy 1"),
+                    "&eShift-click &7to buy 5")),
+                    e -> buyKeys(player, live, e.getClick().isShiftClick() ? 5 : 1, page, backButton));
         }
         if (p > 0) {
             menu.set(base + 7, item(Material.PAPER, "&ePrevious page", List.of()), e -> preview(player, live, p - 1, backButton));
