@@ -34,7 +34,10 @@ public final class StaffModule implements GensModule {
                 // v2: snapshots include the ender chest; restores for offline players wait in pvp_inv_pending.
                 "ALTER TABLE pvp_inv_snapshots ADD COLUMN ender TEXT;"
                         + "CREATE INDEX IF NOT EXISTS pvp_inv_snapshots_reason ON pvp_inv_snapshots (uuid, reason, id);"
-                        + "CREATE TABLE IF NOT EXISTS pvp_inv_pending (uuid TEXT PRIMARY KEY, snapshot_id BIGINT NOT NULL)");
+                        + "CREATE TABLE IF NOT EXISTS pvp_inv_pending (uuid TEXT PRIMARY KEY, snapshot_id BIGINT NOT NULL)",
+                "ALTER TABLE pvp_reports ADD COLUMN kind TEXT NOT NULL DEFAULT 'player';"
+                        + "ALTER TABLE pvp_reports ADD COLUMN evidence TEXT;"
+                        + "ALTER TABLE pvp_reports ADD COLUMN outcome TEXT");
 
         vanish = new Vanish(plugin);
         tools = new StaffTools();

@@ -8,6 +8,8 @@ import me.Evan52098.genscore.menu.Menu;
 import me.Evan52098.genscore.module.GensModule;
 import me.Evan52098.genscore.player.PlayerData;
 import me.Evan52098.genscore.player.PlayerDataService;
+import me.Evan52098.genscore.plots.GensPlayer;
+import me.Evan52098.genscore.plots.PlotsModule;
 import me.Evan52098.genscore.scheduler.Tasks;
 import me.Evan52098.genscore.storage.Database;
 import me.Evan52098.genscore.storage.Migrations;
@@ -182,6 +184,24 @@ public final class LeaderboardsModule implements GensModule {
             PlayerData d = players.get(uuid);
             return d == null ? -1 : d.playtimeMs();
         }));
+        register(new Board("rebirths", "Top Rebirths", "Rebirths", Material.NETHER_STAR, (database, limit) -> database.sync(c -> {
+            List<Entry> out = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT g.uuid, p.name, g.rebirths FROM gens_players g LEFT JOIN pvp_players p ON p.uuid = g.uuid "
+                            + "WHERE g.rebirths > 0 ORDER BY g.rebirths DESC LIMIT ?")) {
+                ps.setInt(1, limit + 20);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(new Entry(UUID.fromString(rs.getString(1)), rs.getString(2), rs.getLong(3)));
+                    }
+                }
+            }
+            return out;
+        }), n -> n + (n == 1 ? " rebirth" : " rebirths"), uuid -> {
+            PlotsModule plots = plugin.modules().get(PlotsModule.class);
+            GensPlayer g = plots == null ? null : plots.gensPlayer(uuid);
+            return g == null ? -1 : g.rebirths();
+        }));
         if (plugin.modules().get(VoteModule.class) != null) {
             register(votesBoard("votes", "Top Voters", "Votes", Material.PAPER, "total_votes", VoteStats::totalVotes));
             register(votesBoard("vote-streak", "Best Voting Streaks", "Best streak", Material.BLAZE_POWDER, "best_streak", VoteStats::bestStreak));
@@ -330,7 +350,7 @@ public final class LeaderboardsModule implements GensModule {
         openBoard(player, board);
     }
 
-    List<String> boardIds() {
+    public List<String> boardIds() {
         List<String> ids = new ArrayList<>();
         for (Board b : boardsSnapshot()) {
             ids.add(b.id());

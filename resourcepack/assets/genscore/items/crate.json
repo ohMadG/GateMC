@@ -1,0 +1,83 @@
+{
+ "model": {
+  "type": "minecraft:select",
+  "property": "minecraft:custom_model_data",
+  "index": 0,
+  "cases": [
+   {
+    "when": "vote_base",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/vote_base"
+    }
+   },
+   {
+    "when": "vote_lid",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/vote_lid"
+    }
+   },
+   {
+    "when": "amethyst_base",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/amethyst_base"
+    }
+   },
+   {
+    "when": "amethyst_lid",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/amethyst_lid"
+    }
+   },
+   {
+    "when": "cosmetic_base",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/cosmetic_base"
+    }
+   },
+   {
+    "when": "cosmetic_lid",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/cosmetic_lid"
+    }
+   },
+   {
+    "when": "op_base",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/op_base"
+    }
+   },
+   {
+    "when": "op_lid",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/op_lid"
+    }
+   },
+   {
+    "when": "santa_base",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/santa_base"
+    }
+   },
+   {
+    "when": "santa_lid",
+    "model": {
+     "type": "minecraft:model",
+     "model": "genscore:crates/santa_lid"
+    }
+   }
+  ],
+  "fallback": {
+   "type": "minecraft:model",
+   "model": "minecraft:item/barrier"
+  }
+ }
+}

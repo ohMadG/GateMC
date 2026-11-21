@@ -23,7 +23,7 @@ record SusSettings(
     static SusSettings read(ConfigurationSection root) {
         ConfigurationSection c = root != null ? root : new MemoryConfiguration();
         return new SusSettings(
-                c.getString("prefix", "<red><bold>SUS</bold> <dark_gray>» "),
+                c.getString("prefix", "<gold><bold>SUS</bold></gold> <dark_gray>»</dark_gray> "),
                 Math.max(0, c.getLong("alert-cooldown-seconds", 60)) * 1000L,
                 Math.max(500, c.getLong("hold-millis", 2000)),
                 c.getBoolean("checks.autoclicker", true),

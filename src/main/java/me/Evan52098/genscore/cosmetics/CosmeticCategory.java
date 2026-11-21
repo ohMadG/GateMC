@@ -10,13 +10,13 @@ import java.util.Locale;
  * database, in permissions ({@code genscore.cosmetics.<key>.<id>}) and in admin commands.
  */
 public enum CosmeticCategory {
-    KILL_EFFECT("kill-effects", "Kill Effects", Material.REDSTONE, "Particles and sounds where your victim falls."),
-    EXPLOSIVE_KILL("explosive-kills", "Explosive Kills", Material.TNT, "A harmless blast where your victim falls."),
     JOIN_MESSAGE("join-messages", "Join Messages", Material.OAK_DOOR, "How the server announces you."),
     LEAVE_MESSAGE("leave-messages", "Leave Messages", Material.IRON_DOOR, "How the server says goodbye."),
-    NAME_COLOR("name-colors", "Name Colours", Material.NAME_TAG, "The colour of your name in chat."),
-    TRAIL("trails", "Trails", Material.BLAZE_POWDER, "Particles behind you as you walk."),
-    TOOL_SKIN("tool-skins", "Tool Skins", Material.DIAMOND_PICKAXE, "A new look for your tools (others see it).");
+    CHAT_TAG("chat-tags", "Chat Tags", Material.OAK_SIGN, "A tag in front of your name in chat."),
+    NAME_COLOR("name-colors", "Name Paints", Material.NAME_TAG, "Your name, animated in chat and the tab list."),
+    CHAT_COLOR("chat-colors", "Chat Colors", Material.CYAN_DYE, "Your chat messages in a new colour."),
+    AURA("auras", "Auras", Material.BEACON, "A helix of particles around you."),
+    GLOW("glows", "Glows", Material.GLOW_INK_SAC, "A glowing outline around you.");
 
     private final String key;
     private final String title;

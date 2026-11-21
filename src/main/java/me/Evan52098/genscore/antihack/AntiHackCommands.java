@@ -22,7 +22,7 @@ import java.util.Locale;
 /** BlockvilleCore's AntiHackCommand: /antihack [check|log|alerts|reload|on|off|strict|setback|kick]. */
 public final class AntiHackCommands {
 
-    private static final String PREFIX = "&c&lAntiHack &8» &7";
+    private static final String PREFIX = "&6&lANTIHACK &8» &7";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("MMM d HH:mm:ss").withZone(ZoneId.systemDefault());
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
 

@@ -276,7 +276,7 @@ public final class PlotService {
                         ps.executeUpdate();
                     }
                 }))
-                .thenCompose(v -> builder.paste(world, slot))
+                .thenCompose(v -> builder.paste(world, slot, owner))
                 .whenComplete((v, error) -> {
                     if (error != null) {
                         log.log(Level.SEVERE, "Could not build plot slot " + slot + " for " + owner, error);
@@ -310,6 +310,11 @@ public final class PlotService {
         plot.setPendingRemoval(Tasks.async.later(() -> remove(plot, token), delay, TimeUnit.SECONDS));
     }
 
+    public CompletableFuture<Void> removeNow(UUID owner) {
+        Plot plot = plots.get(owner);
+        return plot == null ? CompletableFuture.completedFuture(null) : remove(plot, plot.removalToken());
+    }
+
     /** Removes the plot now if {@code token} is still current. Completes when the slot is free again. */
     CompletableFuture<Void> remove(Plot plot, long token) {
         if (!plot.beginRemoval(token)) {
@@ -320,6 +325,43 @@ public final class PlotService {
         return teardown(plot.slot());
     }
 
+    public int perPlatform() {
+        return grid.perPlatform();
+    }
+
+    public int[] playersPerPlatform() {
+        int max = 1;
+        for (Plot p : plots.values()) {
+            max = Math.max(max, grid.platformOf(p.slot()) + 1);
+        }
+        int[] out = new int[max];
+        for (Plot p : plots.values()) {
+            out[grid.platformOf(p.slot())]++;
+        }
+        return out;
+    }
+
+    public int platformOf(UUID owner) {
+        Plot p = plotOf(owner);
+        return p == null ? -1 : grid.platformOf(p.slot());
+    }
+
+    public org.bukkit.Location platformHub(int platform) {
+        return builder.hubSpawn(world, platform);
+    }
+
+    public void propsUnlocked(UUID owner, int fromExclusive, int toInclusive) {
+        Plot plot = plotOf(owner);
+        if (plot != null) {
+            builder.addProps(world, plot.slot(), owner, fromExclusive, toInclusive);
+        }
+    }
+
+    public CompletableFuture<Boolean> rebuildFor(UUID owner) {
+        Plot plot = plotOf(owner);
+        return plot == null ? CompletableFuture.completedFuture(false) : rebuild(plot);
+    }
+
     /** Admin reset: clears the plot and builds it again from the current template on the same slot. */
     CompletableFuture<Boolean> rebuild(Plot plot) {
         if (!plot.beginRebuild()) {
@@ -327,7 +369,7 @@ public final class PlotService {
         }
         fire(plot, false);
         return builder.clear(world, plot.slot())
-                .thenCompose(v -> builder.paste(world, plot.slot()))
+                .thenCompose(v -> builder.paste(world, plot.slot(), plot.owner()))
                 .handle((v, error) -> {
                     if (error != null) {
                         log.log(Level.SEVERE, "Rebuild of plot slot " + plot.slot() + " failed", error);

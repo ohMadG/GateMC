@@ -18,7 +18,7 @@ import java.util.Objects;
  * <ul>
  *   <li>ranks (E): badge, badge_text, rank, tag, tag_id</li>
  *   <li>shards (F): shards, shards_formatted (online players only)</li>
- *   <li>cosmetics (N): killrank, kills, namecolor, colored_name</li>
+ *   <li>cosmetics (N): glow, chat_tag, namecolor, colored_name</li>
  * </ul>
  */
 public final class GensCorePlaceholders extends PlaceholderExpansion {
@@ -39,19 +39,19 @@ public final class GensCorePlaceholders extends PlaceholderExpansion {
         String id = params.toLowerCase(Locale.ROOT);
         Player online = player.getPlayer();
         switch (id) {
-            case "shards", "shards_formatted" -> {
+            case "shards", "shards_formatted", "credits", "credits_formatted" -> {
                 var s = ShardsModule.service();
                 if (s == null || online == null) {
                     return "0";
                 }
                 long n = s.balance(player.getUniqueId());
-                return id.equals("shards") ? Long.toString(n) : String.format("%,d", n);
+                return id.equals("shards") || id.equals("credits") ? Long.toString(n) : String.format("%,d", n);
             }
-            case "killrank" -> {
-                return CosmeticsModule.killRank(player.getUniqueId());
+            case "glow" -> {
+                return CosmeticsModule.glowCode(player.getUniqueId(), "&7");
             }
-            case "kills" -> {
-                return String.valueOf(Math.max(0, CosmeticsModule.kills(player.getUniqueId())));
+            case "chat_tag" -> {
+                return CosmeticsModule.chatTag(player.getUniqueId());
             }
             case "namecolor" -> {
                 return CosmeticsModule.nameColor(player.getUniqueId());
@@ -59,7 +59,23 @@ public final class GensCorePlaceholders extends PlaceholderExpansion {
             case "colored_name" -> {
                 return player.getName() == null ? "" : CosmeticsModule.coloredNameLegacy(player.getUniqueId(), player.getName());
             }
+            case "power" -> {
+                String name = me.Evan52098.genscore.powers.PowersModule.activePowerName(player.getUniqueId());
+                return name == null || name.isEmpty() ? "&7None" : name.replace("&l", "");
+            }
             default -> {
+                String staff = me.Evan52098.genscore.staffmode.StaffModeModule.placeholder(online, id);
+                if (staff != null) {
+                    return staff;
+                }
+                String hub = me.Evan52098.genscore.hub.HubModule.placeholder(player.getUniqueId(), id);
+                if (hub != null) {
+                    return hub;
+                }
+                String gens = me.Evan52098.genscore.factory.FactoryModule.placeholder(player.getUniqueId(), id);
+                if (gens != null) {
+                    return gens;
+                }
                 return RanksModule.placeholder(online, params); // badge, badge_text, rank, tag, tag_id
             }
         }

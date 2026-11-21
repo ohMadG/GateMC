@@ -25,6 +25,15 @@ public final class PlotData {
     private int armorLevel;
     private int turretLevel;
     private int trapLevel;
+    private int machines;
+
+    public synchronized int machines() {
+        return machines;
+    }
+
+    public synchronized void setMachines(int machines) {
+        this.machines = Math.max(0, machines);
+    }
 
     /** Belt armour: each level adds health to every belt segment, so raids take longer. */
     public synchronized int armorLevel() {
@@ -113,10 +122,11 @@ public final class PlotData {
         armorLevel = 0;
         turretLevel = 0;
         trapLevel = 0;
+        machines = 0;
     }
 
     private synchronized Object[] snapshot() {
-        return new Object[]{beltLength, lockLevel, shieldUntil, speedLevel, genLevel, armorLevel, turretLevel, trapLevel};
+        return new Object[]{beltLength, lockLevel, shieldUntil, speedLevel, genLevel, armorLevel, turretLevel, trapLevel, machines};
     }
 
     /** The player-data section for {@code gens_plots}. */
@@ -130,7 +140,7 @@ public final class PlotData {
             @Override
             public PlotData load(Connection c, UUID player) throws SQLException {
                 try (PreparedStatement ps = c.prepareStatement(
-                        "SELECT belt_length, lock_level, shield_until, speed_level, gen_level, armor_level, turret_level, trap_level FROM gens_plots WHERE uuid = ?")) {
+                        "SELECT belt_length, lock_level, shield_until, speed_level, gen_level, armor_level, turret_level, trap_level, machines FROM gens_plots WHERE uuid = ?")) {
                     ps.setString(1, player.toString());
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
@@ -138,6 +148,7 @@ public final class PlotData {
                             d.armorLevel = rs.getInt(6);
                             d.turretLevel = rs.getInt(7);
                             d.trapLevel = rs.getInt(8);
+                            d.machines = rs.getInt(9);
                             return d;
                         }
                     }
@@ -150,12 +161,12 @@ public final class PlotData {
                 Object[] s = data.snapshot();
                 try (PreparedStatement ps = c.prepareStatement(
                         "INSERT INTO gens_plots (uuid, belt_length, lock_level, shield_until, speed_level, gen_level, armor_level, turret_level, "
-                                + "trap_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                                + "trap_level, machines) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                                 + "ON CONFLICT (uuid) DO UPDATE SET belt_length = excluded.belt_length, "
                                 + "lock_level = excluded.lock_level, shield_until = excluded.shield_until, "
                                 + "speed_level = excluded.speed_level, gen_level = excluded.gen_level, "
                                 + "armor_level = excluded.armor_level, turret_level = excluded.turret_level, "
-                                + "trap_level = excluded.trap_level")) {
+                                + "trap_level = excluded.trap_level, machines = excluded.machines")) {
                     ps.setString(1, player.toString());
                     ps.setInt(2, (Integer) s[0]);
                     ps.setInt(3, (Integer) s[1]);
@@ -165,6 +176,7 @@ public final class PlotData {
                     ps.setInt(7, (Integer) s[5]);
                     ps.setInt(8, (Integer) s[6]);
                     ps.setInt(9, (Integer) s[7]);
+                    ps.setInt(10, (Integer) s[8]);
                     ps.executeUpdate();
                 }
             }

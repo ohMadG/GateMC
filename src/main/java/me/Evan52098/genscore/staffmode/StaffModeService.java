@@ -63,6 +63,19 @@ final class StaffModeService {
     private final Map<UUID, Saved> sessions = new ConcurrentHashMap<>();
     private final Set<UUID> busy = ConcurrentHashMap.newKeySet();
 
+    private java.util.function.Function<Player, String> blocker = p -> null;
+    private java.util.function.Consumer<Player> afterEnter = p -> {
+    };
+    private java.util.function.Consumer<Player> afterLeave = p -> {
+    };
+
+    void hooks(java.util.function.Function<Player, String> blocker, java.util.function.Consumer<Player> afterEnter,
+               java.util.function.Consumer<Player> afterLeave) {
+        this.blocker = blocker;
+        this.afterEnter = afterEnter;
+        this.afterLeave = afterLeave;
+    }
+
     StaffModeService(Plugin plugin, Database db, Logger log, VanishBridge vanish, DebugInfo debug) {
         this.plugin = plugin;
         this.db = db;
@@ -106,6 +119,11 @@ final class StaffModeService {
             if (then != null) {
                 then.run();
             }
+            return;
+        }
+        String why = blocker.apply(player);
+        if (why != null) {
+            player.sendMessage(Msg.bad("You can't enter staff mode right now. " + why));
             return;
         }
         if (!busy.add(id)) { // checklist 3: one enter or leave at a time
@@ -168,11 +186,13 @@ final class StaffModeService {
             player.setFlying(true);
             player.setFallDistance(0);
             vanish.set(player, true);
+            refreshVanishTool(player);
             if (!player.hasPermission(BYPASS)) {
                 debug.apply(player, true);
             }
             player.sendMessage(Msg.good("Staff mode enabled. You are vanished. Your inventory is saved."));
             log.info("[staffmode] " + player.getName() + " entered staff mode");
+            afterEnter.accept(player);
         } finally {
             busy.remove(id);
         }
@@ -192,6 +212,9 @@ final class StaffModeService {
         }
         restore(player, saved, quitting);
         player.sendMessage(Msg.good("Staff mode disabled. Your inventory is back."));
+        if (!quitting) {
+            afterLeave.accept(player);
+        }
         log.info("[staffmode] " + player.getName() + " left staff mode" + (quitting ? " (logged out)" : ""));
         return true;
     }
@@ -334,12 +357,27 @@ final class StaffModeService {
 
     private void giveHotbar(Player player) {
         PlayerInventory inv = player.getInventory();
-        inv.setItem(0, tool("random", Material.COMPASS, "Random teleport", "Teleport to a random player."));
-        inv.setItem(1, tool("freeze", Material.PACKED_ICE, "Freeze", "Right-click a player to freeze or unfreeze them."));
-        inv.setItem(2, tool("invsee", Material.CHEST, "Inventory", "Right-click a player to see their inventory."));
-        inv.setItem(4, tool("inspect", Material.BOOK, "Inspect", "Right-click a player to see their details."));
-        inv.setItem(8, tool("vanish", Material.LIME_DYE, "Vanish", "Toggle vanish."));
+        inv.setItem(0, tool("players", Material.NETHER_STAR, "Staff Menu",
+                "Right-click to see every online player. Right-click a player to open their profile."));
+        inv.setItem(8, vanishTool(vanish.isVanished(player)));
         inv.setHeldItemSlot(0);
+    }
+
+    private ItemStack vanishTool(boolean vanished) {
+        return vanished
+                ? tool("vanish", Material.LIME_DYE, "Vanished", "You are hidden. Click to become visible.")
+                : tool("vanish", Material.GRAY_DYE, "Visible", "Players can see you. Click to vanish.");
+    }
+
+    void refreshVanishTool(Player player) {
+        if (!inStaffMode(player.getUniqueId())) {
+            return;
+        }
+        PlayerInventory inv = player.getInventory();
+        String id = toolOf(inv.getItem(8));
+        if (id == null || id.equals("vanish")) {
+            inv.setItem(8, vanishTool(vanish.isVanished(player)));
+        }
     }
 
     private ItemStack tool(String id, Material material, String name, String description) {

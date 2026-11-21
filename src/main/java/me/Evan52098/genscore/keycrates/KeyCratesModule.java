@@ -56,6 +56,7 @@ public final class KeyCratesModule implements GensModule, Listener {
         CrateMenus menus = new CrateMenus(service);
         service.menus(menus);
         blocks = new CrateBlocks(service, menus, plugin.getLogger());
+        service.blocks(blocks);
         blocks.start(plugin);
         CrateSuggestions.service = service;
 

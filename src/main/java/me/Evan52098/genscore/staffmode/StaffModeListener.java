@@ -56,6 +56,22 @@ final class StaffModeListener implements Listener {
     private final @Nullable SusModule sus;
     private final Cooldowns clickCooldown = new Cooldowns();
 
+    private StaffMenus menus;
+
+    StaffModeListener menus(StaffMenus menus) {
+        this.menus = menus.random(this::randomTeleport);
+        return this;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onVanishCommand(org.bukkit.event.player.PlayerCommandPreprocessEvent event) {
+        String cmd = event.getMessage().toLowerCase(java.util.Locale.ROOT);
+        if (cmd.equals("/v") || cmd.startsWith("/v ") || cmd.startsWith("/vanish")) {
+            Player p = event.getPlayer();
+            Tasks.entity.later(p, () -> service.refreshVanishTool(p), 2);
+        }
+    }
+
     StaffModeListener(StaffModeService service, @Nullable StaffTools tools, @Nullable SusModule sus) {
         this.service = service;
         this.tools = tools;
@@ -182,6 +198,9 @@ final class StaffModeListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof me.Evan52098.genscore.menu.Menu) {
+            return;
+        }
         if (event.getWhoClicked() instanceof Player p) {
             cancelIf(p, event); // look only: nothing can move into or out of the staff inventory
         }
@@ -271,7 +290,9 @@ final class StaffModeListener implements Listener {
                 p.sendMessage(service.vanish().set(p, now)
                         ? Msg.good(now ? "You are now vanished." : "You are now visible.")
                         : Msg.bad("Vanish is not available."));
+                service.refreshVanishTool(p);
             }
+            case "players" -> menus.players(p, 0);
             default -> p.sendMessage(Msg.neutral("Right-click a player with this."));
         }
     }
@@ -303,13 +324,13 @@ final class StaffModeListener implements Listener {
                 }
             }
             case "invsee" -> p.performCommand("invsee " + target.getName());
-            case "inspect" -> inspect(p, target);
+            case "inspect", "players" -> menus.profile(p, target.getUniqueId(), 0);
             default -> {
             }
         }
     }
 
-    private void randomTeleport(Player staff) {
+    void randomTeleport(Player staff) {
         List<Player> candidates = new ArrayList<>();
         for (Player other : Bukkit.getOnlinePlayers()) {
             if (!other.equals(staff) && !service.inStaffMode(other.getUniqueId()) && !service.vanish().isVanished(other)) {

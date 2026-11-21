@@ -67,6 +67,13 @@ final class CrateService {
         this.logger = plugin.getLogger();
     }
 
+    private volatile CrateBlocks blocks;
+    private final java.util.Map<UUID, CrateBlocks.Pos> origin = new java.util.concurrent.ConcurrentHashMap<>();
+
+    void blocks(CrateBlocks blocks) {
+        this.blocks = blocks;
+    }
+
     void menus(CrateMenus menus) {
         this.menus = menus;
     }
@@ -97,6 +104,15 @@ final class CrateService {
 
     /** Opens up to {@code requested} keys of a crate. On the player's thread. */
     void open(Player player, String crateId, int requested) {
+        open(player, crateId, requested, null);
+    }
+
+    void open(Player player, String crateId, int requested, @Nullable CrateBlocks.Pos at) {
+        if (at == null) {
+            origin.remove(player.getUniqueId());
+        } else if (!busy.contains(player.getUniqueId())) {
+            origin.put(player.getUniqueId(), at);
+        }
         CrateConfig cfg = config;
         CrateConfig.Crate crate = cfg.crate(crateId);
         if (crate == null) {
@@ -171,6 +187,13 @@ final class CrateService {
             return;
         }
         CrateConfig.Reward shown = rows.size() == 1 ? crate.reward(rows.get(0).reward()) : null;
+        CrateBlocks.Pos at = origin.remove(uuid);
+        CrateBlocks b = blocks;
+        if (shown != null && config.animation && config.worldAnimation && at != null && b != null
+                && b.play(at, player, crate, shown, shown.chance() <= config.broadcastUnder, () -> deliver(player, rows, announce), () -> busy.remove(uuid))) {
+            player.closeInventory();
+            return;
+        }
         if (shown != null && config.animation && menus != null) {
             menus.animate(player, crate, shown, () -> deliver(player, rows, announce), () -> busy.remove(uuid));
         } else {
@@ -241,11 +264,11 @@ final class CrateService {
         CrateConfig cfg = config;
         if (total == 1) {
             CrateConfig.Reward r = wins.keySet().iterator().next();
-            player.sendMessage(CrateConfig.text("&5&lCRATES &8» &7You won " + r.name() + " &7from the " + crate.name()
+            player.sendMessage(CrateConfig.text("&6&lCRATES &8» &7You won " + r.name() + " &7from the " + crate.name()
                     + "&7! " + cfg.rarity(r.chance())));
             return;
         }
-        player.sendMessage(CrateConfig.text("&5&lCRATES &8» &7You opened &f" + total + "x " + crate.name() + "&7:"));
+        player.sendMessage(CrateConfig.text("&6&lCRATES &8» &7You opened &f" + total + "x " + crate.name() + "&7:"));
         int lines = 0;
         for (Map.Entry<CrateConfig.Reward, Integer> w : wins.entrySet()) {
             if (++lines > 15) {
@@ -725,7 +748,7 @@ final class CrateService {
             later(online, () -> {
                 CrateConfig.Crate crate = config.crate(crateId);
                 if (giveKeys(online, crateId, 1, "playtime") && crate != null) {
-                    online.sendMessage(CrateConfig.text("&5&lCRATES &8» &7+1 " + crate.keyName() + " &7for " + cfg.playtimeMinutes + " minutes of playtime!"));
+                    online.sendMessage(CrateConfig.text("&6&lCRATES &8» &7+1 " + crate.keyName() + " &7for " + cfg.playtimeMinutes + " minutes of playtime!"));
                     online.playSound(online.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
                 }
             }, () -> refundToClaims(uuid, crateId, 1, "playtime (left before delivery)"), 1);

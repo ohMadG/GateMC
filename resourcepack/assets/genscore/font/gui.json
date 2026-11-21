@@ -1,0 +1,65 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        "\ue000": -8,
+        "\ue001": -169
+      }
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_1.png",
+      "ascent": 13,
+      "height": 132,
+      "chars": [
+        "\ue101"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_2.png",
+      "ascent": 13,
+      "height": 150,
+      "chars": [
+        "\ue102"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_3.png",
+      "ascent": 13,
+      "height": 168,
+      "chars": [
+        "\ue103"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_4.png",
+      "ascent": 13,
+      "height": 186,
+      "chars": [
+        "\ue104"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_5.png",
+      "ascent": 13,
+      "height": 204,
+      "chars": [
+        "\ue105"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "genscore:gui/menu_6.png",
+      "ascent": 13,
+      "height": 222,
+      "chars": [
+        "\ue106"
+      ]
+    }
+  ]
+}

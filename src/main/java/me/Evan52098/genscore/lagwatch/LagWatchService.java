@@ -108,7 +108,7 @@ public final class LagWatchService implements Listener {
     public static final String ALERT_PERMISSION = "genscore.antihack.alert";
     public static final String ADMIN_PERMISSION = "genscore.antihack.admin";
 
-    private static final String PREFIX = "&6&lLagWatch &8» ";
+    private static final String PREFIX = "&6&lLAGWATCH &8» ";
     private static final long WINDOW_TICKS = 200L;
     private static final long COUNT_TICKS = 600L;
     private static final long SCAN_TIMEOUT_SECONDS = 15;

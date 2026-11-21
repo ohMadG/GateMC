@@ -182,6 +182,7 @@ public final class InvHistory implements Listener {
 
     /** Queued restores read (and taken out of the table) at pre-login, applied in the join tick. */
     private final java.util.Map<UUID, Snapshot> queuedRestores = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<Long> clearing = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPreLogin(org.bukkit.event.player.AsyncPlayerPreLoginEvent event) {
@@ -202,7 +203,7 @@ public final class InvHistory implements Listener {
                 }
                 return snapshotId == null ? null : read(c, snapshotId);
             });
-            if (snap != null) {
+            if (snap != null && !clearing.contains(snap.id())) {
                 queuedRestores.put(id, snap);
             }
         } catch (SQLException e) {
@@ -223,13 +224,14 @@ public final class InvHistory implements Listener {
         apply(player, queued);
         me.Evan52098.genscore.util.PlayerFiles.save(player);
         UUID id = player.getUniqueId();
+        clearing.add(queued.id());
         db.asyncRun(c -> {
             try (PreparedStatement ps = c.prepareStatement("DELETE FROM pvp_inv_pending WHERE uuid = ? AND snapshot_id = ?")) {
                 ps.setString(1, id.toString());
                 ps.setLong(2, queued.id());
                 ps.executeUpdate();
             }
-        }).exceptionally(e -> {
+        }).thenRun(() -> clearing.remove(queued.id())).exceptionally(e -> {
             logger.log(Level.SEVERE, "Restored a queued inventory for " + player.getName() + " but could not clear the queue row; it would apply again on their next join", e);
             return null;
         });
@@ -286,7 +288,7 @@ public final class InvHistory implements Listener {
         int end = Math.min(start + PAGE_SIZE, rows.size());
         String title = "<gray>" + Msg.escape(targetName) + "'s Inventory History</gray>"
                 + (totalPages > 1 ? " <dark_gray>" + (clamped + 1) + "/" + totalPages : "");
-        Menu menu = new Menu(4, Msg.parse(title));
+        Menu menu = new Menu(4, Msg.parse(title)).plain();
 
         if (rows.isEmpty()) {
             menu.set(4, 1, Lore.item(Material.BARRIER, Lore.Accent.GREEN.code() + "&lNo Snapshots Yet",
@@ -338,7 +340,7 @@ public final class InvHistory implements Listener {
     private void showPreview(Player staff, String targetName, Snapshot snap, View view, int page) {
         ItemStack[] items = snap.inventory();
         ItemStack[] ender = snap.ender();
-        Menu menu = new Menu(6, Msg.parse("<gray>" + Msg.escape(targetName) + " - " + view.label + "</gray>"));
+        Menu menu = new Menu(6, Msg.parse("<gray>" + Msg.escape(targetName) + " - " + view.label + "</gray>")).plain();
         switch (view) {
             case INVENTORY -> {
                 for (int i = 9; i < 36; i++) {

@@ -62,6 +62,11 @@ public final class PlotCommands {
     @Description("Go to your plot")
     public void plot(BukkitCommandActor actor) {
         Player player = actor.requirePlayer();
+        me.Evan52098.genscore.staffmode.StaffModeModule staffMode = module.plugin().modules().get(me.Evan52098.genscore.staffmode.StaffModeModule.class);
+        if (staffMode != null && staffMode.inStaffMode(player.getUniqueId())) {
+            player.sendMessage(Msg.bad("Your factory is offline in staff mode. Leave staff mode with " + Msg.white("/staffmode") + " first."));
+            return;
+        }
         Plot plot = service().plotOf(player.getUniqueId());
         if (plot == null) {
             // Built on join; if that failed, try again now.

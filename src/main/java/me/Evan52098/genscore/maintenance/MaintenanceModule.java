@@ -19,17 +19,15 @@ import revxrsal.commands.bukkit.annotation.CommandPermission;
 import java.util.Locale;
 
 /**
- * Server housekeeping from HxCore's {@code maintenance} section and its small fixes: clear-lag ({@link ClearLag}),
+ * Server housekeeping from HxCore's {@code maintenance} section and its small fixes:
  * the daily restart and /reboot ({@link DailyRestart}), the per-chunk mob cap ({@link MobCap}) and the Bedrock
  * fly-kick fix ({@link BedrockFlyFix}).
  */
 public final class MaintenanceModule implements GensModule {
 
     public static final String REBOOT = "genscore.reboot";
-    public static final String CLEARLAG = "genscore.clearlag";
 
     private GensCore plugin;
-    private final ClearLag clearLag = new ClearLag();
     private final MobCap mobCap = new MobCap();
     private DailyRestart restart;
 
@@ -43,9 +41,7 @@ public final class MaintenanceModule implements GensModule {
         this.plugin = plugin;
         restart = new DailyRestart(plugin.getLogger());
         reload();
-        Bukkit.getPluginManager().registerEvents(clearLag, plugin);
         Bukkit.getPluginManager().registerEvents(mobCap, plugin);
-        clearLag.start();
         restart.start();
         plugin.commands().register(this);
         // On the first tick, after every plugin (Floodgate too) has enabled.
@@ -73,7 +69,6 @@ public final class MaintenanceModule implements GensModule {
     @Override
     public void reload() {
         ConfigurationSection c = section();
-        clearLag.load(sub(c, "clear-drops"));
         restart.load(sub(c, "reboot"));
         mobCap.load(sub(c, "mob-cap"));
     }
@@ -113,13 +108,5 @@ public final class MaintenanceModule implements GensModule {
         }
         restart.rebootIn(seconds);
         plugin.getLogger().info("[maintenance] restart in " + seconds + "s started by " + actor.name());
-    }
-
-    @Command("clearlag")
-    @CommandPermission(CLEARLAG)
-    @Description("Clear old ground items, XP orbs and stuck arrows now")
-    public void clearNow(BukkitCommandActor actor) {
-        actor.reply(Msg.neutral("Clearing " + Msg.white(String.valueOf(clearLag.trackedCount())) + " tracked items, orbs and arrows (old ones only)."));
-        clearLag.sweepNow();
     }
 }

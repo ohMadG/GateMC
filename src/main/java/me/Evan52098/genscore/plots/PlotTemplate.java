@@ -79,6 +79,28 @@ final class PlotTemplate {
         }
     }
 
+    List<TemplateBlock> turned(List<TemplateBlock> in, StructureRotation rotation) {
+        if (rotation == StructureRotation.NONE) {
+            return in;
+        }
+        List<TemplateBlock> out = new ArrayList<>(in.size());
+        for (TemplateBlock b : in) {
+            int[] xz = turn(b.x(), b.z(), rotation);
+            BlockData data = b.data().clone();
+            data.rotate(rotation);
+            out.add(new TemplateBlock(xz[0], b.y(), xz[1], data));
+        }
+        return out;
+    }
+
+    boolean builtIn() {
+        return "built-in fortress".equals(source);
+    }
+
+    int footprint() {
+        return footprint;
+    }
+
     /** Marker positions by name, relative to the lot's lowest corner and turned for the lot. Empty if none. */
     List<BlockVector> marker(String name, StructureRotation rotation) {
         List<BlockVector> out = new ArrayList<>();
@@ -233,6 +255,8 @@ final class PlotTemplate {
         BlockData light = Material.SEA_LANTERN.createBlockData();
         BlockData slab = Bukkit.createBlockData("minecraft:smooth_stone_slab[type=bottom]");
         BlockData pad = Material.POLISHED_DIORITE.createBlockData();
+        BlockData accentGlass = Material.ORANGE_STAINED_GLASS.createBlockData();
+        BlockData accentBand = Material.ORANGE_TERRACOTTA.createBlockData();
         int gateHalf = size >= 15 ? 3 : 1;
         int gateLo = size / 2 - gateHalf;
         int gateHi = size / 2 + gateHalf;
@@ -254,7 +278,9 @@ final class PlotTemplate {
                     if (front && p[0] >= gateLo && p[0] <= gateHi && y <= gateTop) {
                         continue;
                     }
-                    put.accept(new int[]{p[0], y, p[1]}, y == 1 ? wallBase : y == wallTop ? cap : wall);
+                    boolean window = !front && (y == 2 || y == 3) && i % 5 == 2 && i > 3 && i < s - 3;
+                    BlockData block = y == 1 ? wallBase : y == wallTop ? cap : window ? accentGlass : y == 4 ? accentBand : wall;
+                    put.accept(new int[]{p[0], y, p[1]}, block);
                 }
                 if (i % 2 == 0) {
                     put.accept(new int[]{p[0], wallTop + 1, p[1]}, battlement);
@@ -266,7 +292,7 @@ final class PlotTemplate {
             for (int dx = 0; dx < 3; dx++) {
                 for (int dz = 0; dz < 3; dz++) {
                     for (int y = 1; y <= wallTop + 2; y++) {
-                        put.accept(new int[]{c[0] + dx, y, c[1] + dz}, tower);
+                        put.accept(new int[]{c[0] + dx, y, c[1] + dz}, y == wallTop + 1 ? accentBand : tower);
                     }
                     if ((dx + dz) % 2 == 0 && !(dx == 1 && dz == 1)) {
                         put.accept(new int[]{c[0] + dx, wallTop + 3, c[1] + dz}, battlement);

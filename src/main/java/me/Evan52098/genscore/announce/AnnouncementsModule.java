@@ -132,4 +132,10 @@ public final class AnnouncementsModule implements GensModule {
             task.cancel();
         }
     }
+
+    public java.util.List<String> announcementIds() {
+        synchronized (messages) {
+            return java.util.List.copyOf(messages.keySet());
+        }
+    }
 }

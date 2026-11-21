@@ -1,0 +1,312 @@
+# The /store menu. Java players with the resource pack get the store screen (tabs, 3 cards per page, cart rewards,
+# cart, checkout); everyone else (and Bedrock) gets a plain chest menu with the same cart. /storelink still sends the
+# plain store link. Reload with /gensadmin reload.
+#
+# Checkout: with a Tebex Headless public token, Checkout builds a Tebex basket for the player and sends a pay link in
+# chat. Without one (or while an item in the cart has package: 0) it lists the cart and links store.url.
+#
+# art: a vanilla texture from modules/store/art.txt (item/... or block/...), drawn big on the card, small in the cart.
+# highlights: up to 9 lines. "* text" is a main line with a bullet, "- text" a smaller sub line. &-colours work.
+#   Main lines fit about 20 letters, sub lines about 18.
+# contents: up to 5 "what's inside" icons (art + name shown in the View screen).
+# price is only what the menu shows; Tebex charges its own package price.
+# max: how many of one product fit in the cart.
+#
+# cart-rewards are only shown in the menu (up to 2 tiers). Deliver them yourself, e.g. with a Tebex sale or a
+# package command, before advertising them.
+
+title: 'Store'
+
+checkout:
+  headless-token: ''
+  complete-url: ''
+
+cart-rewards:
+  - { at: 35, name: '500 Bonus Credits', art: item/emerald, color: '#55E36B' }
+  - { at: 75, name: '&6[GATE] &fTag', art: item/name_tag, color: '#FFB020' }
+
+categories:
+  bundles:
+    name: 'Bundles'
+    label: 'BUNDLES'
+    color: '#E03A3A'
+    art: item/bundle
+    icon: CHEST
+    products:
+      tycoon:
+        name: 'Foundry Bundle'
+        price: 24.99
+        color: '#B3341F'
+        title-color: '#FFC83D'
+        badge: { text: 'Best Value', color: '#E0A800' }
+        art: block/gold_block
+        icon: { material: GOLD_BLOCK, glint: true }
+        view-button: 'View Bundle'
+        highlights:
+          - '* 1x &dOverseer &fRank'
+          - '- 3 pet slots, Nether Forge style'
+          - '* &a2,500 &fCredits'
+          - '* 10x &dCrate Keys'
+          - '* 1x &bSuper Power'
+          - '- Midas Touch'
+        contents:
+          - { art: item/gold_ingot, name: 'Overseer Rank' }
+          - { art: item/emerald, name: '2,500 Credits' }
+          - { art: item/trial_key, name: 'Crate Key', amount: 10 }
+          - { art: block/gold_block, name: 'Midas Touch' }
+        lore: ['&7Everything a growing factory needs.']
+        package: 0
+      overlord:
+        name: 'Overlord Bundle'
+        price: 49.99
+        color: '#8A1F25'
+        title-color: '#FF5A5A'
+        badge: { text: 'Overpowered', color: '#C62828' }
+        art: item/nether_star
+        icon: { material: NETHER_STAR, glint: true }
+        view-button: 'View Bundle'
+        highlights:
+          - '* 1x &6Tycoon &fRank'
+          - '- 5 pet slots, every base style'
+          - '* &a6,000 &fCredits'
+          - '* 25x &dCrate Keys'
+          - '* 3x &bSuper Powers'
+          - '- Jackpot, Warlord'
+          - '- and Overdrive'
+        contents:
+          - { art: item/nether_star, name: 'Tycoon Rank' }
+          - { art: item/emerald, name: '6,000 Credits' }
+          - { art: item/trial_key, name: 'Crate Key', amount: 25 }
+          - { art: item/totem_of_undying, name: 'Jackpot' }
+          - { art: item/blaze_rod, name: 'Overdrive' }
+        lore: ['&7The top of the line.']
+        package: 0
+      starter:
+        name: 'Starter Bundle'
+        price: 9.99
+        color: '#1F5A8A'
+        title-color: '#4FB8FF'
+        badge: { text: 'New', color: '#1E88E5' }
+        art: item/chest_minecart
+        icon: { material: CHEST_MINECART }
+        view-button: 'View Bundle'
+        highlights:
+          - '* 1x &bMechanic &fRank'
+          - '- Ironworks base style'
+          - '* &a500 &fCredits'
+          - '* 3x &dCrate Keys'
+        contents:
+          - { art: item/iron_ingot, name: 'Mechanic Rank' }
+          - { art: item/emerald, name: '500 Credits' }
+          - { art: item/trial_key, name: 'Crate Key', amount: 3 }
+        lore: ['&7A head start for new factories.']
+        package: 0
+
+  ranks:
+    name: 'Ranks'
+    label: 'RANKS'
+    color: '#F2B01E'
+    art: item/name_tag
+    icon: NAME_TAG
+    products:
+      vip:
+        name: 'Mechanic'
+        price: 4.99
+        color: '#2A6F99'
+        title-color: '#55CCFF'
+        art: item/iron_ingot
+        icon: { material: IRON_INGOT }
+        view-button: 'View Rank'
+        highlights: ['* &bMechanic &fchat tag', '* &e+10% &ftokens', '* &a+5% &fsale value', '* &e+1 &ftoken per hour', '* Aqua glow', '* Sky chat colour', '* Turbo hub speed', '* Ironworks style', '* 2 vaults']
+        contents: [{ art: item/name_tag, name: 'Mechanic Tag' }, { art: block/iron_block, name: 'Ironworks Style' }]
+        lore: ['&7Monthly rank.', '&7Every token you earn is worth 10% more,', '&7and your belt sells for 5% more.']
+        package: 0
+        subscription: true
+      vipplus:
+        name: 'Machinist'
+        price: 9.99
+        color: '#1F4E99'
+        title-color: '#5B8CFF'
+        art: item/copper_ingot
+        icon: { material: COPPER_INGOT }
+        view-button: 'View Rank'
+        highlights: ['* &9Machinist &fchat tag', '* &e+20% &ftokens', '* &a+10% &fsale value', '* &e+2 &ftokens per hour', '* Free Foreman', '* Blue glow', '* BELT BOSS tag', '* /hat, 3 vaults', '* All Mechanic perks']
+        contents: [{ art: item/name_tag, name: 'Machinist Tag' }, { art: item/leather_helmet, name: 'Foreman' }]
+        lore: ['&7Monthly rank. Includes Mechanic.', '&7Copperworks base style.']
+        package: 0
+        subscription: true
+      mvp:
+        name: 'Overseer'
+        price: 14.99
+        color: '#7A2F8F'
+        title-color: '#E86BFF'
+        badge: { text: 'Popular', color: '#B044D8' }
+        art: item/gold_ingot
+        icon: { material: GOLD_INGOT }
+        view-button: 'View Rank'
+        highlights: ['* &dOverseer &fchat tag', '* &e+35% &ftokens', '* &a+15% &fsale value', '* &e+3 &ftokens per hour', '* Sunset name paint', '* Flame Halo aura', '* 3 pet slots', '* Remote gate', '* All Machinist perks']
+        contents: [{ art: item/name_tag, name: 'Overseer Tag' }, { art: item/blaze_powder, name: 'Nether Forge Style' }]
+        lore: ['&7Monthly rank. Includes Machinist.', '&7Chat colours, 4 vaults, Nether Forge base style.']
+        package: 0
+        subscription: true
+      mvpplus:
+        name: 'Industrialist'
+        price: 24.99
+        color: '#4B2A8F'
+        title-color: '#A070FF'
+        art: item/diamond
+        icon: { material: DIAMOND }
+        view-button: 'View Rank'
+        highlights: ['* &5Industrialist &fchat tag', '* &e+50% &ftokens', '* &a+20% &fsale value', '* &e+4 &ftokens per hour', '* Free Supervisor', '* Galaxy name paint', '* Runes aura, Fire glow', '* 4 pets, 6 vaults', '* All Overseer perks']
+        contents: [{ art: item/name_tag, name: 'Industrialist Tag' }, { art: item/iron_helmet, name: 'Supervisor' }]
+        lore: ['&7Monthly rank. Includes Overseer.', '&7/craft, /enderchest, Deep Sea base style.']
+        package: 0
+        subscription: true
+      legend:
+        name: 'Tycoon'
+        price: 34.99
+        color: '#9A5A12'
+        title-color: '#FFB020'
+        badge: { text: 'Best Value', color: '#E0A800' }
+        art: item/netherite_ingot
+        icon: { material: NETHERITE_INGOT, glint: true }
+        view-button: 'View Rank'
+        highlights: ['* &6Tycoon &fchat tag', '* &e+75% &ftokens', '* &a+25% &fsale value', '* &e+6 &ftokens per hour', '* Free Director', '* Gilded name paint', '* BARON tag, Gold Dust', '* 5 pets, 8 vaults', '* All Industrialist']
+        contents: [{ art: item/name_tag, name: 'Tycoon Tag' }, { art: item/golden_helmet, name: 'Director' }]
+        lore: ['&7Monthly rank. Includes Industrialist.', '&7Rainbow glow, Legend join & leave messages,', '&7/anvil, /nick, Royal Void base style.']
+        package: 0
+        subscription: true
+
+  credits:
+    name: 'Credits'
+    label: 'CREDITS'
+    color: '#39C23A'
+    art: item/emerald
+    icon: EMERALD
+    products:
+      c1000:
+        name: '1,000 Credits'
+        price: 9.99
+        color: '#1E7A34'
+        title-color: '#55E36B'
+        art: item/emerald
+        icon: { material: EMERALD }
+        view-button: 'View Credits'
+        highlights: ['* &a1,000 &fCredits', '- Spend on super powers', '- with /powers super']
+        contents: [{ art: item/emerald, name: '1,000 Credits' }]
+        package: 0
+        max: 10
+      c2500:
+        name: '2,500 Credits'
+        price: 19.99
+        color: '#1E7A34'
+        title-color: '#55E36B'
+        badge: { text: '+25% Bonus', color: '#2BAA52' }
+        art: block/emerald_block
+        icon: { material: EMERALD_BLOCK }
+        view-button: 'View Credits'
+        highlights: ['* &a2,000 &fCredits', '* &e+500 &fbonus', '- Spend on super powers']
+        contents: [{ art: block/emerald_block, name: '2,500 Credits' }]
+        package: 0
+        max: 10
+      c6000:
+        name: '6,000 Credits'
+        price: 39.99
+        color: '#1E7A34'
+        title-color: '#55E36B'
+        badge: { text: '+50% Bonus', color: '#2BAA52' }
+        art: block/beacon
+        icon: { material: BEACON }
+        view-button: 'View Credits'
+        highlights: ['* &a4,000 &fCredits', '* &e+2,000 &fbonus', '- Spend on super powers']
+        contents: [{ art: block/beacon, name: '6,000 Credits' }]
+        package: 0
+        max: 10
+
+  keys:
+    name: 'Crate Keys'
+    label: ['CRATE', 'KEYS']
+    color: '#2C8FE8'
+    art: item/trial_key
+    icon: TRIPWIRE_HOOK
+    products:
+      key1:
+        name: '1x Crate Key'
+        price: 1.99
+        color: '#1F4F8A'
+        title-color: '#6FB8FF'
+        art: item/trial_key
+        icon: { material: TRIPWIRE_HOOK }
+        view-button: 'View Key'
+        highlights: ['* 1x &dAmethyst &fKey', '- Open at the crates', '- in spawn']
+        contents: [{ art: item/trial_key, name: 'Amethyst Key' }]
+        package: 0
+        max: 20
+      key5:
+        name: '5x Crate Keys'
+        price: 7.99
+        color: '#1F4F8A'
+        title-color: '#6FB8FF'
+        badge: { text: 'Save 20%', color: '#1E88E5' }
+        art: item/trial_key
+        icon: { material: TRIPWIRE_HOOK, glint: true }
+        view-button: 'View Keys'
+        highlights: ['* 5x &dAmethyst &fKeys', '- Open at the crates', '- in spawn']
+        contents: [{ art: item/trial_key, name: 'Amethyst Key', amount: 5 }]
+        package: 0
+        max: 20
+      key10:
+        name: '10x Crate Keys'
+        price: 13.99
+        color: '#1F4F8A'
+        title-color: '#6FB8FF'
+        badge: { text: 'Save 30%', color: '#1E88E5' }
+        art: item/ominous_trial_key
+        icon: { material: TRIPWIRE_HOOK, glint: true }
+        view-button: 'View Keys'
+        highlights: ['* 10x &dAmethyst &fKeys', '- Open at the crates', '- in spawn']
+        contents: [{ art: item/ominous_trial_key, name: 'Amethyst Key', amount: 10 }]
+        package: 0
+        max: 20
+
+  powers:
+    name: 'Super Powers'
+    label: ['SUPER', 'POWERS']
+    color: '#9B4DFF'
+    art: item/nether_star
+    icon: NETHER_STAR
+    products:
+      midas_touch:
+        name: 'Midas Touch'
+        price: 9.99
+        color: '#8A6A12'
+        title-color: '#FFC83D'
+        art: block/gold_block
+        icon: { material: GOLD_BLOCK }
+        view-button: 'View Power'
+        highlights: ['* &6+50% &fsale value', '- On everything sold', '- off your belt']
+        contents: [{ art: block/gold_block, name: 'Midas Touch' }]
+        package: 0
+      jackpot:
+        name: 'Jackpot'
+        price: 12.99
+        color: '#8A7A12'
+        title-color: '#FFE066'
+        badge: { text: 'Popular', color: '#B044D8' }
+        art: item/totem_of_undying
+        icon: { material: TOTEM_OF_UNDYING }
+        view-button: 'View Power'
+        highlights: ['* &eBetter caches', '* &eDouble tokens', '- More rare drops']
+        contents: [{ art: item/totem_of_undying, name: 'Jackpot' }]
+        package: 0
+      overdrive:
+        name: 'Overdrive'
+        price: 14.99
+        color: '#8A2A12'
+        title-color: '#FF7A45'
+        art: item/blaze_rod
+        icon: { material: BLAZE_ROD }
+        view-button: 'View Power'
+        highlights: ['* &cFaster belts', '* Active: burst of', '- double speed']
+        contents: [{ art: item/blaze_rod, name: 'Overdrive' }]
+        package: 0

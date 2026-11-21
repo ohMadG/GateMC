@@ -17,6 +17,13 @@ import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.MemoryConfiguration;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -52,6 +59,11 @@ public final class SettingsModule implements GensModule, Listener {
     private final PlayerSettings.Section section = new PlayerSettings.Section();
     private PlayerDataService players;
     private EssentialsBridge essentials;
+    private GensCore plugin;
+    private volatile boolean joinLeaveEnabled;
+    private volatile String joinFormat;
+    private volatile String firstJoinFormat;
+    private volatile String quitFormat;
 
     @Override
     public String id() {
@@ -60,7 +72,9 @@ public final class SettingsModule implements GensModule, Listener {
 
     @Override
     public void enable(GensCore plugin) throws Exception {
+        this.plugin = plugin;
         this.players = plugin.playerData();
+        readJoinLeave();
         this.essentials = new EssentialsBridge(plugin);
         Migrations.apply(plugin.database(), id(), plugin.getLogger(),
                 "CREATE TABLE IF NOT EXISTS pvp_settings ("
@@ -84,6 +98,45 @@ public final class SettingsModule implements GensModule, Listener {
                 }
             }
         }, 20, 4);
+    }
+
+    @Override
+    public void reload() {
+        readJoinLeave();
+    }
+
+    private void readJoinLeave() {
+        ConfigurationSection c = plugin.getConfig().getConfigurationSection("join-leave");
+        if (c == null) {
+            c = new MemoryConfiguration();
+        }
+        joinLeaveEnabled = c.getBoolean("enabled", true);
+        joinFormat = c.getString("join", "<dark_gray>[<green>+</green>]</dark_gray> <gray>{player}");
+        firstJoinFormat = c.getString("first-join", "<dark_gray>[<gold>\u2605</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC!");
+        quitFormat = c.getString("quit", "<dark_gray>[<red>-</red>]</dark_gray> <gray>{player}");
+    }
+
+    private static Component format(String format, Player player) {
+        MiniMessage mm = MiniMessage.miniMessage();
+        return mm.deserialize(format.replace("{player}", mm.escapeTags(player.getName())));
+    }
+
+    @EventHandler(priority = EventPriority.LOW)
+    public void onJoinFormat(PlayerJoinEvent event) {
+        if (!joinLeaveEnabled || event.joinMessage() == null) {
+            return;
+        }
+        Player p = event.getPlayer();
+        PlayerData data = players.get(p.getUniqueId());
+        boolean first = data != null ? data.isFirstTime() : !p.hasPlayedBefore();
+        event.joinMessage(format(first ? firstJoinFormat : joinFormat, p));
+    }
+
+    @EventHandler(priority = EventPriority.LOW)
+    public void onQuitFormat(PlayerQuitEvent event) {
+        if (joinLeaveEnabled && event.quitMessage() != null) {
+            event.quitMessage(format(quitFormat, event.getPlayer()));
+        }
     }
 
     // ------------------------------------------------------------------ public API for other modules
@@ -300,18 +353,7 @@ public final class SettingsModule implements GensModule, Listener {
 
     /** Grey glass in every empty slot, like BlockvilleCore's global filler. */
     static void fill(Menu menu) {
-        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = pane.getItemMeta();
-        if (meta != null) {
-            meta.setHideTooltip(true);
-            pane.setItemMeta(meta);
-        }
-        for (int i = 0; i < menu.getInventory().getSize(); i++) {
-            ItemStack existing = menu.getInventory().getItem(i);
-            if (existing == null || existing.isEmpty()) {
-                menu.set(i, pane);
-            }
-        }
+        me.Evan52098.genscore.menu.MenuStyle.frame(menu, menu.getInventory().getSize() / 9);
     }
 
     // ------------------------------------------------------------------ forcefield and ignore velocity

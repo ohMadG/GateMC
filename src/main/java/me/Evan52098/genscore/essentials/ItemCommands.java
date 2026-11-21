@@ -175,6 +175,10 @@ public final class ItemCommands implements Listener {
         }
         ItemMeta meta = item.getItemMeta();
         List<Component> lore = lore(meta);
+        if (lore.size() >= 32) {
+            player.sendMessage(Msg.bad("That item can't hold any more lore lines."));
+            return;
+        }
         lore.add(styled(player, text));
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -347,7 +351,8 @@ public final class ItemCommands implements Listener {
             return;
         }
         // A live view of another player's inventory or ender chest: stop if they are no longer on our thread.
-        if (top.getHolder() instanceof Player owner && !owner.equals(event.getWhoClicked()) && !Tasks.owns(owner)) {
+        if (top.getHolder() instanceof Player owner && !owner.equals(event.getWhoClicked())
+                && (!owner.isOnline() || !Tasks.owns(owner))) {
             event.setCancelled(true);
             Tasks.entity.run(event.getWhoClicked(), () -> event.getWhoClicked().closeInventory());
         }

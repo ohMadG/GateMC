@@ -1,0 +1,179 @@
+# Powers (/powers). One power is active at a time and switching is free.
+# Powers are bought once with tokens (cost); the first one is free.
+# Super powers (op: true) cost credits (cost), the store currency; "powers grant <player|uuid> <power>" also
+# gives one from the console. /powers super shows them.
+# Active powers fire on a double-tap of sneak. Reload with /powers reload.
+#
+# Passive numbers are added on top of upgrades while the power is active:
+#   belt-speed / sale-value / luck / raid-loot / turret-damage / cache-money: 0.15 = +15%
+#   token-double: chance a belt token pays double. cache-upgrade: extra chance a cache holds a better one.
+#   gate-seconds: extra seconds the gate stays shut. repair-speed: 0.5 = broken belts mend 50% sooner.
+#   raid-damage: extra damage per Raid Pick hit. raid-defense: 0.5 = raiders do half damage to your belt.
+# Durations and cooldowns are in seconds.
+
+menu-title: '&b&l⚡ &f&lPOWERS &b&l⚡'
+op-menu-title: '&6&l★ &e&lSUPER POWERS &6&l★'
+update-id: ''
+update-message: ''
+double-sneak-ms: 400
+first-free: true
+disabled-worlds: []
+disable-all-in-combat: false
+icon-model: ''
+
+list:
+  overclock:
+    name: '&b&lOverclock'
+    cost: 40
+    material: REPEATER
+    lore: ['Your conveyor belt runs', '15% faster.']
+    belt-speed: 0.15
+  appraiser:
+    name: '&a&lAppraiser'
+    cost: 40
+    material: EMERALD
+    lore: ['Everything you sell off', 'your belt is worth 15% more.']
+    sale-value: 0.15
+  lucky_streak:
+    name: '&e&lLucky Streak'
+    cost: 30
+    material: RABBIT_FOOT
+    lore: ['Tokens and caches drop off', 'your belt 30% more often.']
+    luck: 0.30
+  token_tycoon:
+    name: '&6&lToken Tycoon'
+    cost: 35
+    material: SUNFLOWER
+    lore: ['Tokens from your belt have', 'a 30% chance to pay double.']
+    token-double: 0.30
+  cache_cracker:
+    name: '&d&lCache Cracker'
+    cost: 25
+    material: CHEST
+    lore: ['Caches pay 25% more money', 'and are more likely to hold', 'a better cache.']
+    cache-money: 0.25
+    cache-upgrade: 0.07
+  reinforced_gate:
+    name: '&7&lReinforced Gate'
+    cost: 20
+    material: IRON_DOOR
+    lore: ['Your gate stays shut', '20 seconds longer.']
+    gate-seconds: 20
+  quick_fix:
+    name: '&2&lQuick Fix'
+    cost: 15
+    material: ANVIL
+    lore: ['Broken belt segments mend', 'themselves twice as fast.']
+    repair-speed: 0.5
+  plunderer:
+    name: '&c&lPlunderer'
+    cost: 35
+    material: GOLD_INGOT
+    lore: ['Take a 25% bigger share', 'of the loot when you', 'break a rival belt.']
+    raid-loot: 0.25
+  demolisher:
+    name: '&4&lDemolisher'
+    cost: 35
+    material: IRON_PICKAXE
+    lore: ['Your Raid Pick hits belts', 'for +1 damage.']
+    raid-damage: 1
+  turret_tech:
+    name: '&3&lTurret Tech'
+    cost: 30
+    material: DISPENSER
+    lore: ['Your factory turrets', 'hit 30% harder.']
+    turret-damage: 0.30
+  lockdown:
+    name: '&8&lLockdown'
+    cost: 45
+    material: IRON_BARS
+    lore: ['Slam your gate shut', 'from anywhere.']
+    cooldown: 90
+  repair_drone:
+    name: '&a&lRepair Drone'
+    cost: 50
+    material: BEACON
+    lore: ['Instantly fix every broken', 'segment on your belt.']
+    cooldown: 120
+  rush_hour:
+    name: '&b&lRush Hour'
+    cost: 60
+    material: CLOCK
+    lore: ['Double belt speed', 'for 20 seconds.']
+    belt-speed: 1.0
+    duration: 20
+    cooldown: 180
+
+  midas_touch:
+    name: '&6&lMidas Touch'
+    op: true
+    cost: 1200
+    material: GOLD_BLOCK
+    lore: ['Everything you sell off', 'your belt is worth 50% more.']
+    sale-value: 0.50
+  hyperdrive:
+    name: '&b&lHyperdrive'
+    op: true
+    cost: 1200
+    material: NETHER_STAR
+    lore: ['Your conveyor belt runs', '50% faster.']
+    belt-speed: 0.50
+  jackpot:
+    name: '&e&lJackpot'
+    op: true
+    cost: 1000
+    material: TOTEM_OF_UNDYING
+    lore: ['Twice the tokens and caches,', 'tokens can pay double and', 'caches pay 50% more.']
+    luck: 1.0
+    token-double: 0.25
+    cache-money: 0.50
+  iron_curtain:
+    name: '&7&lIron Curtain'
+    op: true
+    cost: 800
+    material: NETHERITE_BLOCK
+    lore: ['Your gate stays shut 60s longer', 'and raiders do half damage', 'to your belt.']
+    gate-seconds: 60
+    raid-defense: 0.5
+  warlord:
+    name: '&4&lWarlord'
+    op: true
+    cost: 1000
+    material: NETHERITE_AXE
+    lore: ['Raid Pick hits do +2 damage', 'and you take 60% more loot', 'from rival belts.']
+    raid-damage: 2
+    raid-loot: 0.60
+  sentinel:
+    name: '&3&lSentinel'
+    op: true
+    cost: 800
+    material: TARGET
+    lore: ['Your turrets hit 75% harder', 'and broken segments mend', 'twice as fast.']
+    turret-damage: 0.75
+    repair-speed: 0.5
+  golden_hour:
+    name: '&6&lGolden Hour'
+    op: true
+    cost: 1500
+    material: GOLDEN_APPLE
+    lore: ['Triple sale value', 'for 30 seconds.']
+    sale-value: 2.0
+    duration: 30
+    cooldown: 300
+  overdrive:
+    name: '&c&lOverdrive'
+    op: true
+    cost: 1500
+    material: BLAZE_POWDER
+    lore: ['Triple belt speed', 'for 20 seconds.']
+    belt-speed: 2.0
+    duration: 20
+    cooldown: 240
+  fortress_mode:
+    name: '&5&lFortress Mode'
+    op: true
+    cost: 900
+    material: SHIELD
+    lore: ['Shield your factory: no raids', 'for 60 seconds.']
+    duration: 60
+    cooldown: 600

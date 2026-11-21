@@ -74,8 +74,17 @@ public final class Lore {
 
     public Lore clickPrompt(String action) {
         lines.add("");
-        lines.add("&e" + smallCaps(action));
+        lines.add(prompt(action));
         return this;
+    }
+
+    /** The themed "click to ..." line every button ends with. */
+    public static String prompt(String action) {
+        String text = action.trim();
+        if (!text.toLowerCase(Locale.ROOT).startsWith("click") && !text.toLowerCase(Locale.ROOT).startsWith("right") && !text.toLowerCase(Locale.ROOT).startsWith("left")) {
+            text = "click to " + text;
+        }
+        return "&6▸ &e" + smallCaps(text);
     }
 
     public List<String> build() {

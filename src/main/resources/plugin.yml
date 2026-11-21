@@ -98,6 +98,9 @@ permissions:
   genscore.chat.alerts: {default: op}
   genscore.chat.bypass.filter: {default: op}
   genscore.chat.bypass.cooldown: {default: op}
+  genscore.drop.bypass: {default: op}              # may drop items (gameplay.no-item-drops)
+  genscore.chat.filter.admin: {default: op}       # /filter add|deny (live word list changes)
+  genscore.mute: {default: op}                    # /mute, /unmute
   genscore.clearchat: {default: op}
   genscore.clearchat.exempt: {default: op}
   genscore.broadcast: {default: op}
@@ -116,6 +119,23 @@ permissions:
   genscore.invhistory: {default: op}
   genscore.report: {default: true}
   genscore.reports: {default: op}
+  # punish
+  genscore.punish.gui: {default: op}      # /punish, /p, /warn and the punish menu
+  genscore.punish: {default: op}          # /punishment, /history, /checkban, /altcheck
+  genscore.punish.approve: {default: op}  # revoke mutes/warns (bans need action.unban)
+  genscore.punish.admin: {default: op}    # admin actions menu, alt-ban-evasion exemptions, staff lockouts
+  genscore.punish.category.chat: {default: true}
+  genscore.punish.category.severeconduct: {default: true}
+  genscore.punish.category.gameplaycheating: {default: true}
+  genscore.punish.category.accountsecurity: {default: true}
+  # punish - per-rank action permissions (grant per staff group: guide = warn+mute,
+  # helper = +kick, mod = +ban, admin = +unban, owner = +blacklist)
+  genscore.punish.action.warn: {default: op}
+  genscore.punish.action.mute: {default: op}
+  genscore.punish.action.kick: {default: op}
+  genscore.punish.action.ban: {default: op}
+  genscore.punish.action.unban: {default: op}
+  genscore.punish.action.blacklist: {default: op}
   # kits, vaults, announcements
   genscore.kit: {default: true}
   genscore.kits.admin: {default: op}
@@ -167,11 +187,33 @@ permissions:
   genscore.shards.others: {default: true}
   genscore.shards.top: {default: true}
   genscore.shards.admin: {default: op}
+  genscore.credits: {default: true}
+  genscore.credits.others: {default: true}
+  genscore.credits.top: {default: true}
+  genscore.credits.admin: {default: op}
   # (genscore.shards.rank.<name> for the per-minute rates under shards.earn.ranks; grant with LuckPerms)
   # key crates
   genscore.keycrates: {default: true}
   genscore.keycrates.admin: {default: op}
   # super powers
+  genscore.powers: {default: true}
+  genscore.powers.admin: {default: op}
+  genscore.pets: {default: true}
+  genscore.pets.admin: {default: op}
+  genscore.basestyle: {default: true}
+  genscore.hub: {default: true}
+  genscore.weekly: {default: true}
+  genscore.merchant: {default: true}
+  genscore.merchant.admin: {default: op}
+  genscore.manager.1: {default: false}   # Foreman free (rank perk)
+  genscore.manager.2: {default: false}   # Supervisor free
+  genscore.manager.3: {default: false}   # Director free
+  genscore.turbo: {default: op}       # Turbo speed: a donator perk, grant to ranks with LuckPerms
+  genscore.intro: {default: true}
+  genscore.gate.remote: {default: false}
+  genscore.admin.events: {default: op}
+  genscore.admin.reward: {default: op}
+  genscore.basestyle.admin: {default: op}
   # season pass
   genscore.pass: {default: true}
   genscore.pass.premium: {default: false}   # the premium track: grant with Tebex / LuckPerms
@@ -196,7 +238,6 @@ permissions:
   # arena
   # maintenance
   genscore.reboot: {default: op}
-  genscore.clearlag: {default: op}
   # mobspawns
   # sit
   genscore.sit: {default: true}
@@ -216,12 +257,12 @@ permissions:
   genscore.supervanish.see: {default: false}    # can see a super-vanished owner (was hxcore.supervanish.see)
   genscore.hiddenalts.bypass: {default: false}  # sees real alt results for hidden accounts (was hxcore.hiddenalts.bypass)
   genscore.allhomes: {default: op}              # /allhomes (was hxcore.allhomes)
-  genscore.cosmetics: {default: true}        # /cosmetics, /killrank
+  genscore.cosmetics: {default: true}        # /cosmetics
   genscore.cosmetics.admin: {default: op}    # give/revoke/reload; also owns every cosmetic
   genscore.homeicon: {default: false}        # /homeicon, grant to paid ranks (was hxcore.homes.style)
-  # Each cosmetic: genscore.cosmetics.<category>.<id>, e.g. genscore.cosmetics.trails.flame,
-  # genscore.cosmetics.kill-effects.thunder. Grant with LuckPerms (store ranks). Categories: kill-effects,
-  # explosive-kills, join-messages, leave-messages, name-colors, trails, tool-skins.
+  # Each cosmetic: genscore.cosmetics.<category>.<id>, e.g. genscore.cosmetics.auras.flame_halo,
+  # genscore.cosmetics.name-colors.galaxy. Grant with LuckPerms (store ranks). Categories: join-messages,
+  # leave-messages, chat-tags, name-colors, chat-colors, auras, glows.
 softdepend:
   - Vault
   - LuckPerms

@@ -22,7 +22,7 @@ import java.util.List;
 /** BlockvilleCore's LagWatchCommand: /lagwatch [top|log|limits|tp|alerts|reload|on|off]. */
 public final class LagWatchCommands {
 
-    private static final String PREFIX = "&6&lLagWatch &8» &7";
+    private static final String PREFIX = "&6&lLAGWATCH &8» &7";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("MMM d HH:mm").withZone(ZoneId.systemDefault());
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
 

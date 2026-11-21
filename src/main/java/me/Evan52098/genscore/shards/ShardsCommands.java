@@ -33,17 +33,17 @@ public final class ShardsCommands {
         this.players = players;
     }
 
-    @Command("shards")
-    @CommandPermission("genscore.shards")
-    @Description("Check your shards")
+    @Command("credits")
+    @CommandPermission("genscore.credits")
+    @Description("Check your credits")
     public void self(BukkitCommandActor actor) {
         Player player = actor.requirePlayer();
-        player.sendMessage(Msg.neutral("Your shards: " + Msg.white(fmt(shards.balance(player.getUniqueId())))));
+        player.sendMessage(Msg.neutral("Your credits: " + Msg.white(fmt(shards.balance(player.getUniqueId())))));
     }
 
-    @Command("shards")
-    @CommandPermission("genscore.shards.others")
-    @Description("Check another player's shards")
+    @Command("credits")
+    @CommandPermission("genscore.credits.others")
+    @Description("Check another player's credits")
     public void other(BukkitCommandActor actor, @Named("player") String name) {
         CommandSender sender = actor.sender();
         if (!rateLimit(sender)) {
@@ -53,18 +53,18 @@ public final class ShardsCommands {
                 ? CompletableFuture.completedFuture((Long) null)
                 : shards.balanceAsync(found.get())).thenAccept(amount -> Tasks.forSender(sender, () -> sender.sendMessage(amount == null
                 ? Msg.bad("No player named " + Msg.white(name) + " has joined.")
-                : Msg.neutral(Msg.escape(name) + " has " + Msg.white(fmt(amount)) + " shards."))));
+                : Msg.neutral(Msg.escape(name) + " has " + Msg.white(fmt(amount)) + " credits."))));
     }
 
-    @Command("shards top")
-    @CommandPermission("genscore.shards.top")
-    @Description("The players with the most shards")
+    @Command("credits top")
+    @CommandPermission("genscore.credits.top")
+    @Description("The players with the most credits")
     public void top(BukkitCommandActor actor) {
         CommandSender sender = actor.sender();
         shards.topAsync().thenAccept(list -> Tasks.forSender(sender, () -> {
-            sender.sendMessage(Msg.parse("<aqua><bold>Top shards"));
+            sender.sendMessage(Msg.parse("<aqua><bold>Top credits"));
             if (list.isEmpty()) {
-                sender.sendMessage(Msg.parse("<gray>Nobody has shards yet."));
+                sender.sendMessage(Msg.parse("<gray>Nobody has credits yet."));
             }
             int rank = 1;
             for (ShardsService.TopEntry e : List.copyOf(list)) {
@@ -73,23 +73,23 @@ public final class ShardsCommands {
         }));
     }
 
-    @Command({"shards give", "shards add"})
-    @CommandPermission("genscore.shards.admin")
-    @Description("Give a player shards")
+    @Command({"credits give", "credits add"})
+    @CommandPermission("genscore.credits.admin")
+    @Description("Give a player credits")
     public void give(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
         change(actor.sender(), name, amount, Op.GIVE);
     }
 
-    @Command({"shards take", "shards remove"})
-    @CommandPermission("genscore.shards.admin")
-    @Description("Take shards from a player")
+    @Command({"credits take", "credits remove"})
+    @CommandPermission("genscore.credits.admin")
+    @Description("Take credits from a player")
     public void take(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
         change(actor.sender(), name, amount, Op.TAKE);
     }
 
-    @Command("shards set")
-    @CommandPermission("genscore.shards.admin")
-    @Description("Set a player's shards")
+    @Command("credits set")
+    @CommandPermission("genscore.credits.admin")
+    @Description("Set a player's credits")
     public void set(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
         change(actor.sender(), name, amount, Op.SET);
     }
@@ -118,25 +118,25 @@ public final class ShardsCommands {
                 case SET -> shards.set(uuid, amount, reason);
             };
             long now = shards.balance(uuid);
-            LOG.info("[shards] " + by + " " + op.name().toLowerCase() + " " + amount + " shards " + (op == Op.TAKE ? "from " : "for ")
+            LOG.info("[credits] " + by + " " + op.name().toLowerCase() + " " + amount + " credits " + (op == Op.TAKE ? "from " : "for ")
                     + name + " (" + uuid + "): " + (ok ? "done, now " + now : "refused"));
             Tasks.forSender(sender, () -> sender.sendMessage(ok
                     ? Msg.good(switch (op) {
-                        case GIVE -> "Gave " + Msg.white(fmt(amount)) + " shards to " + Msg.escape(name) + ".";
-                        case TAKE -> "Took " + Msg.white(fmt(amount)) + " shards from " + Msg.escape(name) + ".";
-                        case SET -> "Set " + Msg.escape(name) + "'s shards to " + Msg.white(fmt(amount)) + ".";
+                        case GIVE -> "Gave " + Msg.white(fmt(amount)) + " credits to " + Msg.escape(name) + ".";
+                        case TAKE -> "Took " + Msg.white(fmt(amount)) + " credits from " + Msg.escape(name) + ".";
+                        case SET -> "Set " + Msg.escape(name) + "'s credits to " + Msg.white(fmt(amount)) + ".";
                     } + " They now have " + Msg.white(fmt(now)) + ".")
-                    : Msg.bad(op == Op.TAKE ? Msg.escape(name) + " does not have " + Msg.white(fmt(amount)) + " shards."
-                    : "That would put " + Msg.escape(name) + " over the shard limit.")));
+                    : Msg.bad(op == Op.TAKE ? Msg.escape(name) + " does not have " + Msg.white(fmt(amount)) + " credits."
+                    : "That would put " + Msg.escape(name) + " over the credit limit.")));
             Player online = Bukkit.getPlayer(uuid);
             if (ok && online != null && op == Op.GIVE) {
-                Tasks.entity.run(online, () -> online.sendMessage(Msg.good("You received " + Msg.white(fmt(amount)) + " shards.")));
+                Tasks.entity.run(online, () -> online.sendMessage(Msg.good("You received " + Msg.white(fmt(amount)) + " credits.")));
             }
         });
     }
 
     private boolean rateLimit(CommandSender sender) {
-        if (sender instanceof Player p && !cooldowns.tryStart(p.getUniqueId(), "shards-lookup", 2000)) {
+        if (sender instanceof Player p && !cooldowns.tryStart(p.getUniqueId(), "credits-lookup", 2000)) {
             sender.sendMessage(Msg.bad("Slow down a little."));
             return false;
         }

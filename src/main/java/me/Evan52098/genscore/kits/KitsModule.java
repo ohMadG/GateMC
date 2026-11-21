@@ -369,4 +369,8 @@ public final class KitsModule implements GensModule, Listener {
             return null;
         });
     }
+
+    public java.util.List<String> kitNames() {
+        return kits.keySet().stream().sorted().toList();
+    }
 }

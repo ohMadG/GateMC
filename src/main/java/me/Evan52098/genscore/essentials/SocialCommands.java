@@ -53,6 +53,7 @@ public final class SocialCommands implements Listener {
     private final Map<UUID, UUID> lastMessaged = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastActive = new ConcurrentHashMap<>();
     private final Set<UUID> afk = ConcurrentHashMap.newKeySet();
+    private final Cooldowns lookups = new Cooldowns();
 
     SocialCommands(PlayerDataService players, Social.Section section, int nickMin, int nickMax, long nickCooldownSeconds,
                    long autoAfkMinutes, List<String> rules) {
@@ -66,6 +67,14 @@ public final class SocialCommands implements Listener {
         if (autoAfkMillis > 0) {
             Tasks.async.timer(t -> checkIdle(), 30, 30, TimeUnit.SECONDS);
         }
+    }
+
+    private boolean lookupLimited(CommandSender sender) {
+        if (sender instanceof Player p && !lookups.tryStart(p.getUniqueId(), "lookup", 1000)) {
+            sender.sendMessage(Msg.bad("Slow down."));
+            return true;
+        }
+        return false;
     }
 
     /** The online player's social data (used by the settings menu). */
@@ -124,6 +133,16 @@ public final class SocialCommands implements Listener {
                 sender.sendMessage(Msg.bad("That player isn't accepting messages."));
                 return;
             }
+            me.Evan52098.genscore.chat.ChatModule chat = me.Evan52098.genscore.command.Suggest.module(me.Evan52098.genscore.chat.ChatModule.class);
+            String blocked = chat == null ? null : chat.privateMessageBlocked(p, message);
+            if (blocked != null) {
+                sender.sendMessage(Msg.bad("Your message was not sent: " + blocked + "."));
+                return;
+            }
+            if (chat != null && chat.privateMessageShadowed(p)) {
+                sender.sendMessage(Msg.parse("<gray>[<white>me</white> -> <white>" + target.getName() + "</white>]</gray> " + Msg.escape(message)));
+                return;
+            }
             lastMessaged.put(p.getUniqueId(), target.getUniqueId());
             lastMessaged.put(target.getUniqueId(), p.getUniqueId());
             if (afk.contains(target.getUniqueId())) {
@@ -179,6 +198,14 @@ public final class SocialCommands implements Listener {
     @Description("Hide a player's messages")
     public void ignore(BukkitCommandActor actor, @Named("player") String name) {
         Player player = actor.requirePlayer();
+        if (lookupLimited(player)) {
+            return;
+        }
+        Social own = social(player.getUniqueId());
+        if (own != null && own.ignored().size() >= 200) {
+            player.sendMessage(Msg.bad("You can't ignore more than " + Msg.white("200") + " players."));
+            return;
+        }
         players.findUuid(name).whenComplete((found, error) -> Tasks.entity.run(player, () -> {
             Social s = social(player.getUniqueId());
             if (error != null || found.isEmpty() || s == null) {
@@ -205,6 +232,9 @@ public final class SocialCommands implements Listener {
     @Description("Stop ignoring a player")
     public void unignore(BukkitCommandActor actor, @Named("player") String name) {
         Player player = actor.requirePlayer();
+        if (lookupLimited(player)) {
+            return;
+        }
         players.findUuid(name).whenComplete((found, error) -> Tasks.entity.run(player, () -> {
             Social s = social(player.getUniqueId());
             if (error != null || found.isEmpty() || s == null || !s.unignore(found.get())) {
@@ -220,6 +250,9 @@ public final class SocialCommands implements Listener {
     @Description("List the players you ignore")
     public void ignoreList(BukkitCommandActor actor) {
         Player player = actor.requirePlayer();
+        if (lookupLimited(player)) {
+            return;
+        }
         Social s = social(player.getUniqueId());
         if (s == null || s.ignored().isEmpty()) {
             player.sendMessage(Msg.neutral("You are not ignoring anyone."));
@@ -388,6 +421,9 @@ public final class SocialCommands implements Listener {
             sender.sendMessage(Msg.neutral(Msg.white(online.getName()) + " is online now."));
             return;
         }
+        if (lookupLimited(sender)) {
+            return;
+        }
         players.lookup(name).whenComplete((found, error) -> Tasks.forSender(sender, () -> {
             if (error != null || found.isEmpty()) {
                 sender.sendMessage(Msg.bad("Player not found."));
@@ -411,6 +447,9 @@ public final class SocialCommands implements Listener {
         Player online = Bukkit.getPlayerExact(name);
         if (online != null && players.get(online.getUniqueId()) != null) {
             sender.sendMessage(Msg.neutral(Msg.white(online.getName()) + "'s playtime: " + Msg.white(duration(players.get(online).playtimeMs()))));
+            return;
+        }
+        if (lookupLimited(sender)) {
             return;
         }
         players.lookup(name).whenComplete((found, error) -> Tasks.forSender(sender, () -> {

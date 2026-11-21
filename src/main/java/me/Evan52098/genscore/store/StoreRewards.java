@@ -45,7 +45,7 @@ final class StoreRewards {
             Set<String> ips = new HashSet<>();
             List<Player> paid = new ArrayList<>();
             for (Player p : Bukkit.getOnlinePlayers()) {
-                if (onePerIp) {
+                if (onePerIp && !me.Evan52098.genscore.info.Bedrock.is(p.getUniqueId())) {
                     InetSocketAddress addr = p.getAddress();
                     String ip = addr == null || addr.getAddress() == null ? null : addr.getAddress().getHostAddress();
                     if (ip != null && !ips.add(ip)) {

@@ -90,11 +90,11 @@ final class WipeMenu {
                 click -> {
                     staff.closeInventory();
                     WipeKeepList keepList = keepList(wipeKeys);
-                    staff.sendMessage(LEGACY.deserialize("&7Type the reason for this wipe in chat. (staff-only - the player will not see it; type 'cancel' to abort)"));
+                    staff.sendMessage(me.Evan52098.genscore.util.Msg.neutral("Type the reason for this wipe in chat. (staff-only - the player will not see it; type 'cancel' to abort)"));
                     prompt.await(staff, reason -> {
                         String trimmed = reason.trim();
                         if (trimmed.isBlank() || trimmed.equalsIgnoreCase("cancel")) {
-                            staff.sendMessage(LEGACY.deserialize("&7Wipe canceled."));
+                            staff.sendMessage(me.Evan52098.genscore.util.Msg.neutral("Wipe canceled."));
                             return;
                         }
                         service.confirmCustom(staff, targetName, keepList, trimmed);

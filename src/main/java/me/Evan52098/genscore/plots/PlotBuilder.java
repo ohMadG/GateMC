@@ -126,8 +126,8 @@ final class PlotBuilder {
     // ------------------------------------------------------------------ factories
 
     /** Builds the factory template on the slot's lot, turned to face its road. */
-    CompletableFuture<Void> paste(World world, int slot) {
-        return queued(() -> pasteNow(world, slot));
+    CompletableFuture<Void> paste(World world, int slot, java.util.UUID owner) {
+        return queued(() -> pasteNow(world, slot, owner));
     }
 
     /** Removes everything on the slot's lot above the platform floor. */
@@ -140,10 +140,31 @@ final class PlotBuilder {
         return new Area(lot.minX(), lot.minZ(), lot.minX() + grid.size() - 1, lot.minZ() + grid.size() - 1);
     }
 
-    private CompletableFuture<Void> pasteNow(World world, int slot) {
+    private CompletableFuture<Void> pasteNow(World world, int slot, java.util.UUID owner) {
         PlotSettings.Lot lot = grid.lot(slot);
-        List<PlotTemplate.TemplateBlock> blocks = template.get().blocks(lot.rotation());
+        PlotTemplate t = template.get();
+        List<PlotTemplate.TemplateBlock> blocks = new ArrayList<>(t.blocks(lot.rotation()));
+        if (t.builtIn()) {
+            blocks.addAll(t.turned(PlotProps.blocks(t.footprint(), -1, PlotProps.level(owner)), lot.rotation()));
+        }
+        blocks = PlotStyles.apply(owner, blocks);
         return place(world, lotArea(slot), lot.minX(), grid.floorY(), lot.minZ(), blocks, slot);
+    }
+
+    CompletableFuture<Void> addProps(World world, int slot, java.util.UUID owner, int fromExclusive, int toInclusive) {
+        return queued(() -> {
+            PlotSettings.Lot lot = grid.lot(slot);
+            PlotTemplate t = template.get();
+            if (!t.builtIn()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            List<PlotTemplate.TemplateBlock> props = PlotStyles.apply(owner,
+                    t.turned(PlotProps.blocks(t.footprint(), fromExclusive, toInclusive), lot.rotation()));
+            if (props.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            return place(world, lotArea(slot), lot.minX(), grid.floorY(), lot.minZ(), props, null);
+        });
     }
 
     private CompletableFuture<Void> clearNow(World world, int slot) {
@@ -224,7 +245,322 @@ final class PlotBuilder {
     private CompletableFuture<Void> buildPlatformNow(World world, int platform) {
         Area area = platformArea(platform);
         return place(world, area, 0, grid.floorY() - 1, 0, platformFloor(platform), null)
+                .thenCompose(v -> place(world, area, 0, grid.floorY() - 1, 0, platformDecor(platform), null))
                 .thenCompose(v -> pasteHub(world, platform));
+    }
+
+    private static final int[][] DECOR_ARMS = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+
+    private List<PlotTemplate.TemplateBlock> platformDecor(int platform) {
+        java.util.Map<Long, PlotTemplate.TemplateBlock> out = new java.util.LinkedHashMap<>();
+        int cx = grid.centerX(platform);
+        int cz = grid.centerZ(platform);
+        int size = grid.size();
+        int gap = grid.gap();
+        int c0 = grid.roadHalf() + 1;
+        int c1 = grid.roadHalf() + size;
+        java.util.function.BiConsumer<int[], String> put = (pos, data) -> out.put(
+                ((long) (pos[0] + 4096) << 32) | ((long) (pos[1] + 512) << 16) | (pos[2] + 4096 & 0xffffL),
+                new PlotTemplate.TemplateBlock(pos[0], pos[1], pos[2], org.bukkit.Bukkit.createBlockData("minecraft:" + data)));
+        for (int[] d : DECOR_ARMS) {
+            for (int sign : new int[]{1, -1}) {
+                int px = -d[1] * sign;
+                int pz = d[0] * sign;
+                for (int k = 0; k + 1 < grid.lotsPerSide(); k++) {
+                    int g0 = grid.plazaReach() + k * (size + gap) + size;
+                    for (int ga = 0; ga < gap; ga++) {
+                        int along = g0 + ga;
+                        for (int c = c0; c <= c1; c++) {
+                            int x = cx + d[0] * along + px * c;
+                            int z = cz + d[1] * along + pz * c;
+                            boolean mid = ga == gap / 2;
+                            put.accept(new int[]{x, 0, z}, mid ? "polished_andesite" : "gray_concrete");
+                            if (c == c0) {
+                                for (int y = 1; y <= 4; y++) {
+                                    put.accept(new int[]{x, y, z}, "barrier");
+                                }
+                                continue;
+                            }
+                            int depth = c - c0;
+                            if (mid) {
+                                if (depth % 8 == 4) {
+                                    for (int y = 1; y <= 5; y++) {
+                                        put.accept(new int[]{x, y, z}, y == 1 ? "chiseled_polished_blackstone" : "polished_deepslate");
+                                    }
+                                    put.accept(new int[]{x, 6, z}, depth > 16 ? "campfire[lit=true]" : "lantern[hanging=false]");
+                                } else if (depth == 1) {
+                                    put.accept(new int[]{x, 1, z}, "potted_flowering_azalea_bush");
+                                }
+                            } else {
+                                put.accept(new int[]{x, 1, z}, depth % 3 == 0 ? "flowering_azalea_leaves[persistent=true]" : "azalea_leaves[persistent=true]");
+                                if (depth >= 2) {
+                                    put.accept(new int[]{x, ga == 0 ? 3 : 5, z}, ga == 0 ? "waxed_copper_block" : "iron_block");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        int island = grid.plazaReach() + size + gap + size / 2 + 4;
+        for (int qx : new int[]{1, -1}) {
+            for (int qz : new int[]{1, -1}) {
+                decorIsland(put, cx + qx * island, cz + qz * island, qx, qz);
+                int far = grid.reach() - 10;
+                int near = grid.roadHalf() + size + 16;
+                decorCrane(put, cx + qx * far, cz + qz * near, 0, -qz);
+                decorTanks(put, cx + qx * near, cz + qz * (grid.reach() - 12));
+            }
+        }
+        decorArms(put, cx, cz);
+        List<PlotTemplate.TemplateBlock> list = new ArrayList<>(out.values());
+        list.sort(java.util.Comparator.comparingInt(PlotTemplate.TemplateBlock::y));
+        return list;
+    }
+
+    private void decorDisc(java.util.function.BiConsumer<int[], String> put, int ix, int iz, int base, double radius) {
+        int r = (int) Math.ceil(radius);
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                double d = Math.sqrt(dx * dx + dz * dz);
+                if (d > radius) {
+                    continue;
+                }
+                put.accept(new int[]{ix + dx, base, iz + dz}, d > radius - 1.2 ? "gray_concrete" : (dx * 3 + dz) % 7 == 0 ? "polished_andesite" : "smooth_stone");
+                int under = (int) Math.round((radius - d) / 2.0);
+                for (int y = 1; y <= under; y++) {
+                    put.accept(new int[]{ix + dx, base - y, iz + dz}, y == under ? "cobbled_deepslate" : "deepslate");
+                }
+            }
+        }
+    }
+
+    private void decorCrane(java.util.function.BiConsumer<int[], String> put, int ix, int iz, int jx, int jz) {
+        int base = -6;
+        decorDisc(put, ix, iz, base, 8.5);
+        int top = base + 34;
+        for (int y = base + 1; y <= top; y++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    boolean corner = dx != 0 && dz != 0;
+                    boolean ring = (y - base) % 4 == 0;
+                    if (dx == 0 && dz == 0) {
+                        if (y <= base + 2) {
+                            put.accept(new int[]{ix, y, iz}, "polished_deepslate");
+                        }
+                        continue;
+                    }
+                    if (corner || ring) {
+                        put.accept(new int[]{ix + dx, y, iz + dz}, y <= base + 2 ? "polished_deepslate" : "yellow_concrete");
+                    }
+                }
+            }
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                put.accept(new int[]{ix + dx, top + 1, iz + dz}, "white_concrete");
+                put.accept(new int[]{ix + dx, top + 2, iz + dz}, dx == 0 && dz == 0 ? "white_concrete" : "light_blue_stained_glass");
+                put.accept(new int[]{ix + dx, top + 3, iz + dz}, "white_concrete");
+            }
+        }
+        int jib = 18;
+        for (int k = -7; k <= jib; k++) {
+            int x = ix + jx * k;
+            int z = iz + jz * k;
+            put.accept(new int[]{x, top + 4, z}, (k / 2) % 2 == 0 ? "yellow_concrete" : "black_concrete");
+            if (k > 1 && k % 3 == 0) {
+                put.accept(new int[]{x, top + 5, z}, "iron_bars");
+            }
+        }
+        for (int y = top + 4; y <= top + 9; y++) {
+            put.accept(new int[]{ix, y, iz}, y == top + 9 ? "red_concrete" : "yellow_concrete");
+        }
+        put.accept(new int[]{ix, top + 10, iz}, "end_rod[facing=up]");
+        for (int k = -7; k >= -8; k--) {
+            for (int y = top + 1; y <= top + 3; y++) {
+                put.accept(new int[]{ix + jx * k, y, iz + jz * k}, "polished_blackstone");
+            }
+        }
+        int hx = ix + jx * (jib - 2);
+        int hz = iz + jz * (jib - 2);
+        for (int y = top + 3; y >= top - 6; y--) {
+            put.accept(new int[]{hx, y, hz}, "iron_chain[axis=y]");
+        }
+        int lx = jz != 0 ? 1 : 0;
+        int lz = jx != 0 ? 1 : 0;
+        for (int along = -3; along <= 3; along++) {
+            for (int side = -1; side <= 1; side++) {
+                for (int y = top - 9; y <= top - 7; y++) {
+                    int x = hx + lx * along + jx * side;
+                    int z = hz + lz * along + jz * side;
+                    boolean rib = Math.abs(along) == 3 || y == top - 7;
+                    put.accept(new int[]{x, y, z}, rib ? "orange_terracotta" : "orange_concrete");
+                }
+            }
+        }
+        for (int a = 0; a < 360; a += 45) {
+            int dx = (int) Math.round(Math.cos(Math.toRadians(a)) * 6.5);
+            int dz = (int) Math.round(Math.sin(Math.toRadians(a)) * 6.5);
+            if (a % 90 == 0) {
+                put.accept(new int[]{ix + dx, base + 1, iz + dz}, "polished_deepslate");
+                put.accept(new int[]{ix + dx, base + 2, iz + dz}, "lantern[hanging=false]");
+            } else {
+                for (int y = 1; y <= 2; y++) {
+                    for (int s = 0; s <= 1; s++) {
+                        put.accept(new int[]{ix + dx + s, base + y, iz + dz}, (a / 45 + s) % 2 == 0 ? "blue_concrete" : "red_concrete");
+                    }
+                }
+            }
+        }
+    }
+
+    private void decorTanks(java.util.function.BiConsumer<int[], String> put, int ix, int iz) {
+        int base = -10;
+        decorDisc(put, ix, iz, base, 10.5);
+        int[][] tanks = {{-4, -3, 11}, {4, -3, 9}, {0, 4, 13}};
+        for (int[] t : tanks) {
+            int tx = ix + t[0];
+            int tz = iz + t[1];
+            int h = t[2];
+            for (int y = 1; y <= h + 2; y++) {
+                double r = y <= h ? 3.2 : y == h + 1 ? 2.3 : 1.2;
+                for (int dx = -4; dx <= 4; dx++) {
+                    for (int dz = -4; dz <= 4; dz++) {
+                        double d = Math.sqrt(dx * dx + dz * dz);
+                        if (d > r) {
+                            continue;
+                        }
+                        boolean wall = d > r - 1 || y > h;
+                        if (!wall) {
+                            continue;
+                        }
+                        String b = y > h ? "light_gray_concrete" : y % 4 == 0 ? "light_gray_concrete" : y == 1 ? "polished_deepslate" : "white_concrete";
+                        put.accept(new int[]{tx + dx, base + y, tz + dz}, b);
+                    }
+                }
+            }
+            put.accept(new int[]{tx, base + h + 3, tz}, "lightning_rod[facing=up]");
+            for (int y = 2; y <= h; y += 1) {
+                put.accept(new int[]{tx + 3, base + y, tz}, y % 2 == 0 ? "iron_bars" : "iron_bars");
+            }
+        }
+        for (int x = -4; x <= 4; x++) {
+            put.accept(new int[]{ix + x, base + 3, iz - 3}, "waxed_copper_grate");
+        }
+        for (int z = -3; z <= 4; z++) {
+            put.accept(new int[]{ix, base + 4, iz + z}, "waxed_copper_grate");
+        }
+        for (int a = 0; a < 360; a += 60) {
+            int dx = (int) Math.round(Math.cos(Math.toRadians(a)) * 9);
+            int dz = (int) Math.round(Math.sin(Math.toRadians(a)) * 9);
+            put.accept(new int[]{ix + dx, base + 1, iz + dz}, "polished_deepslate");
+            put.accept(new int[]{ix + dx, base + 2, iz + dz}, "lantern[hanging=false]");
+        }
+    }
+
+    private void decorArms(java.util.function.BiConsumer<int[], String> put, int cx, int cz) {
+        int reach = grid.reach();
+        int half = grid.roadHalf();
+        for (int[] d : DECOR_ARMS) {
+            int px = -d[1];
+            int pz = d[0];
+            for (int along = grid.plazaReach() + 14; along < reach - 4; along += 28) {
+                for (int y = -1; y >= -40; y--) {
+                    int w = y < -30 ? 0 : 1;
+                    for (int a = -w; a <= w; a++) {
+                        for (int b = -w; b <= w; b++) {
+                            int x = cx + d[0] * (along + a) + px * b;
+                            int z = cz + d[1] * (along + a) + pz * b;
+                            put.accept(new int[]{x, y, z}, y % 6 == 0 ? "deepslate_tiles" : "polished_deepslate");
+                        }
+                    }
+                }
+                for (int side : new int[]{-half, half}) {
+                    for (int y = -1; y >= -6; y--) {
+                        put.accept(new int[]{cx + d[0] * along + px * side, y, cz + d[1] * along + pz * side}, "iron_chain[axis=y]");
+                    }
+                    put.accept(new int[]{cx + d[0] * along + px * side, -7, cz + d[1] * along + pz * side}, "lantern[hanging=true]");
+                }
+            }
+            int end = reach - 1;
+            for (int side : new int[]{-(half + 2), half + 2}) {
+                for (int y = 1; y <= 9; y++) {
+                    put.accept(new int[]{cx + d[0] * end + px * side, y, cz + d[1] * end + pz * side}, y == 1 ? "chiseled_polished_blackstone" : "polished_deepslate");
+                }
+                put.accept(new int[]{cx + d[0] * end + px * side, 10, cz + d[1] * end + pz * side}, "lantern[hanging=false]");
+            }
+            for (int c = -(half + 2); c <= half + 2; c++) {
+                int x = cx + d[0] * end + px * c;
+                int z = cz + d[1] * end + pz * c;
+                put.accept(new int[]{x, 8, z}, ((c + 20) / 2) % 2 == 0 ? "yellow_concrete" : "black_concrete");
+                put.accept(new int[]{x, 9, z}, "polished_deepslate");
+                if (Math.abs(c) <= half && c % 2 == 0) {
+                    put.accept(new int[]{x, 7, z}, "sea_lantern");
+                }
+            }
+            String bars = d[0] != 0 ? "iron_bars[north=true,south=true]" : "iron_bars[east=true,west=true]";
+            for (int c = -half; c <= half; c++) {
+                int x = cx + d[0] * reach + px * c;
+                int z = cz + d[1] * reach + pz * c;
+                put.accept(new int[]{x, 1, z}, (c & 1) == 0 ? "yellow_concrete" : "black_concrete");
+                put.accept(new int[]{x, 2, z}, bars);
+            }
+        }
+    }
+
+    private void decorIsland(java.util.function.BiConsumer<int[], String> put, int ix, int iz, int qx, int qz) {
+        int base = -8;
+        for (int dx = -14; dx <= 14; dx++) {
+            for (int dz = -14; dz <= 14; dz++) {
+                double r = Math.sqrt(dx * dx + dz * dz);
+                if (r > 13.5) {
+                    continue;
+                }
+                put.accept(new int[]{ix + dx, base, iz + dz}, r > 12 ? "gray_concrete" : (dx + dz) % 5 == 0 ? "andesite" : "stone");
+                int under = (int) Math.round((13.5 - r) / 2.2);
+                for (int y = 1; y <= under; y++) {
+                    put.accept(new int[]{ix + dx, base - y, iz + dz}, y == under ? "cobbled_deepslate" : "deepslate");
+                }
+            }
+        }
+        for (int y = 1; y <= 26; y++) {
+            double t = y / 26.0;
+            double radius = 8.5 - 4.2 * Math.sin(Math.PI * t * 0.85);
+            for (int dx = -10; dx <= 10; dx++) {
+                for (int dz = -10; dz <= 10; dz++) {
+                    double r = Math.sqrt(dx * dx + dz * dz);
+                    if (r >= radius - 0.5 && r <= radius + 0.5) {
+                        put.accept(new int[]{ix + dx, base + y, iz + dz}, y % 7 == 0 ? "light_gray_concrete" : "white_concrete");
+                    }
+                }
+            }
+            if (y == 26) {
+                for (int a = 0; a < 360; a += 30) {
+                    int dx = (int) Math.round(Math.cos(Math.toRadians(a)) * (radius - 1.5));
+                    int dz = (int) Math.round(Math.sin(Math.toRadians(a)) * (radius - 1.5));
+                    put.accept(new int[]{ix + dx, base + y - 1, iz + dz}, "hay_block[axis=y]");
+                    put.accept(new int[]{ix + dx, base + y, iz + dz}, "campfire[lit=true,signal_fire=true]");
+                }
+            }
+        }
+        int sx = ix - qx * 9;
+        int sz = iz + qz * 8;
+        for (int y = 1; y <= 32; y++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    String b = y <= 3 ? "polished_deepslate" : (y >= 24 && y <= 29) ? ((y / 2) % 2 == 0 ? "red_concrete" : "white_concrete") : "bricks";
+                    if (y == 32 && dx == 0 && dz == 0) {
+                        b = "campfire[lit=true,signal_fire=true]";
+                    } else if (y == 31 && dx == 0 && dz == 0) {
+                        b = "hay_block[axis=y]";
+                    }
+                    put.accept(new int[]{sx + dx, base + y, sz + dz}, b);
+                }
+            }
+        }
+        for (int y = 1; y <= 4; y++) {
+            put.accept(new int[]{ix + qx * 10, base + y, iz - qz * 9}, y == 4 ? "lantern[hanging=false]" : "polished_deepslate");
+        }
     }
 
     private CompletableFuture<Void> pasteHub(World world, int platform) {

@@ -27,7 +27,12 @@ import java.util.Map;
 record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpeed, List<SpeedLevel> speedLevels,
                        int lengthStep, long lengthBasePrice, double lengthGrowth, double genIntervalSeconds,
                        List<GenTier> genTiers, double valuePerSegment, int depositSeconds,
-                       int maxDrawnItems, int viewDistance, float modelYawOffset, Pack pack) {
+                       int maxDrawnItems, int viewDistance, float modelYawOffset, Pack pack,
+                       double lengthGrowthEnd, int lengthRamp) {
+
+    static double rampGrowth(int n, double start, double end, int ramp) {
+        return start + (end - start) * Math.min(1.0, n / (double) Math.max(1, ramp));
+    }
 
     record SpeedLevel(double speed, long price) {
     }
@@ -75,6 +80,10 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         }
     }
 
+    int tierCount() {
+        return genTiers.size();
+    }
+
     GenTier tier(int level) {
         return genTiers.get(Math.max(0, Math.min(level, genTiers.size() - 1)));
     }
@@ -105,7 +114,11 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
 
     /** Price of the length upgrade number {@code done + 1}. */
     long lengthPrice(int done) {
-        return Math.round(lengthBasePrice * Math.pow(lengthGrowth, done));
+        double f = 1;
+        for (int k = 0; k < done; k++) {
+            f *= rampGrowth(k, lengthGrowth, lengthGrowthEnd, lengthRamp);
+        }
+        return Math.round(lengthBasePrice * f);
     }
 
     /** What an average item from gen tier {@code tier} is worth after riding {@code segments} segments, in cents. */
@@ -151,7 +164,10 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
         double[] priceFactor = new double[Math.max(1, count)];
         priceFactor[0] = 1;
         for (int t = 1; t < priceFactor.length; t++) {
-            priceFactor[t] = priceFactor[t - 1] * (priceGrowth + earlyExtra * Math.exp(-(t - 1) / earlyFade));
+            priceFactor[t] = priceFactor[t - 1] * (root.isSet("gen.generate.price-growth-start")
+                    ? rampGrowth(t - 1, root.getDouble("gen.generate.price-growth-start", 1.05),
+                    root.getDouble("gen.generate.price-growth-end", 1.16), root.getInt("gen.generate.ramp-tiers", 60))
+                    : priceGrowth + earlyExtra * Math.exp(-(t - 1) / earlyFade));
         }
         List<GenTier> out = new ArrayList<>(count);
         // Blend: tier t sits at position x along the item list (tier 1 = the first item, the last tier = the last item).
@@ -235,9 +251,14 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
             double step = Math.max(0.01, root.getDouble("belt.speed.step", 0.25));
             double price = Math.max(0, root.getDouble("belt.speed.base-price", 800));
             double growth = Math.max(1, root.getDouble("belt.speed.price-growth", 1.5));
+            double gStart = Math.max(1, root.getDouble("belt.speed.price-growth-start", growth));
+            double gEnd = Math.max(1, root.getDouble("belt.speed.price-growth-end", growth));
+            int ramp = Math.max(1, root.getInt("belt.speed.ramp-levels", 1));
             int n = 0;
+            double f = 1;
             for (double mult = 1 + step; mult <= max + 1e-9; mult += step) {
-                levels.add(new SpeedLevel(startSpeed * mult, Math.round(price * Math.pow(growth, n++) * 100)));
+                levels.add(new SpeedLevel(startSpeed * mult, Math.round(price * f * 100)));
+                f *= rampGrowth(n++, gStart, gEnd, ramp);
             }
         }
         Material door = Material.matchMaterial(root.getString("gate.door-block", "light_gray_concrete"));
@@ -261,7 +282,7 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
                 List.copyOf(levels),
                 Math.max(1, root.getInt("belt.length-step", 2)),
                 Money.toCents(Math.max(0, root.getDouble("belt.length-base-price", 200))),
-                Math.max(1.0, root.getDouble("belt.length-price-growth", 1.5)),
+                Math.max(1.0, root.getDouble("belt.length-price-growth-start", root.getDouble("belt.length-price-growth", 1.5))),
                 Math.max(0.05, root.getDouble("belt.gen-interval-seconds", 0.1)),
                 List.copyOf(tiers),
                 Math.max(0, root.getDouble("belt.value-per-segment", 0.10)),
@@ -271,6 +292,8 @@ record FactorySettings(int gateCloseSeconds, Material doorBlock, double startSpe
                 (float) root.getDouble("visuals.model-yaw-offset", 0),
                 new Pack(root.getString("resource-pack.url", ""), root.getString("resource-pack.sha1", ""),
                         root.getBoolean("resource-pack.required", false),
-                        root.getString("resource-pack.prompt", "GensCore needs its resource pack for conveyor belts.")));
+                        root.getString("resource-pack.prompt", "GensCore needs its resource pack for conveyor belts.")),
+                Math.max(1.0, root.getDouble("belt.length-price-growth-end", root.getDouble("belt.length-price-growth", 1.5))),
+                Math.max(1, root.getInt("belt.length-ramp", 1)));
     }
 }

@@ -41,7 +41,7 @@ public record ShardsSettings(
                 s.getBoolean("earn.count-afk", true),
                 milli(s.getDouble("earn.base-per-minute", 0.5)),
                 Map.copyOf(ranks),
-                s.getString("earn.actionbar", "&b+{amount} shards &8| &bShards: &f{shards}"),
+                s.getString("earn.actionbar", "&b+{amount} credits &8| &bCredits: &f{credits}"),
                 (int) clamp(s.getInt("top.size", 10), 1, 100),
                 clamp(s.getLong("top.cache-seconds", 60), 5, 3600) * 1000L);
     }

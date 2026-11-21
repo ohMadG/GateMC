@@ -15,6 +15,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import io.papermc.paper.connection.PlayerGameConnection;
+import io.papermc.paper.event.player.PlayerCustomClickEvent;
+import net.kyori.adventure.key.Key;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.jetbrains.annotations.Nullable;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.Description;
@@ -24,10 +31,14 @@ import revxrsal.commands.annotation.Subcommand;
 import revxrsal.commands.bukkit.actor.BukkitCommandActor;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
+import java.io.File;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -60,6 +71,10 @@ public final class StoreModule implements GensModule {
     private TebexClient tebex;
     private StoreRewards rewards;
     private StorePopup popup;
+    private volatile StoreCatalog catalog;
+    private StoreMenu menu;
+    private StoreArt art;
+    private final Set<UUID> packLoaded = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean syncing = new AtomicBoolean();
     private final AtomicBoolean syncSoon = new AtomicBoolean();
     private final Cooldowns cooldowns = new Cooldowns();
@@ -85,6 +100,43 @@ public final class StoreModule implements GensModule {
         this.rewards = new StoreRewards(plugin.modules(), plugin.getLogger());
         this.popup = new StorePopup(() -> settings, this::storeLine);
         Bukkit.getPluginManager().registerEvents(popup, plugin);
+        this.catalog = loadCatalog();
+        this.art = StoreArt.load(plugin.getResource("modules/store/art.txt"));
+        this.menu = new StoreMenu(() -> catalog, () -> settings, () -> art, packLoaded, plugin.getLogger());
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onPack(PlayerResourcePackStatusEvent event) {
+                switch (event.getStatus()) {
+                    case SUCCESSFULLY_LOADED -> packLoaded.add(event.getPlayer().getUniqueId());
+                    case DECLINED, FAILED_DOWNLOAD, FAILED_RELOAD, INVALID_URL, DISCARDED ->
+                            packLoaded.remove(event.getPlayer().getUniqueId());
+                    default -> {
+                    }
+                }
+            }
+
+            @EventHandler
+            public void onCustomClick(PlayerCustomClickEvent event) {
+                Key id = event.getIdentifier();
+                if (!id.namespace().equals(StoreDialog.NS) || !id.value().startsWith("store/")
+                        || !(event.getCommonConnection() instanceof PlayerGameConnection connection)) {
+                    return;
+                }
+                Player player = connection.getPlayer();
+                String path = id.value().substring("store/".length());
+                Tasks.onEntity(player, () -> {
+                    if (player.isOnline() && cooldowns.tryStart(player.getUniqueId(), "store-click", 120)) {
+                        menu.click(player, path);
+                    }
+                });
+            }
+
+            @EventHandler
+            public void onQuit(PlayerQuitEvent event) {
+                packLoaded.remove(event.getPlayer().getUniqueId());
+                menu.forget(event.getPlayer().getUniqueId());
+            }
+        }, plugin);
         plugin.commands().register(this, new Admin());
         registerBoard();
         warnBadUrl();
@@ -97,7 +149,16 @@ public final class StoreModule implements GensModule {
     public void reload() {
         settings = StoreSettings.load(plugin.getConfig().getConfigurationSection("store"), plugin.getLogger());
         popup.forgetAll();
+        catalog = loadCatalog();
         warnBadUrl();
+    }
+
+    private StoreCatalog loadCatalog() {
+        File file = new File(plugin.getDataFolder(), "modules/store/store.yml");
+        if (!file.isFile()) {
+            plugin.saveResource("modules/store/store.yml", false);
+        }
+        return StoreCatalog.load(file, plugin.getLogger());
     }
 
     private void warnBadUrl() {
@@ -135,6 +196,17 @@ public final class StoreModule implements GensModule {
     @CommandPermission("genscore.store")
     @Description("Link to the server store")
     public void store(BukkitCommandActor actor) {
+        if (actor.sender() instanceof Player player && !catalog.categories().isEmpty()) {
+            menu.open(player, 0, 0);
+            return;
+        }
+        linkCommand(actor);
+    }
+
+    @Command({"storelink"})
+    @CommandPermission("genscore.store")
+    @Description("Link to the server store")
+    public void linkCommand(BukkitCommandActor actor) {
         StoreSettings s = settings;
         if (s.url().isEmpty()) {
             actor.sender().sendMessage(Msg.bad("The store link isn't set up yet."));

@@ -48,7 +48,7 @@ final class CrateConfig {
 
     record Crate(String id, String name, String keyName, Material keyMaterial, @Nullable NamespacedKey keyModel,
                  ItemStack icon, int menuSlot, List<String> hologram, double hologramHeight, List<String> locations,
-                 boolean noDuplicates, List<Reward> rewards, double totalWeight) {
+                 boolean noDuplicates, List<Reward> rewards, double totalWeight, @Nullable String model, org.bukkit.Color color) {
 
         @Nullable Reward reward(String rewardId) {
             for (Reward r : rewards) {
@@ -109,6 +109,8 @@ final class CrateConfig {
     final int openAllMax;
     final long openCooldownMs;
     final boolean animation;
+    final boolean worldAnimation;
+    final @Nullable NamespacedKey crateModel;
     final boolean welcomeEnabled;
     final @Nullable String welcomeCrate;
     final int welcomeDelaySeconds;
@@ -126,11 +128,11 @@ final class CrateConfig {
         voteCrate = known(s.getString("vote.crate", ""), crates, "vote.crate", logger);
         voteKeys = Math.max(0, Math.min(64, s.getInt("vote.keys", 0)));
         voteShards = Math.max(0, Math.min(1_000_000, s.getLong("vote.shards", 30)));
-        voteMessage = s.getString("vote.message", "&a&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}");
+        voteMessage = s.getString("vote.message", "&6&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}");
         broadcastUnder = s.getDouble("broadcast-under", 5.0);
-        broadcast = s.getString("broadcast", "&5&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!");
+        broadcast = s.getString("broadcast", "&6&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!");
         broadcastRare = s.getString("broadcast-rare", "&d&l✦ RARE WIN ✦ &f{player} &7won {reward} &7from the {crate}&7! &8({chance}%)");
-        broadcastBulk = s.getString("broadcast-bulk", "&5&lCRATES &8» &f{player} &7opened &f{amount}x {crate}&7!");
+        broadcastBulk = s.getString("broadcast-bulk", "&6&lCRATES &8» &f{player} &7opened &f{amount}x {crate}&7!");
         rareLinesMax = Math.max(0, Math.min(20, s.getInt("bulk-rare-lines", 5)));
         List<Rarity> list = new ArrayList<>();
         for (Map<?, ?> m : s.getMapList("rarities")) {
@@ -160,6 +162,8 @@ final class CrateConfig {
         openAllMax = Math.max(1, Math.min(512, s.getInt("open-all-max", 128)));
         openCooldownMs = Math.max(0, Math.min(10_000, s.getLong("open-cooldown-ms", 600)));
         animation = s.getBoolean("animation", true);
+        worldAnimation = s.getBoolean("world-animation", true);
+        crateModel = key(s.getString("crate-model", "genscore:crate"));
         welcomeEnabled = s.getBoolean("welcome-spin.enabled", true);
         welcomeCrate = known(s.getString("welcome-spin.crate", "vote"), crates, "welcome-spin.crate", logger);
         welcomeDelaySeconds = Math.max(1, Math.min(120, s.getInt("welcome-spin.delay-seconds", 5)));
@@ -312,7 +316,22 @@ final class CrateConfig {
         return new Crate(id, name, c.getString("key", "&f" + id + " Key"), keyMat, key(c.getString("key-model")), icon,
                 c.getInt("menu-slot", -1), List.copyOf(c.getStringList("hologram")),
                 Double.isNaN(height) ? 1.6 : Math.max(0.5, Math.min(5, height)),
-                List.copyOf(c.getStringList("locations")), c.getBoolean("no-duplicates", false), List.copyOf(rewards), total);
+                List.copyOf(c.getStringList("locations")), c.getBoolean("no-duplicates", false), List.copyOf(rewards), total,
+                blankToNull(c.getString("model")), color(c.getString("color")));
+    }
+
+    private static @Nullable String blankToNull(@Nullable String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
+    private static org.bukkit.Color color(@Nullable String hex) {
+        if (hex != null) {
+            try {
+                return org.bukkit.Color.fromRGB(Integer.parseInt(hex.replace("#", ""), 16));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return org.bukkit.Color.fromRGB(0xFFB347);
     }
 
     private static @Nullable Reward reward(String crate, String id, ConfigurationSection r, double weight, double chance, Logger logger) {

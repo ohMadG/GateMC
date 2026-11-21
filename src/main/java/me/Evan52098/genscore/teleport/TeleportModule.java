@@ -10,6 +10,8 @@ import org.bukkit.configuration.MemoryConfiguration;
 /** Homes, warps, spawn, /back, /top and /tpa, with warmups that combat and claims can veto. */
 public final class TeleportModule implements GensModule {
 
+    private volatile LocationStore locations;
+
     private TeleportService service;
 
     @Override
@@ -31,7 +33,7 @@ public final class TeleportModule implements GensModule {
             c = new MemoryConfiguration();
         }
         service = new TeleportService(c);
-        LocationStore locations = new LocationStore(plugin.database(), plugin.getLogger());
+        LocationStore locations = this.locations = new LocationStore(plugin.database(), plugin.getLogger());
         Homes.Section homesSection = new Homes.Section();
         plugin.playerData().register(homesSection);
 
@@ -41,6 +43,10 @@ public final class TeleportModule implements GensModule {
                 Math.max(0, c.getInt("homes.max-default", 3)));
         TpaCommands tpa = new TpaCommands(plugin, service, c.getLong("tpa.timeout-seconds", 60), c.getLong("tpa.cooldown-seconds", 30));
         plugin.commands().register(commands, tpa);
+        if (c.getBoolean("homes.enabled", true)) {
+            plugin.commands().register(new HomeCommands(service, plugin.playerData(), homesSection,
+                    Math.max(0, c.getInt("homes.max-default", 3))));
+        }
 
         Bukkit.getPluginManager().registerEvents(new TeleportListener(service, commands, tpa, plugin.playerData(),
                 c.getBoolean("back.on-death", true),
@@ -66,5 +72,10 @@ public final class TeleportModule implements GensModule {
     public java.util.List<String> homeNames(org.bukkit.entity.Player p) {
         me.Evan52098.genscore.player.PlayerData d = players == null ? null : players.get(p.getUniqueId());
         return d == null ? java.util.List.of() : d.get(homesSection).names();
+    }
+
+    public java.util.List<String> warpNames() {
+        LocationStore l = locations;
+        return l == null ? java.util.List.of() : l.warpNames();
     }
 }

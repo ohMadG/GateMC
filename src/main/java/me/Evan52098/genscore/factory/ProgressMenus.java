@@ -2,6 +2,7 @@ package me.Evan52098.genscore.factory;
 
 import me.Evan52098.genscore.menu.Lore;
 import me.Evan52098.genscore.menu.Menu;
+import me.Evan52098.genscore.menu.MenuStyle;
 import me.Evan52098.genscore.plots.GensPlayer;
 import me.Evan52098.genscore.plots.PlotData;
 import me.Evan52098.genscore.util.Money;
@@ -200,7 +201,7 @@ final class ProgressMenus {
         int level = g.gearLevel();
         long price = ps.gear().price(level);
         Menu menu = new Menu(3, Msg.parse("<dark_gray>Raid gear"));
-        menu.set(11, raidPick(level), e -> {
+        menu.set(10, raidPick(level), e -> {
             giveRaidPick(p);
             p.closeInventory();
         });
@@ -213,7 +214,7 @@ final class ProgressMenus {
             lore.stat("Next", ps.hitDamage(level + 1) + " per hit, " + Math.round(ps.lootShare(level + 1) * 100) + "% loot")
                     .stat("Price", Money.compact(price * 100)).clickPrompt("buy");
         }
-        menu.set(15, Lore.item(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&cUpgrade gear", lore.build()), e -> {
+        menu.set(12, Lore.item(Material.NETHERITE_UPGRADE_SMITHING_TEMPLATE, "&cUpgrade gear", lore.build()), e -> {
             long cost = ps.gear().price(g.gearLevel());
             if (cost < 0) {
                 p.sendMessage(Msg.neutral("Your gear is fully upgraded."));
@@ -228,6 +229,39 @@ final class ProgressMenus {
             refreshPicks(p);
             gear(p);
         });
+        Lockpicks picks = module.lockpicks();
+        if (picks.settings().enabled()) {
+            int pickPrice = picks.settings().priceTokens();
+            menu.set(14, Lore.item(Material.TRIPWIRE_HOOK, "&e&lLockpicks", Lore.builder(Lore.Accent.WHITE)
+                    .description("Pick a closed enemy gate to", "jam it open for " + picks.settings().jamSeconds() + "s.").divider()
+                    .stat("You have", String.valueOf(picks.count(p)))
+                    .stat("Skill", picks.skillText(p))
+                    .stat("Price", pickPrice + " tokens each")
+                    .stat("Tokens", String.valueOf(g.tokens()))
+                    .description("Shift-click: buy 5.").clickPrompt("buy one").build()), e -> {
+                picks.buy(p, e.isShiftClick() ? 5 : 1);
+                gear(p);
+            });
+            int tier = picks.tier(p);
+            boolean max = tier >= picks.maxTier();
+            Lore up = Lore.builder(Lore.Accent.WHITE)
+                    .description("Better lockpicks make every", "lock game easier. Stacks with skill.").divider()
+                    .stat("Now", Lockpicks.tierName(tier))
+                    .stat("Bonus", tier == 0 ? "none" : Lockpicks.tierPerks(tier));
+            if (max) {
+                up.description("", "&aBest lockpick unlocked.");
+            } else {
+                up.stat("Next", Lockpicks.tierName(tier + 1))
+                        .stat("Next bonus", Lockpicks.tierPerks(tier + 1))
+                        .stat("Cost", picks.settings().upgradeCosts()[tier] + " tokens")
+                        .clickPrompt("upgrade");
+            }
+            menu.set(16, MenuStyle.clean(Lore.item(Lockpicks.TIER_ICONS[Math.min(Lockpicks.TIER_ICONS.length - 1, tier + (max ? 0 : 1))],
+                    "&e&lUpgrade Lockpick", up.build()), max), e -> {
+                picks.upgrade(p);
+                gear(p);
+            });
+        }
         menu.set(22, Lore.item(Material.PAPER, "&fHow raiding works", Lore.builder(Lore.Accent.WHITE)
                 .description("Walk into a factory whose gate is open.", "Hit its belt with the Raid Pick to break",
                         "segments. Items on a broken segment spill:", "you take a share, the rest is lost.",
@@ -246,9 +280,29 @@ final class ProgressMenus {
                 Msg.parse("<gray>Damage <white>" + ps.hitDamage(level) + "</white>, loot <white>"
                         + Math.round(ps.lootShare(level) * 100) + "%").decoration(TextDecoration.ITALIC, false)));
         meta.setUnbreakable(true);
+        meta.setItemModel(pickModel(level));
         meta.getPersistentDataContainer().set(pickKey, PersistentDataType.INTEGER, level);
         pick.setItemMeta(meta);
         return pick;
+    }
+
+    private static org.bukkit.NamespacedKey pickModel(int level) {
+        return new org.bukkit.NamespacedKey("genscore", "raid_pick_" + (level >= 15 ? 3 : level >= 5 ? 2 : 1));
+    }
+
+    void restylePicks(Player p) {
+        ItemStack[] contents = p.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack it = contents[i];
+            if (!isRaidPick(it)) {
+                continue;
+            }
+            Integer level = it.getItemMeta().getPersistentDataContainer().get(pickKey, PersistentDataType.INTEGER);
+            int lv = level == null ? 0 : level;
+            if (!pickModel(lv).equals(it.getItemMeta().getItemModel())) {
+                p.getInventory().setItem(i, raidPick(lv));
+            }
+        }
     }
 
     boolean isRaidPick(ItemStack item) {

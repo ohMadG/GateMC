@@ -108,7 +108,7 @@ public final class ShardsModule implements GensModule {
         long rate = s.baseMilliPerMinute();
         String best = null;
         for (Map.Entry<String, Long> rank : s.rankMilliPerMinute().entrySet()) {
-            if (rank.getValue() > rate && player.hasPermission("genscore.shards.rank." + rank.getKey())) {
+            if (rank.getValue() > rate && player.hasPermission("genscore.credits.rank." + rank.getKey())) {
                 rate = rank.getValue(); // the best matching rank counts, as in HxCrates
                 best = rank.getKey();
             }
@@ -117,7 +117,7 @@ public final class ShardsModule implements GensModule {
         String bar = s.actionbar();
         if (added > 0 && best != null && bar != null && !bar.isBlank()) {
             long now = service.balance(player.getUniqueId());
-            player.sendActionBar(LEGACY.deserialize(bar.replace("{amount}", Long.toString(added)).replace("{shards}", String.format("%,d", now))));
+            player.sendActionBar(LEGACY.deserialize(bar.replace("{amount}", Long.toString(added)).replace("{credits}", String.format("%,d", now))));
         }
     }
 

@@ -67,7 +67,17 @@ public final class RanksModule implements GensModule, Listener {
     /** A player's chosen tag. Thread-safe: changed on the player's thread, saved on a database thread. */
     static final class Choice {
         private String tag;
+        private String color;
         private boolean dirty;
+
+        synchronized @Nullable String color() {
+            return color;
+        }
+
+        synchronized void setColor(@Nullable String color) {
+            this.color = color;
+            this.dirty = true;
+        }
 
         synchronized @Nullable String tag() {
             return tag;
@@ -89,6 +99,8 @@ public final class RanksModule implements GensModule, Listener {
     private static final int[] TAG_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
 
     private static volatile RanksModule instance;
+    static final String RANK_COLOR_PERMISSION = "genscore.rankcolor";
+    private static final int[] COLOR_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
 
     private GensCore plugin;
     private PlayerDataService players;
@@ -107,11 +119,12 @@ public final class RanksModule implements GensModule, Listener {
         @Override
         public Choice load(Connection c, UUID player) throws SQLException {
             Choice choice = new Choice();
-            try (PreparedStatement ps = c.prepareStatement("SELECT tag FROM pvp_player_tags WHERE uuid = ?")) {
+            try (PreparedStatement ps = c.prepareStatement("SELECT tag, rank_color FROM pvp_player_tags WHERE uuid = ?")) {
                 ps.setString(1, player.toString());
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         choice.tag = rs.getString(1);
+                        choice.color = rs.getString(2);
                     }
                 }
             }
@@ -124,10 +137,12 @@ public final class RanksModule implements GensModule, Listener {
                 return;
             }
             String tag = data.tag();
+            String color = data.color();
             try (PreparedStatement ps = c.prepareStatement(
-                    "INSERT INTO pvp_player_tags (uuid, tag) VALUES (?, ?) ON CONFLICT (uuid) DO UPDATE SET tag = excluded.tag")) {
+                    "INSERT INTO pvp_player_tags (uuid, tag, rank_color) VALUES (?, ?, ?) ON CONFLICT (uuid) DO UPDATE SET tag = excluded.tag, rank_color = excluded.rank_color")) {
                 ps.setString(1, player.toString());
                 ps.setString(2, tag);
+                ps.setString(3, color);
                 ps.executeUpdate();
             }
         }
@@ -143,7 +158,8 @@ public final class RanksModule implements GensModule, Listener {
         this.plugin = plugin;
         this.players = plugin.playerData();
         Migrations.apply(plugin.database(), id(), plugin.getLogger(),
-                "CREATE TABLE IF NOT EXISTS pvp_player_tags (uuid TEXT PRIMARY KEY, tag TEXT)");
+                "CREATE TABLE IF NOT EXISTS pvp_player_tags (uuid TEXT PRIMARY KEY, tag TEXT)",
+                "ALTER TABLE pvp_player_tags ADD COLUMN rank_color TEXT");
         loadConfig();
         players.register(section);
         plugin.commands().register(this);
@@ -218,7 +234,23 @@ public final class RanksModule implements GensModule, Listener {
         if (allowLogo && useLogo && !b.logo().isEmpty() && !Bedrock.is(p.getUniqueId())) {
             return b.logo();
         }
-        return b.text();
+        RankColors.Preset color = colorOf(p);
+        return color == null ? b.text() : RankColors.apply(color, b.text());
+    }
+
+    private @Nullable RankColors.Preset colorOf(Player p) {
+        if (!p.hasPermission(RANK_COLOR_PERMISSION)) {
+            return null;
+        }
+        PlayerData data = players.get(p.getUniqueId());
+        if (data == null) {
+            return null;
+        }
+        try {
+            return RankColors.get(data.get(section).color());
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     private @Nullable Tag tagOf(Player p) {
@@ -242,7 +274,18 @@ public final class RanksModule implements GensModule, Listener {
     /** The player's rank badge in {@code &} codes: the glyph for Java players when set, else the text. "" if none. */
     public static String badge(Player p) {
         RanksModule m = instance;
-        return m == null ? "" : m.badgeString(p, true);
+        return rebirthTag(p) + (m == null ? "" : m.badgeString(p, true));
+    }
+
+    public static String rebirthTag(Player p) {
+        String value = me.Evan52098.genscore.factory.FactoryModule.placeholder(p.getUniqueId(), "rebirths");
+        int r;
+        try {
+            r = value == null ? 0 : Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            r = 0;
+        }
+        return r <= 0 ? "&8[&7R0&8] " : "&8[&dR" + r + "&8] ";
     }
 
     /** The text badge, never the glyph (for places a resource pack can't reach, like the console or Discord). */
@@ -253,6 +296,10 @@ public final class RanksModule implements GensModule, Listener {
 
     /** The player's chosen, still-unlocked tag in {@code &} codes, or "". */
     public static String tag(Player p) {
+        String cosmetic = me.Evan52098.genscore.cosmetics.CosmeticsModule.chatTag(p.getUniqueId());
+        if (!cosmetic.isEmpty()) {
+            return cosmetic;
+        }
         RanksModule m = instance;
         Tag t = m == null ? null : m.tagOf(p);
         return t == null ? "" : t.display();
@@ -265,7 +312,7 @@ public final class RanksModule implements GensModule, Listener {
     /** The tag followed by a space, or empty, ready to put in front of a name. */
     public static Component tagComponent(Player p) {
         String t = tag(p);
-        return t.isEmpty() ? Component.empty() : Text.legacy(t + "&r ");
+        return t.isEmpty() ? Component.empty() : Text.legacy(" " + t + "&r");
     }
 
     /**
@@ -278,7 +325,8 @@ public final class RanksModule implements GensModule, Listener {
             return null;
         }
         return switch (params.toLowerCase(Locale.ROOT)) {
-            case "badge" -> m.badgeString(p, true);
+            case "badge" -> rebirthTag(p) + m.badgeString(p, true);
+            case "rebirth_tag" -> rebirthTag(p);
             case "badge_text" -> m.badgeString(p, false);
             case "rank" -> {
                 Badge b = m.badgeOf(p);
@@ -299,7 +347,11 @@ public final class RanksModule implements GensModule, Listener {
     @CommandPermission("genscore.tags")
     @Description("Pick a chat tag")
     public void tagsCommand(BukkitCommandActor actor) {
-        openTags(actor.requirePlayer(), 0);
+        Player player = actor.requirePlayer();
+        if (me.Evan52098.genscore.cosmetics.CosmeticsModule.openCategory(player, me.Evan52098.genscore.cosmetics.CosmeticCategory.CHAT_TAG)) {
+            return;
+        }
+        openTags(player, 0);
     }
 
     private void openTags(Player player, int page) {
@@ -322,7 +374,7 @@ public final class RanksModule implements GensModule, Listener {
             lore.add("");
             lore.add("&7Preview: " + tag.display() + " &f" + player.getName());
             lore.add("");
-            lore.add(equipped ? "&a✔ Equipped" : unlocked ? "&eClick to equip" : "&c✘ Locked");
+            lore.add(equipped ? "&a✔ Equipped" : unlocked ? me.Evan52098.genscore.menu.Lore.prompt("click to equip") : "&c✘ Locked");
             ItemStack item = item(unlocked ? Material.NAME_TAG : Material.GRAY_DYE, tag.display(), lore, equipped);
             if (!unlocked || equipped) {
                 menu.set(TAG_SLOTS[i], item);
@@ -363,6 +415,66 @@ public final class RanksModule implements GensModule, Listener {
             player.sendMessage(Msg.good("Tag equipped: ").append(Text.legacy(tags.get(tagId).display())));
         }
         openTags(player, page);
+    }
+
+    @Command({"rankcolor", "rankcolour"})
+    @CommandPermission(RANK_COLOR_PERMISSION)
+    @Description("Pick the colour of your rank")
+    public void rankColorCommand(BukkitCommandActor actor) {
+        openColors(actor.requirePlayer());
+    }
+
+    private void openColors(Player player) {
+        Badge badge = badgeOf(player);
+        String label = badge == null ? "RANK" : stripCodes(badge.text()).trim();
+        String current = players.get(player).get(section).color();
+        Menu menu = new Menu(6, Text.legacy("&6&lRANK COLOUR"));
+        for (int i = 0; i < RankColors.ALL.size() && i < COLOR_SLOTS.length; i++) {
+            RankColors.Preset preset = RankColors.ALL.get(i);
+            boolean equipped = preset.id().equals(current);
+            List<String> lore = new ArrayList<>();
+            lore.add("");
+            lore.add("&7Preview: " + RankColors.paint(preset, label, true) + " &f" + player.getName());
+            if (preset.animated()) {
+                lore.add("&d✦ Animated &8(tab list and nametag)");
+            }
+            lore.add("");
+            lore.add(equipped ? "&a✔ Selected" : me.Evan52098.genscore.menu.Lore.prompt("click to select"));
+            ItemStack item = item(preset.icon(), RankColors.paint(preset, preset.name(), false), lore, equipped);
+            if (equipped) {
+                menu.set(COLOR_SLOTS[i], item);
+                continue;
+            }
+            menu.set(COLOR_SLOTS[i], item, click -> chooseColor(player, preset.id()));
+        }
+        if (current != null) {
+            menu.set(49, item(Material.BARRIER, "&cReset colour", List.of("&7Go back to the default rank colour."), false),
+                    click -> chooseColor(player, null));
+        }
+        menu.open(player);
+    }
+
+    private void chooseColor(Player player, @Nullable String id) {
+        if (!cooldowns.tryStart(player.getUniqueId(), "tag", 750)) {
+            return;
+        }
+        if (!player.hasPermission(RANK_COLOR_PERMISSION)) {
+            player.closeInventory();
+            return;
+        }
+        RankColors.Preset preset = RankColors.get(id);
+        players.get(player).get(section).setColor(preset == null ? null : preset.id());
+        players.saveSoon(player.getUniqueId());
+        if (preset == null) {
+            player.sendMessage(Msg.good("Rank colour reset."));
+        } else {
+            player.sendMessage(Msg.good("Rank colour set to ").append(Text.legacy(RankColors.paint(preset, preset.name(), false))));
+        }
+        openColors(player);
+    }
+
+    private static String stripCodes(String s) {
+        return s.replaceAll("[&§]#[0-9A-Fa-f]{6}", "").replaceAll("[&§][0-9A-Fa-fK-Ok-oRr]", "");
     }
 
     private static ItemStack item(Material material, String name, List<String> lore, boolean glow) {

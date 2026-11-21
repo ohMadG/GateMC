@@ -13,12 +13,17 @@ public final class Msg {
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
-    private static String goodPrefix = "<#10b900>✔ ";
-    private static String badPrefix = "<#b90000>✘ ";
-    private static String neutralPrefix = "<#e0b000>» ";
-    private static String goodColor = "<#10b900>";
-    private static String badColor = "<#b90000>";
-    private static String neutralColor = "<#e0b000>";
+    public static final String BRAND = "<gradient:#FF7A18:#FFD54F>";
+    public static final String ACCENT = "<#FFC21F>";
+    public static final String GOOD = "<#9BE15D>";
+    public static final String BAD = "<#FF5A4D>";
+
+    private static String goodPrefix = "<#9BE15D>✔ ";
+    private static String badPrefix = "<#FF5A4D>✘ ";
+    private static String neutralPrefix = "<#FFC21F>» ";
+    private static String goodColor = "<gray>";
+    private static String badColor = "<gray>";
+    private static String neutralColor = "<gray>";
 
     private Msg() {
     }
@@ -45,6 +50,15 @@ public final class Msg {
 
     public static Component neutral(String message) {
         return MM.deserialize(neutralPrefix + neutralColor + message);
+    }
+
+    /** A server-wide announcement or a feature's own message: a gradient tag, then the body in gray. */
+    public static Component header(String tag, String body) {
+        return MM.deserialize(headerText(tag) + "<gray>" + body);
+    }
+
+    public static String headerText(String tag) {
+        return "<gold><bold>" + tag.toUpperCase(java.util.Locale.ROOT) + "</bold></gold> <dark_gray>»</dark_gray> ";
     }
 
     public static Component parse(String miniMessage) {

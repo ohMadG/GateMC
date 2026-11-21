@@ -84,7 +84,8 @@ public final class PlotsModule implements GensModule, Listener {
                         + "ALTER TABLE gens_plots ADD COLUMN trap_level INTEGER NOT NULL DEFAULT 0;"
                         + "CREATE TABLE IF NOT EXISTS gens_raid_log (" + plugin.database().autoIdColumn("id") + ", raider TEXT NOT NULL, "
                         + "owner TEXT NOT NULL, at BIGINT NOT NULL, segments INTEGER NOT NULL, loot_cents BIGINT NOT NULL, "
-                        + "tokens INTEGER NOT NULL DEFAULT 0, caches INTEGER NOT NULL DEFAULT 0)");
+                        + "tokens INTEGER NOT NULL DEFAULT 0, caches INTEGER NOT NULL DEFAULT 0)",
+                "ALTER TABLE gens_plots ADD COLUMN machines INTEGER NOT NULL DEFAULT 0");
 
         ConfigurationSection root = config();
         grid = PlotSettings.grid(root);
@@ -98,6 +99,10 @@ public final class PlotsModule implements GensModule, Listener {
         reloadTemplates();
 
         PlotBuilder builder = new PlotBuilder(plugin, grid, () -> live, () -> template, () -> hub);
+        PlotProps.setLevelSource(uuid -> {
+            PlotData d = data(uuid);
+            return d == null ? 0 : d.genLevel();
+        });
         service = new PlotService(plugin.database(), plugin.getLogger(), world, grid, () -> live, () -> template, builder);
         int recovered = service.recover(this::firstPlatformReady);
         if (recovered > 0) {
@@ -309,6 +314,87 @@ public final class PlotsModule implements GensModule, Listener {
     public void onBucketFill(PlayerBucketFillEvent event) {
         if (blocked(event.getPlayer(), event.getBlock().getWorld())) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onHangingPlace(org.bukkit.event.hanging.HangingPlaceEvent event) {
+        if (event.getPlayer() == null ? live.protectWorld() && event.getEntity().getWorld() == service.world()
+                : blocked(event.getPlayer(), event.getEntity().getWorld())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onHangingBreak(org.bukkit.event.hanging.HangingBreakEvent event) {
+        if (!live.protectWorld() || event.getEntity().getWorld() != service.world()) {
+            return;
+        }
+        if (event instanceof org.bukkit.event.hanging.HangingBreakByEntityEvent byEntity
+                && byEntity.getRemover() instanceof Player p && p.hasPermission(BUILD)) {
+            return;
+        }
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onEntityPlace(org.bukkit.event.entity.EntityPlaceEvent event) {
+        Player p = event.getPlayer();
+        if (p == null ? live.protectWorld() && event.getEntity().getWorld() == service.world() : blocked(p, event.getEntity().getWorld())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onStandManipulate(org.bukkit.event.player.PlayerArmorStandManipulateEvent event) {
+        if (blocked(event.getPlayer(), event.getRightClicked().getWorld())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onFrameUse(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        if ((event.getRightClicked() instanceof org.bukkit.entity.ItemFrame || event.getRightClicked() instanceof org.bukkit.entity.ArmorStand)
+                && blocked(event.getPlayer(), event.getRightClicked().getWorld())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onDecorDamage(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        org.bukkit.entity.Entity e = event.getEntity();
+        if (!(e instanceof org.bukkit.entity.Hanging || e instanceof org.bukkit.entity.ArmorStand)
+                || !live.protectWorld() || e.getWorld() != service.world()) {
+            return;
+        }
+        org.bukkit.entity.Entity damager = event.getDamager() instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof org.bukkit.entity.Entity shooter
+                ? shooter : event.getDamager();
+        if (!(damager instanceof Player p) || !p.hasPermission(BUILD)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onIgnite(org.bukkit.event.block.BlockIgniteEvent event) {
+        if (!live.protectWorld() || event.getBlock().getWorld() != service.world()) {
+            return;
+        }
+        if (event.getPlayer() == null || !event.getPlayer().hasPermission(BUILD)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onEntityExplode(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (live.protectWorld() && event.getEntity().getWorld() == service.world()) {
+            event.blockList().clear();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBlockExplode(org.bukkit.event.block.BlockExplodeEvent event) {
+        if (live.protectWorld() && event.getBlock().getWorld() == service.world()) {
+            event.blockList().clear();
         }
     }
 

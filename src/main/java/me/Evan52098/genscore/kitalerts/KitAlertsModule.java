@@ -100,7 +100,7 @@ public final class KitAlertsModule implements GensModule, Listener {
                 List.copyOf(kits), Map.copyOf(names),
                 c.getString("title", "&a&lKIT READY"),
                 c.getString("subtitle", "{kits} &fcan be claimed again!"),
-                c.getString("chat", "&a&lKITS &8» {kits} &fis ready again! &7Claim it with &e/kit"));
+                c.getString("chat", "&6&lKITS &8» {kits} &fis ready again! &7Claim it with &e/kit"));
     }
 
     private void tick() {

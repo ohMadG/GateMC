@@ -1,0 +1,102 @@
+# Factory base styles (/basestyle). Each style swaps the blocks of the factory fortress for its own set.
+# palette: template block -> new block. Fortress blocks: smooth_stone (floor), polished_andesite (floor edge),
+#   stone_bricks (walls), deepslate_bricks (wall base), chiseled_stone_bricks (wall top), stone_brick_wall
+#   (battlements; map to another *_wall), polished_blackstone_bricks (towers), polished_deepslate (gate frame),
+#   iron_block (gate housing), sea_lantern (lights).
+# door: the garage door block. ranks: LuckPerms groups that unlock it (players need group.<rank>);
+#   genscore.basestyle.<id> also unlocks it. A style with no ranks is free.
+# Reload with /basestyle reload.
+
+menu-title: '&b&l⚒ &f&lBASE STYLES &b&l⚒'
+default: stonework
+change-cooldown: 30
+
+styles:
+  stonework:
+    name: '&7&lStonework'
+    icon: STONE_BRICKS
+    lore: ['The classic stone fortress.']
+    ranks: []
+    door: light_gray_concrete
+    palette: {}
+  ironworks:
+    name: '&b&lIronworks'
+    icon: IRON_BLOCK
+    lore: ['Concrete and steel with', 'hazard-striped edges.']
+    ranks: [vip, vipplus, mvp, mvpplus, legend]
+    door: iron_block
+    palette:
+      smooth_stone: gray_concrete
+      polished_andesite: yellow_concrete
+      stone_bricks: light_gray_concrete
+      deepslate_bricks: black_concrete
+      chiseled_stone_bricks: yellow_concrete
+      stone_brick_wall: andesite_wall
+      polished_blackstone_bricks: gray_concrete
+      polished_deepslate: black_concrete
+  copperworks:
+    name: '&6&lCopperworks'
+    icon: WAXED_COPPER_BLOCK
+    lore: ['Gleaming copper walls,', 'weathered towers.']
+    ranks: [vipplus, mvp, mvpplus, legend]
+    door: waxed_cut_copper
+    palette:
+      smooth_stone: waxed_cut_copper
+      polished_andesite: waxed_exposed_cut_copper
+      stone_bricks: waxed_copper_block
+      deepslate_bricks: waxed_oxidized_cut_copper
+      chiseled_stone_bricks: waxed_chiseled_copper
+      stone_brick_wall: tuff_brick_wall
+      polished_blackstone_bricks: waxed_weathered_copper
+      polished_deepslate: polished_tuff
+      sea_lantern: ochre_froglight
+  nether_forge:
+    name: '&c&lNether Forge'
+    icon: NETHER_BRICKS
+    lore: ['Nether brick and blackstone,', 'gold trim and glowing lights.']
+    ranks: [mvp, mvpplus, legend]
+    door: crimson_planks
+    palette:
+      smooth_stone: polished_blackstone
+      polished_andesite: gilded_blackstone
+      stone_bricks: nether_bricks
+      deepslate_bricks: red_nether_bricks
+      chiseled_stone_bricks: chiseled_nether_bricks
+      stone_brick_wall: nether_brick_wall
+      polished_blackstone_bricks: red_nether_bricks
+      polished_deepslate: polished_basalt
+      iron_block: gold_block
+      sea_lantern: shroomlight
+  deep_sea:
+    name: '&3&lDeep Sea'
+    icon: PRISMARINE_BRICKS
+    lore: ['A prismarine stronghold', 'with diamond trim.']
+    ranks: [mvpplus, legend]
+    door: prismarine_bricks
+    palette:
+      smooth_stone: prismarine_bricks
+      polished_andesite: dark_prismarine
+      stone_bricks: prismarine
+      deepslate_bricks: deepslate_tiles
+      chiseled_stone_bricks: prismarine_bricks
+      stone_brick_wall: prismarine_wall
+      polished_blackstone_bricks: dark_prismarine
+      polished_deepslate: dark_prismarine
+      iron_block: diamond_block
+  royal_void:
+    name: '&5&lRoyal Void'
+    icon: AMETHYST_BLOCK
+    lore: ['Purpur and obsidian walls,', 'amethyst towers, gold trim.']
+    ranks: [legend]
+    door: quartz_bricks
+    palette:
+      smooth_stone: smooth_quartz
+      polished_andesite: gold_block
+      stone_bricks: purpur_block
+      deepslate_bricks: obsidian
+      chiseled_stone_bricks: purpur_pillar
+      stone_brick_wall: end_stone_brick_wall
+      polished_blackstone_bricks: amethyst_block
+      polished_deepslate: obsidian
+      iron_block: gold_block
+      sea_lantern: pearlescent_froglight

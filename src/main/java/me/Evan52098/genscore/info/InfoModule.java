@@ -78,7 +78,7 @@ public final class InfoModule implements GensModule, Listener {
         discordUrl = d.getString("url", "");
         discordLabel = d.getString("label", "&9&l[CLICK FOR DISCORD]");
         List<String> lines = d.getStringList("message");
-        discordMessage = lines.isEmpty() ? List.of("&9&lDISCORD &8» &7Join the community: {discord}") : List.copyOf(lines);
+        discordMessage = lines.isEmpty() ? List.of("&6&lDISCORD &8» &7Join the community: {discord}") : List.copyOf(lines);
         if (!discordUrl.isEmpty() && !Text.isWebLink(discordUrl)) {
             plugin.getLogger().warning("[info] info.discord.url is not an http(s) link; it will not be clickable.");
         }

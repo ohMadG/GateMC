@@ -30,11 +30,80 @@ import java.util.function.Consumer;
  */
 public final class Menu implements InventoryHolder {
 
-    private final Inventory inventory;
+    private static final java.util.Set<java.util.UUID> PACKED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private record Return(String label, Consumer<Player> action, long until) {
+    }
+
+    private static final Map<java.util.UUID, Return> RETURNS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void setReturn(Player player, String label, Consumer<Player> action) {
+        RETURNS.put(player.getUniqueId(), new Return(label, action, System.currentTimeMillis() + 10 * 60_000L));
+    }
+
+    public static void clearReturn(Player player) {
+        RETURNS.remove(player.getUniqueId());
+    }
+
+    private void addReturn(Player player) {
+        Return r = RETURNS.get(player.getUniqueId());
+        if (r == null) {
+            return;
+        }
+        if (r.until() < System.currentTimeMillis()) {
+            RETURNS.remove(player.getUniqueId(), r);
+            return;
+        }
+        int slot = (rows - 1) * 9;
+        if (buttons.containsKey(slot)) {
+            return;
+        }
+        ItemStack there = inventory.getItem(slot);
+        if (there != null && !there.isEmpty() && !there.getType().name().endsWith("STAINED_GLASS_PANE")) {
+            return;
+        }
+        set(slot, MenuStyle.back(r.label()), click -> {
+            RETURNS.remove(player.getUniqueId(), r);
+            r.action().accept(player);
+        });
+    }
+    private static final net.kyori.adventure.key.Key GUI_FONT = net.kyori.adventure.key.Key.key("genscore", "gui");
+
+    private Inventory inventory;
+    private final int rows;
+    private final Component title;
+    private boolean styled;
+    private boolean custom;
+    private boolean plain;
     private final Map<Integer, Consumer<InventoryClickEvent>> buttons = new HashMap<>();
 
     public Menu(int rows, Component title) {
-        this.inventory = Bukkit.createInventory(this, Math.max(1, Math.min(6, rows)) * 9, title);
+        this.rows = Math.max(1, Math.min(6, rows));
+        this.title = title;
+        this.inventory = Bukkit.createInventory(this, this.rows * 9, title);
+    }
+
+    public Menu customTitle() {
+        this.custom = true;
+        return this;
+    }
+
+    /** Leave empty slots empty (menus that mirror a real inventory). */
+    public Menu plain() {
+        this.plain = true;
+        return this;
+    }
+
+    public static boolean styledFor(Player player) {
+        return PACKED.contains(player.getUniqueId()) && !me.Evan52098.genscore.util.Bedrock.is(player);
+    }
+
+    private Component styledTitle() {
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(title);
+        Component background = Component.text("\ue000" + (char) (0xE100 + rows) + "\ue001")
+                .font(GUI_FONT).color(net.kyori.adventure.text.format.NamedTextColor.WHITE);
+        return Component.empty().append(background)
+                .append(Component.text(plain, net.kyori.adventure.text.format.TextColor.color(0xFFB347)));
     }
 
     /** An item that does nothing when clicked. */
@@ -61,7 +130,24 @@ public final class Menu implements InventoryHolder {
     }
 
     /** Opens the menu. Call on the player's thread. */
+    public boolean isEmpty(int slot) {
+        ItemStack i = slot >= 0 && slot < inventory.getSize() ? inventory.getItem(slot) : null;
+        return i == null || i.isEmpty();
+    }
+
     public void open(Player player) {
+        if (!custom && !plain) {
+            MenuStyle.frame(this, rows);
+        }
+        addReturn(player);
+        if (!styled && !custom) {
+            Component themed = styledFor(player) ? styledTitle()
+                    : MenuStyle.title(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(title));
+            Inventory fancy = Bukkit.createInventory(this, rows * 9, themed);
+            fancy.setContents(inventory.getContents());
+            inventory = fancy;
+            styled = true;
+        }
         player.openInventory(inventory);
     }
 
@@ -83,6 +169,21 @@ public final class Menu implements InventoryHolder {
                     button.accept(event);
                 }
             }
+        }
+
+        @EventHandler
+        public void onPack(org.bukkit.event.player.PlayerResourcePackStatusEvent event) {
+            switch (event.getStatus()) {
+                case SUCCESSFULLY_LOADED -> PACKED.add(event.getPlayer().getUniqueId());
+                case DECLINED, FAILED_DOWNLOAD, FAILED_RELOAD, INVALID_URL, DISCARDED -> PACKED.remove(event.getPlayer().getUniqueId());
+                default -> {
+                }
+            }
+        }
+
+        @EventHandler
+        public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+            PACKED.remove(event.getPlayer().getUniqueId());
         }
 
         @EventHandler(ignoreCancelled = true)

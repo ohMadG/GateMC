@@ -56,21 +56,13 @@ final class CosmeticsMenu {
             menu.set(CATEGORY_SLOTS[i], Lore.item(cat.icon(), "&b" + cat.title(), lore), e -> openCategory(player, cat, 0));
         }
 
-        int kills = data.kills();
-        CosmeticsConfig.KillRank rank = cfg.rankFor(kills);
-        CosmeticsConfig.KillRank next = cfg.nextRank(kills);
-        Lore rankLore = Lore.builder(Lore.Accent.WHITE)
-                .subcategory("Kill rank")
-                .description("Shown above your head. Earned by", "killing other players.")
-                .divider()
-                .stat("Kills", String.valueOf(kills))
-                .stat("Rank", rank == null ? "None" : rank.display());
-        if (next != null) {
-            rankLore.stat("Next", next.display() + " &7(" + (next.kills() - kills) + " more)");
-        }
-        menu.set(29, Lore.item(Material.IRON_SWORD, "&fKill Rank", rankLore.build()));
+        var credits = me.Evan52098.genscore.shards.ShardsModule.service();
+        long balance = credits == null ? 0 : credits.balance(player.getUniqueId());
+        menu.set(29, Lore.item(Material.AMETHYST_SHARD, "&dCredits: &f" + String.format("%,d", balance), Lore.builder(Lore.Accent.WHITE)
+                .description("Buy any locked cosmetic", "with credits. Get credits on", "the store or from crates.")
+                .build()));
 
-        if (player.hasPermission(CosmeticsModule.HOMEICON)) {
+        if (module.homesEnabled() && player.hasPermission(CosmeticsModule.HOMEICON)) {
             menu.set(33, Lore.item(Material.RED_BED, "&fHome Icons", Lore.builder(Lore.Accent.WHITE)
                     .subcategory("Homes")
                     .description("Pick the icon each of your", "homes shows in the homes menu.")
@@ -107,14 +99,13 @@ final class CosmeticsMenu {
             for (String line : c.description()) {
                 lore.description(line);
             }
-            if (cat == CosmeticCategory.TOOL_SKIN && c.skin() != null) {
-                lore.divider().description("&7Others see it on your tools;", "&7your own view stays the same.");
-            }
             lore.divider().stat("Status", selected ? "Selected" : owned ? "Owned" : "Locked");
-            if (!owned) {
-                lore.divider().description(cfg.lockedHint);
-            } else {
+            if (owned) {
                 lore.clickPrompt(selected ? "Click to unequip" : "Click to equip");
+            } else if (c.price() > 0) {
+                lore.stat("Price", c.price() + " credits").clickPrompt("Click to buy");
+            } else {
+                lore.divider().description(cfg.lockedHint);
             }
             ItemStack icon = Lore.item(c.icon(), c.displayName(), lore.build());
             menu.set(i, icon, e -> click(player, cat, c, p));
@@ -149,7 +140,7 @@ final class CosmeticsMenu {
             return;
         }
         if (!module.owns(player, data, current)) {
-            player.sendMessage(Msg.bad("You don't own " + Msg.white(CosmeticsModule.plain(current.displayName())) + " yet."));
+            module.buy(player, data, current, () -> openCategory(player, cat, page));
             return;
         }
         if (current.id().equals(data.active(cat))) {

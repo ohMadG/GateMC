@@ -20,12 +20,12 @@ storage:
 
 # Chat message style (MiniMessage). Used by every module.
 messages:
-  good-prefix: '<#10b900>✔ '
-  bad-prefix: '<#b90000>✘ '
-  neutral-prefix: '<#e0b000>» '
-  good-color: '<#10b900>'
-  bad-color: '<#b90000>'
-  neutral-color: '<#e0b000>'
+  good-prefix: '<#9BE15D>✔ '
+  bad-prefix: '<#FF5A4D>✘ '
+  neutral-prefix: '<#FFC21F>» '
+  good-color: '<gray>'
+  bad-color: '<gray>'
+  neutral-color: '<gray>'
 
 # Plots (gens roadmap phase 1). Every online player gets a factory on a shared platform: a plaza in the middle with
 # four roads running out of it, and factory lots on both sides of every road, all facing their road. Players walk the
@@ -104,6 +104,45 @@ plots:
 
 # Factory (gens roadmap phase 2, plus the gate from phase 3). Reloads with /gensadmin reload.
 factory:
+  # Raid lockpicks (Raid Gear menu). Hold one and right-click a closed enemy gate: a lock-picking game opens. A
+  # tension marker sweeps along a track; click when it's on the sweet spot to set a pin (each pin moves the spot and
+  # speeds the marker up). Set every pin before time runs out = the gate is jammed open (owner can't close it) for
+  # jam-seconds. Too many misses or running out of time snaps the pick. Closing the game, moving away or getting hit
+  # stops it (pick kept). The owner is warned and can click their gate to jam the lock (pick snaps).
+  # Shielded factories can't be picked.
+  lockpick:
+    enabled: true
+    price-tokens: 10
+    # Lockpick upgrades (Rusty -> Iron -> Steel -> Gold -> Diamond -> Netherite), tokens for each next tier. Each tier
+    # adds 2s; every 2 tiers +1 miss; marker slower; tiers 3 and 5 widen the sweet spot. Stacks with skill.
+    upgrade-costs: [60, 150, 350, 800, 1600]
+    pins: 3
+    pins-per-lock-level: 1
+    max-pins: 8
+    strikes: 1
+    gear-levels-per-extra-strike: 5
+    speed-ticks: 2
+    seconds: 10
+    seconds-per-pin: 2
+    jam-seconds: 15
+    cooldown-seconds: 30
+    range: 4
+    # Skill: the values above are for a brand-new lockpicker (hard). Each skill level adds 1s; every 3 levels the
+    # marker gets slower and you get 1 more miss; level 5 and 10 widen the sweet spot. Points: success/fail.
+    skill:
+      max-level: 10
+      points-per-level: 6
+      success-points: 3
+      fail-points: 1
+  # Paid rank boosts (best rank wins; LuckPerms group.<id>, inherited ranks count). tokens: % more tokens from
+  # everything earned in play (belt, caches, raids, defends, milestones, playtime, daily tasks; not store/crates).
+  # sale: % more sale value on the belt. hourly-tokens: extra tokens per hour played (base is 2).
+  rank-perks:
+    vip:     { tokens: 10, sale: 5,  hourly-tokens: 1 }
+    vipplus: { tokens: 20, sale: 10, hourly-tokens: 2 }
+    mvp:     { tokens: 35, sale: 15, hourly-tokens: 3 }
+    mvpplus: { tokens: 50, sale: 20, hourly-tokens: 4 }
+    legend:  { tokens: 75, sale: 25, hourly-tokens: 6 }
   gate:
     close-seconds: 45        # the owner closes the gate; it opens by itself after this. Closed: only the owner gets in.
     door-block: light_gray_concrete   # the garage door slats
@@ -112,13 +151,19 @@ factory:
     speed:                   # speed upgrades, generated: 1.25x, 1.5x ... up to max-multiplier x the start speed
       max-multiplier: 10     # 10x = 5 segments a second
       step: 0.25             # 36 upgrades from 1x to 10x
-      base-price: 800        # the first speed upgrade
+      base-price: 250        # the first speed upgrade
       price-growth: 1.5      # each costs this much more than the last (10x after about 95 hours of play)
+      price-growth-start: 1.5   # each speed upgrade costs this much more than the last at first...
+      price-growth-end: 1.8     # ...rising to this by ramp-levels: quick early, slow late
+      ramp-levels: 22
     # speed-levels:          # or list them by hand instead (this replaces the generated ones):
     #   - {speed: 0.75, price: 150}
     length-step: 2           # segments added per length upgrade
-    length-base-price: 200   # first length upgrade
+    length-base-price: 40   # first length upgrade
     length-price-growth: 1.5 # each length upgrade costs this much more than the last (full belt after about a day)
+    length-price-growth-start: 1.5
+    length-price-growth-end: 1.8
+    length-ramp: 18
     gen-interval-seconds: 0.1    # fastest the gen can make items (10 a second); it waits while the start of the belt is full
     value-per-segment: 0.10  # each working belt segment adds 10% of the item's base value
     deposit-every-seconds: 5 # earnings are paid into the balance this often (one ledger line each time)
@@ -131,10 +176,13 @@ factory:
       # Prices: tier 2 costs base-price; each next tier costs (price-growth + early extra) times the one before, the
       # early extra fading over early-fade-tiers. Quick at the start, then each tier takes longer than the last.
       # An efficient player (tools/balance_sim.py): tier 11 ~1h, 26 ~4h, 51 ~20h, 101 ~180h, 150 ~800h of play.
-      base-price: 100
+      base-price: 25
       price-growth: 1.135
       early-extra-growth: 0.25
       early-fade-tiers: 40
+      price-growth-start: 1.22  # replaces price-growth/early-extra: cheap first tiers, each step a bit steeper
+      price-growth-end: 1.26
+      ramp-tiers: 70
       items: [cobblestone, coal, raw_copper, copper_ingot, raw_iron, iron_ingot, redstone, lapis_lazuli, raw_gold,
               gold_ingot, quartz, amethyst_shard, slime_ball, honeycomb, resin_clump, armadillo_scute, turtle_scute,
               rabbit_foot, glowstone_dust, magma_cream, prismarine_shard, prismarine_crystals, emerald, diamond,
@@ -146,16 +194,16 @@ factory:
     # tiers:                 # or list them by hand instead (this replaces the generated ones):
     #   - {name: Raw Copper, item: raw_copper, value: 1.0, price: 0}
   drops:                     # special items that ride the belt now and then (drop luck in /tokens raises both)
-    token-chance: 0.0033     # per item made: about 1 in 300 is a token
-    cache-chance: 0.0011     # about 1 in 900 is a cache
+    token-chance: 0.0012    # per item made: about 1 in 830 is a token
+    cache-chance: 0.0004    # about 1 in 2500 is a cache
   caches:                    # broken in /caches
-    weights: {common: 70, rare: 22, epic: 7, legendary: 1}
+    weights: {common: 160, rare: 32, epic: 7, legendary: 1}
     money-minutes: {common: 2, rare: 10, epic: 30, legendary: 120}   # cash = this many minutes of your income (x0.5-1.5)
     tokens:
-      common: {min: 1, max: 3}
-      rare: {min: 4, max: 10}
-      epic: {min: 12, max: 25}
-      legendary: {min: 40, max: 80}
+      common: {min: 1, max: 2}
+      rare: {min: 3, max: 6}
+      epic: {min: 8, max: 15}
+      legendary: {min: 20, max: 35}
     key-chance: {common: 0.05, rare: 0.2, epic: 0.5, legendary: 1.0}
     key-crates: [amethyst]   # crate keys a cache can give (keycrates module); one is picked at random
   token-shop:                # prices in tokens; level n costs base-price * price-growth^n
@@ -182,6 +230,9 @@ factory:
     repair-lock-seconds: 5   # no repairs until this long after the last hit
     loot-share: 0.4          # share of a broken segment's items the raider takes with no gear
     tokens-per-segment: 1
+    steal-percent: 0.03      # each broken segment steals this share of the owner's balance
+    steal-max-minutes: 10    # ...but no more than this many minutes of the owner's income
+    steal-min: 25            # the cap is never below this, so new bases are still worth raiding
   gear:                      # raid gear, paid in money
     max-level: 25
     base-price: 2000
@@ -224,6 +275,7 @@ teleport:
   cancel-on-move: true
   cancel-on-damage: true
   homes:
+    enabled: false    # /home, /sethome, /homeicon and /allhomes; off on GateMC
     # More with the permission genscore.homes.<number>, or genscore.homes.unlimited.
     max-default: 3
   tpa:
@@ -257,17 +309,1535 @@ essentials:
     - '<gray>1. <white>No cheating or exploiting.'
     - '<gray>2. <white>Be respectful in chat.'
 
+join-leave:
+  enabled: true
+  join: '<dark_gray>[<green>+</green>]</dark_gray> <gray>{player}'
+  first-join: '<dark_gray>[<gold>★</gold>]</dark_gray> <yellow>Welcome <white>{player}</white> to GateMC!'
+  quit: '<dark_gray>[<red>-</red>]</dark_gray> <gray>{player}'
+
 chat:
   # MiniMessage. <prefix> and <suffix> come from LuckPerms, <name> is the nickname if set.
-  format: '<badge><tag><prefix><name><gray>: </gray><message>'
+  format: '<badge><prefix><name><tag><gray>: </gray><message>'
   cooldown-ms: 1000
   filter:
     enabled: true
+    alert-banned-words: false
     # Matched after removing look-alike letters, leetspeak, repeats and spacing (so "b a d" and "b4d" count).
-    zero-tolerance-words: []
-    banned-words: []
-    # Words that contain a banned word but are fine (e.g. "assassin" if "ass" is banned).
-    safe-words: []
+    zero-tolerance-words:
+      - 'heil hitler'
+      - 'rape kids'
+      - 'rape a kid'
+      - 'rape minors'
+      - 'rape children'
+      - 'raping kids'
+      - 'raping minors'
+      - 'i rape kids'
+      - 'i love cp'
+      - 'child porn'
+      - 'childporn'
+      - 'kiddie porn'
+      - 'kiddy porn'
+      - 'loli porn'
+      - 'lolicon'
+      - 'shotacon'
+      - 'pedophile'
+      - 'pedo'
+      - 'groom kids'
+      - 'grooming kids'
+      - 'molest a kid'
+      - 'molest kids'
+      - 'molest children'
+      - 'fuck a kid'
+      - 'fuck kids'
+      - 'sex with kids'
+      - 'sex with a minor'
+      - 'sex with children'
+      - 'nudes of kids'
+      - 'nigger'
+      - 'nigga'
+      - 'faggot'
+      - 'fag'
+      - 'tranny'
+      - 'trannie'
+      - 'trannies'
+      - 'shemale'
+      - 'heshe'
+      - 'newhalf'
+      - 'kike'
+      - 'spic'
+      - 'chink'
+      - 'wetback'
+      - 'beaner'
+      - 'gook'
+      - 'coon'
+      - 'identify as an attack helicopter'
+      - 'identifies as an attack helicopter'
+      - 'identifying as an attack helicopter'
+      - 'kill yourself'
+      - 'kys'
+    banned-words:
+      - 'fuck'
+      - 'fucker'
+      - 'fucking'
+      - 'fuckface'
+      - 'motherfucker'
+      - 'fuk'
+      - 'fck'
+      - 'shit'
+      - 'shitty'
+      - 'bullshit'
+      - 'shithead'
+      - 'bitch'
+      - 'bitches'
+      - 'bitchass'
+      - 'asshole'
+      - 'ass hole'
+      - 'bastard'
+      - 'dick'
+      - 'dickhead'
+      - 'dickface'
+      - 'pussy'
+      - 'cunt'
+      - 'whore'
+      - 'slut'
+      - 'slutty'
+      - 'twat'
+      - 'prick'
+      - 'douche'
+      - 'douchebag'
+      - 'retard'
+      - 'retarded'
+      - 'porn'
+      - 'porno'
+      - 'hentai'
+      - 'nude'
+      - 'nudes'
+      - 'blowjob'
+      - 'handjob'
+      - 'dildo'
+      - 'vibrator'
+      - 'masturbate'
+      - 'masturbating'
+      - 'boobs'
+      - 'titties'
+      - 'weed'
+      - 'marijuana'
+      - 'cocaine'
+      - 'heroin'
+      - 'meth'
+      - 'methamphetamine'
+      - 'rapist'
+      - '2g1c'
+      - '2 girls 1 cup'
+      - 'acrotomophilia'
+      - 'alabama hot pocket'
+      - 'alaskan pipeline'
+      - 'anal'
+      - 'anilingus'
+      - 'anus'
+      - 'apeshit'
+      - 'arsehole'
+      - 'ass'
+      - 'assmunch'
+      - 'auto erotic'
+      - 'autoerotic'
+      - 'babeland'
+      - 'baby batter'
+      - 'baby juice'
+      - 'ball gag'
+      - 'ball gravy'
+      - 'ball kicking'
+      - 'ball licking'
+      - 'ball sack'
+      - 'ball sucking'
+      - 'bangbros'
+      - 'bangbus'
+      - 'barely legal'
+      - 'barenaked'
+      - 'bastardo'
+      - 'bastinado'
+      - 'bbw'
+      - 'bdsm'
+      - 'beaner'
+      - 'beaners'
+      - 'beaver cleaver'
+      - 'beaver lips'
+      - 'beastiality'
+      - 'bestiality'
+      - 'big breasts'
+      - 'big knockers'
+      - 'big tits'
+      - 'bimbos'
+      - 'birdlock'
+      - 'black cock'
+      - 'blonde action'
+      - 'blonde on blonde action'
+      - 'blow job'
+      - 'blow your load'
+      - 'blue waffle'
+      - 'blumpkin'
+      - 'bollocks'
+      - 'bondage'
+      - 'boner'
+      - 'boob'
+      - 'booty call'
+      - 'brown showers'
+      - 'brunette action'
+      - 'bukkake'
+      - 'bulldyke'
+      - 'bullet vibe'
+      - 'bung hole'
+      - 'bunghole'
+      - 'busty'
+      - 'buttcheeks'
+      - 'butthole'
+      - 'camel toe'
+      - 'camgirl'
+      - 'camslut'
+      - 'camwhore'
+      - 'carpet muncher'
+      - 'carpetmuncher'
+      - 'chocolate rosebuds'
+      - 'cialis'
+      - 'circlejerk'
+      - 'cleveland steamer'
+      - 'clit'
+      - 'clitoris'
+      - 'clover clamps'
+      - 'clusterfuck'
+      - 'cock'
+      - 'cocks'
+      - 'coprolagnia'
+      - 'coprophilia'
+      - 'cornhole'
+      - 'coon'
+      - 'coons'
+      - 'creampie'
+      - 'cum'
+      - 'cumming'
+      - 'cumshot'
+      - 'cumshots'
+      - 'cunnilingus'
+      - 'darkie'
+      - 'date rape'
+      - 'daterape'
+      - 'deep throat'
+      - 'deepthroat'
+      - 'dendrophilia'
+      - 'dingleberry'
+      - 'dingleberries'
+      - 'dirty pillows'
+      - 'dirty sanchez'
+      - 'doggie style'
+      - 'doggiestyle'
+      - 'doggy style'
+      - 'doggystyle'
+      - 'dog style'
+      - 'dolcett'
+      - 'dominatrix'
+      - 'dommes'
+      - 'donkey punch'
+      - 'double dong'
+      - 'double penetration'
+      - 'dp action'
+      - 'dry hump'
+      - 'dvda'
+      - 'eat my ass'
+      - 'ecchi'
+      - 'ejaculation'
+      - 'erotic'
+      - 'erotism'
+      - 'fag'
+      - 'faggot'
+      - 'fecal'
+      - 'felch'
+      - 'fellatio'
+      - 'feltch'
+      - 'female squirting'
+      - 'femdom'
+      - 'figging'
+      - 'fingerbang'
+      - 'fingering'
+      - 'fisting'
+      - 'foot fetish'
+      - 'footjob'
+      - 'frotting'
+      - 'fuck buttons'
+      - 'fuckin'
+      - 'fucktards'
+      - 'fudge packer'
+      - 'fudgepacker'
+      - 'futanari'
+      - 'gangbang'
+      - 'gang bang'
+      - 'gay sex'
+      - 'genitals'
+      - 'giant cock'
+      - 'girls gone wild'
+      - 'goatcx'
+      - 'goatse'
+      - 'god damn'
+      - 'gokkun'
+      - 'golden shower'
+      - 'goodpoop'
+      - 'goo girl'
+      - 'goregasm'
+      - 'grope'
+      - 'group sex'
+      - 'g-spot'
+      - 'guro'
+      - 'hand job'
+      - 'homoerotic'
+      - 'honkey'
+      - 'hooker'
+      - 'horny'
+      - 'hot carl'
+      - 'humping'
+      - 'incest'
+      - 'intercourse'
+      - 'jack off'
+      - 'jail bait'
+      - 'jailbait'
+      - 'jelly donut'
+      - 'jerk off'
+      - 'jigaboo'
+      - 'jiggaboo'
+      - 'jiggerboo'
+      - 'jizz'
+      - 'juggs'
+      - 'kike'
+      - 'kinbaku'
+      - 'kinkster'
+      - 'kinky'
+      - 'knobbing'
+      - 'leather restraint'
+      - 'leather straight jacket'
+      - 'lemon party'
+      - 'livesex'
+      - 'lovemaking'
+      - 'male squirting'
+      - 'masturbation'
+      - 'menage a trois'
+      - 'milf'
+      - 'missionary position'
+      - 'mong'
+      - 'mound of venus'
+      - 'mr hands'
+      - 'muff diver'
+      - 'muffdiving'
+      - 'nambla'
+      - 'nawashi'
+      - 'negro'
+      - 'neonazi'
+      - 'nigga'
+      - 'nigger'
+      - 'nig nog'
+      - 'nimphomania'
+      - 'nipple'
+      - 'nipples'
+      - 'nsfw'
+      - 'nsfw images'
+      - 'nudity'
+      - 'nutten'
+      - 'nympho'
+      - 'nymphomania'
+      - 'octopussy'
+      - 'omorashi'
+      - 'one cup two girls'
+      - 'one guy one jar'
+      - 'orgasm'
+      - 'orgy'
+      - 'paedophile'
+      - 'paki'
+      - 'panties'
+      - 'panty'
+      - 'pedobear'
+      - 'pedophile'
+      - 'penis'
+      - 'phone sex'
+      - 'piece of shit'
+      - 'pikey'
+      - 'pissing'
+      - 'piss pig'
+      - 'pisspig'
+      - 'pleasure chest'
+      - 'pole smoker'
+      - 'ponyplay'
+      - 'poon'
+      - 'poontang'
+      - 'punany'
+      - 'poop chute'
+      - 'poopchute'
+      - 'pornography'
+      - 'prince albert piercing'
+      - 'pthc'
+      - 'pubes'
+      - 'queaf'
+      - 'queef'
+      - 'quim'
+      - 'raghead'
+      - 'raging boner'
+      - 'rape'
+      - 'raping'
+      - 'rectum'
+      - 'reverse cowgirl'
+      - 'rimjob'
+      - 'rimming'
+      - 'rosy palm'
+      - 'rosy palm and her 5 sisters'
+      - 'rusty trombone'
+      - 'sadism'
+      - 'schlong'
+      - 'scissoring'
+      - 'semen'
+      - 'sex'
+      - 'sexcam'
+      - 'sexo'
+      - 'sexual'
+      - 'shaved beaver'
+      - 'shaved pussy'
+      - 'shemale'
+      - 'shibari'
+      - 'shitblimp'
+      - 'shota'
+      - 'shrimping'
+      - 'skeet'
+      - 'slanteye'
+      - 'smut'
+      - 'snowballing'
+      - 'sodomize'
+      - 'sodomy'
+      - 'spastic'
+      - 'spic'
+      - 'splooge'
+      - 'splooge moose'
+      - 'spooge'
+      - 'spread legs'
+      - 'spunk'
+      - 'strap on'
+      - 'strapon'
+      - 'strappado'
+      - 'strip club'
+      - 'style doggy'
+      - 'suicide girls'
+      - 'swastika'
+      - 'swinger'
+      - 'tea bagging'
+      - 'threesome'
+      - 'throating'
+      - 'thumbzilla'
+      - 'tits'
+      - 'titty'
+      - 'topless'
+      - 'tosser'
+      - 'towelhead'
+      - 'tranny'
+      - 'tribadism'
+      - 'tub girl'
+      - 'tubgirl'
+      - 'tushy'
+      - 'twink'
+      - 'two girls one cup'
+      - 'upskirt'
+      - 'urethra play'
+      - 'urophilia'
+      - 'vagina'
+      - 'venus mound'
+      - 'viagra'
+      - 'violet wand'
+      - 'vorarephilia'
+      - 'voyeur'
+      - 'voyeurweb'
+      - 'voyuer'
+      - 'vulva'
+      - 'wank'
+      - 'wetback'
+      - 'wet dream'
+      - 'white power'
+      - 'worldsex'
+      - 'wrinkled starfish'
+      - 'xxx'
+      - 'yaoi'
+      - 'yellow showers'
+      - 'yiffy'
+      - 'zoophilia'
+      - 'anal sex'
+      - 'arse'
+      - 'arses'
+      - 'bellend'
+      - 'beotch'
+      - 'biatch'
+      - 'bitchtits'
+      - 'bitchy'
+      - 'blowjobs'
+      - 'boobies'
+      - 'bullshitting'
+      - 'chink'
+      - 'chinks'
+      - 'cock sucker'
+      - 'cocksucker'
+      - 'cocksucking'
+      - 'cumdump'
+      - 'cumslut'
+      - 'dick pic'
+      - 'dickheads'
+      - 'dickpic'
+      - 'dickwad'
+      - 'dipshit'
+      - 'dumbass'
+      - 'dumbfuck'
+      - 'dyke'
+      - 'dykes'
+      - 'end yourself'
+      - 'faggots'
+      - 'faggy'
+      - 'fags'
+      - 'fucked'
+      - 'fuckers'
+      - 'fuckhead'
+      - 'fucks'
+      - 'fuckup'
+      - 'fuckwit'
+      - 'fuker'
+      - 'fukin'
+      - 'fuking'
+      - 'fvck'
+      - 'go die'
+      - 'go kill yourself'
+      - 'gook'
+      - 'gooks'
+      - 'gtfo'
+      - 'handjobs'
+      - 'hang yourself'
+      - 'heil hitler'
+      - 'jackass'
+      - 'jerkoff'
+      - 'jizzed'
+      - 'kikes'
+      - 'kill urself'
+      - 'kill your self'
+      - 'kill yourself'
+      - 'knobhead'
+      - 'kys'
+      - 'masturbated'
+      - 'masturbates'
+      - 'mfer'
+      - 'mofo'
+      - 'molest'
+      - 'molester'
+      - 'molesting'
+      - 'mongoloid'
+      - 'motherfuckers'
+      - 'motherfucking'
+      - 'neck yourself'
+      - 'niggas'
+      - 'niggers'
+      - 'niglet'
+      - 'nude pic'
+      - 'nudepic'
+      - 'onlyfans'
+      - 'orgasms'
+      - 'pedo'
+      - 'pedos'
+      - 'phuck'
+      - 'phuk'
+      - 'pornhub'
+      - 'ragheads'
+      - 'raped'
+      - 'rapes'
+      - 'rapists'
+      - 'retards'
+      - 'rule 34'
+      - 'sandnigger'
+      - 'shitbag'
+      - 'shitheads'
+      - 'shits'
+      - 'shitstain'
+      - 'shitting'
+      - 'sieg heil'
+      - 'skank'
+      - 'skanks'
+      - 'sluts'
+      - 'spaz'
+      - 'spazz'
+      - 'spics'
+      - 'stfu'
+      - 'tard'
+      - 'thot'
+      - 'tiddies'
+      - 'towelheads'
+      - 'trannies'
+      - 'twats'
+      - 'wanker'
+      - 'wankers'
+      - 'wetbacks'
+      - 'white supremacy'
+      - 'whores'
+      - 'xhamster'
+      - 'xvideos'
+      - 'jap'
+      - 'wigger'
+      - 'wop'
+      - 'gyp'
+      - 'gypped'
+      - 'injun'
+      - 'curry muncher'
+      - 'crackhead'
+      - 'fentanyl'
+      - 'oxycodone'
+      - 'unalive yourself'
+      - 'commit sudoku'
+      - 'rope yourself'
+      - 'shat'
+      - 'dago'
+      - 'window licker'
+      - 'fatass'
+      - 'lardass'
+      - 'fatso'
+      - 'camel jockey'
+      - 'abbo'
+      - 'squaw'
+      - 'tar baby'
+      - 'jungle bunny'
+      - 'porch monkey'
+      - 'spearchucker'
+      - 'half breed'
+      - 'halfbreed'
+    safe-words:
+      - 'therapist'
+      - 'torpedo'
+      - 'torpedoes'
+      - 'torpedoed'
+      - 'torpedoing'
+      - 'pedometer'
+      - 'pedometers'
+      - 'spice'
+      - 'spices'
+      - 'spiced'
+      - 'spicy'
+      - 'spicier'
+      - 'spiciest'
+      - 'spiciness'
+      - 'skys'
+      - 'shiitake'
+      - 'shiitakes'
+      - 'beanery'
+      - 'scunthorpe'
+      - 'accumulate'
+      - 'accumulated'
+      - 'accumulates'
+      - 'accumulating'
+      - 'accumulation'
+      - 'accumulative'
+      - 'accumulator'
+      - 'accumulators'
+      - 'accuracy'
+      - 'accurate'
+      - 'accurately'
+      - 'acoustics'
+      - 'acquit'
+      - 'acquittal'
+      - 'acquitted'
+      - 'acquitting'
+      - 'adapt'
+      - 'adaptation'
+      - 'adaptations'
+      - 'addicted'
+      - 'addiction'
+      - 'addictions'
+      - 'addictive'
+      - 'adept'
+      - 'adequacy'
+      - 'adequate'
+      - 'adequately'
+      - 'adp'
+      - 'adultery'
+      - 'advocacy'
+      - 'advocate'
+      - 'advocates'
+      - 'aesthetic'
+      - 'aesthetics'
+      - 'affection'
+      - 'affectionally'
+      - 'affectionate'
+      - 'affidavit'
+      - 'affidavits'
+      - 'affiliate'
+      - 'affiliated'
+      - 'affiliates'
+      - 'affiliation'
+      - 'affiliations'
+      - 'affinity'
+      - 'affix'
+      - 'affixed'
+      - 'affixes'
+      - 'affixing'
+      - 'afflict'
+      - 'afflicted'
+      - 'affliction'
+      - 'afflictions'
+      - 'afternoon'
+      - 'afternoons'
+      - 'allspice'
+      - 'altitude'
+      - 'altitudes'
+      - 'ambergris'
+      - 'ammonia'
+      - 'ammonium'
+      - 'ammunition'
+      - 'analysis'
+      - 'analyst'
+      - 'analysts'
+      - 'analytic'
+      - 'analytical'
+      - 'analytically'
+      - 'analyze'
+      - 'analyzed'
+      - 'analyzer'
+      - 'analyzers'
+      - 'analyzes'
+      - 'analyzing'
+      - 'anaphylactic'
+      - 'anaphylaxis'
+      - 'ancestor'
+      - 'ancestors'
+      - 'ancestral'
+      - 'ancestry'
+      - 'apis'
+      - 'apocalypse'
+      - 'apocalyptic'
+      - 'apoplectic'
+      - 'apoplexy'
+      - 'apparatus'
+      - 'apparatuses'
+      - 'appetite'
+      - 'appetites'
+      - 'appetizer'
+      - 'appetizers'
+      - 'appetizing'
+      - 'applaud'
+      - 'applauded'
+      - 'applauding'
+      - 'applause'
+      - 'applicant'
+      - 'applicants'
+      - 'application'
+      - 'applications'
+      - 'applied'
+      - 'applies'
+      - 'apply'
+      - 'applying'
+      - 'appoint'
+      - 'appointed'
+      - 'appointee'
+      - 'appointees'
+      - 'appointing'
+      - 'appointment'
+      - 'appointments'
+      - 'appoints'
+      - 'appraisal'
+      - 'appraisals'
+      - 'appraise'
+      - 'appraised'
+      - 'appraises'
+      - 'appraising'
+      - 'appreciate'
+      - 'appreciated'
+      - 'appreciates'
+      - 'appreciating'
+      - 'appreciation'
+      - 'appreciative'
+      - 'apprehend'
+      - 'apprehended'
+      - 'apprehending'
+      - 'apprehension'
+      - 'apprehensive'
+      - 'apprentice'
+      - 'apprenticed'
+      - 'apprentices'
+      - 'apprenticeship'
+      - 'approach'
+      - 'approachable'
+      - 'approached'
+      - 'approaches'
+      - 'approaching'
+      - 'appropriate'
+      - 'appropriately'
+      - 'appropriateness'
+      - 'appropriation'
+      - 'appropriations'
+      - 'approval'
+      - 'approvals'
+      - 'approve'
+      - 'approved'
+      - 'approves'
+      - 'approving'
+      - 'approvingly'
+      - 'approximate'
+      - 'approximated'
+      - 'approximately'
+      - 'approximation'
+      - 'approximations'
+      - 'aptitude'
+      - 'aptitudes'
+      - 'aqua'
+      - 'aquarium'
+      - 'aquariums'
+      - 'aquatic'
+      - 'aqueduct'
+      - 'aqueducts'
+      - 'architectural'
+      - 'architecture'
+      - 'architectures'
+      - 'artichoke'
+      - 'artichokes'
+      - 'articulate'
+      - 'articulated'
+      - 'articulates'
+      - 'articulating'
+      - 'articulation'
+      - 'aspect'
+      - 'aspects'
+      - 'aspersions'
+      - 'asphalt'
+      - 'asphyxiate'
+      - 'asphyxiated'
+      - 'asphyxiation'
+      - 'aspic'
+      - 'aspirate'
+      - 'aspiration'
+      - 'aspirations'
+      - 'aspire'
+      - 'aspired'
+      - 'aspires'
+      - 'aspirin'
+      - 'aspiring'
+      - 'assail'
+      - 'assailant'
+      - 'assailants'
+      - 'assailed'
+      - 'assailing'
+      - 'assassin'
+      - 'assassinate'
+      - 'assassinated'
+      - 'assassinates'
+      - 'assassinating'
+      - 'assassination'
+      - 'assassinations'
+      - 'assault'
+      - 'assaulted'
+      - 'assaulting'
+      - 'assaults'
+      - 'assay'
+      - 'assayed'
+      - 'assaying'
+      - 'assays'
+      - 'assemble'
+      - 'assembled'
+      - 'assemblies'
+      - 'assembly'
+      - 'asset'
+      - 'assets'
+      - 'assiduity'
+      - 'assiduous'
+      - 'assiduously'
+      - 'assign'
+      - 'assignation'
+      - 'assignations'
+      - 'assigned'
+      - 'assignment'
+      - 'assignments'
+      - 'assimilate'
+      - 'assimilated'
+      - 'assimilates'
+      - 'assimilating'
+      - 'assimilation'
+      - 'assist'
+      - 'assistance'
+      - 'assistant'
+      - 'assistants'
+      - 'assisted'
+      - 'associate'
+      - 'associated'
+      - 'association'
+      - 'associations'
+      - 'assonance'
+      - 'assort'
+      - 'assorted'
+      - 'assortment'
+      - 'assortments'
+      - 'assuage'
+      - 'assuaged'
+      - 'assuages'
+      - 'assuaging'
+      - 'assume'
+      - 'assumed'
+      - 'assumption'
+      - 'assumptions'
+      - 'assurance'
+      - 'assure'
+      - 'assured'
+      - 'asunder'
+      - 'asylum'
+      - 'asylums'
+      - 'asymmetrically'
+      - 'asymmetry'
+      - 'atmosphere'
+      - 'atmospheres'
+      - 'atmospheric'
+      - 'attitude'
+      - 'attitudes'
+      - 'attribute'
+      - 'attributed'
+      - 'attributes'
+      - 'attributing'
+      - 'attribution'
+      - 'attributions'
+      - 'audition'
+      - 'auditions'
+      - 'auditory'
+      - 'auspex'
+      - 'auspicatious'
+      - 'auspice'
+      - 'auspices'
+      - 'auspicious'
+      - 'authentic'
+      - 'authenticate'
+      - 'authenticated'
+      - 'authenticates'
+      - 'authenticating'
+      - 'authentication'
+      - 'authenticity'
+      - 'basement'
+      - 'basements'
+      - 'baseness'
+      - 'baseplate'
+      - 'baseplates'
+      - 'basic'
+      - 'basically'
+      - 'basics'
+      - 'basin'
+      - 'basins'
+      - 'basis'
+      - 'basket'
+      - 'basketball'
+      - 'basketballs'
+      - 'baskets'
+      - 'basque'
+      - 'bass'
+      - 'bassist'
+      - 'bassists'
+      - 'bassoon'
+      - 'bassoons'
+      - 'basswood'
+      - 'bastion'
+      - 'bastions'
+      - 'benedict'
+      - 'benediction'
+      - 'benedictions'
+      - 'beneficence'
+      - 'beneficent'
+      - 'beneficial'
+      - 'beneficiaries'
+      - 'beneficiary'
+      - 'benefit'
+      - 'benefited'
+      - 'benefiting'
+      - 'benefits'
+      - 'benevolence'
+      - 'benevolent'
+      - 'benign'
+      - 'benignly'
+      - 'bicycle'
+      - 'bicycled'
+      - 'bicycles'
+      - 'bicycling'
+      - 'bicyclist'
+      - 'bicyclists'
+      - 'brass'
+      - 'brasses'
+      - 'brassiere'
+      - 'brassieres'
+      - 'brassy'
+      - 'buffoon'
+      - 'buffoons'
+      - 'bypass'
+      - 'bypassed'
+      - 'bypasses'
+      - 'campus'
+      - 'campuses'
+      - 'canass'
+      - 'canopic'
+      - 'canopies'
+      - 'canopy'
+      - 'canopying'
+      - 'capis'
+      - 'capstone'
+      - 'capstones'
+      - 'caption'
+      - 'captioned'
+      - 'captioning'
+      - 'captions'
+      - 'captivate'
+      - 'captivated'
+      - 'captivates'
+      - 'captivating'
+      - 'captive'
+      - 'captives'
+      - 'captivity'
+      - 'captor'
+      - 'captors'
+      - 'capture'
+      - 'captured'
+      - 'captures'
+      - 'capturing'
+      - 'cartoon'
+      - 'cartoons'
+      - 'census'
+      - 'censuses'
+      - 'chassis'
+      - 'chickadee'
+      - 'chickadees'
+      - 'class'
+      - 'classes'
+      - 'classic'
+      - 'classical'
+      - 'classicism'
+      - 'classicist'
+      - 'classicists'
+      - 'classification'
+      - 'classifications'
+      - 'classified'
+      - 'classifies'
+      - 'classify'
+      - 'classifying'
+      - 'classroom'
+      - 'classrooms'
+      - 'clematis'
+      - 'clepsydra'
+      - 'cockatoo'
+      - 'cockatoos'
+      - 'cockle'
+      - 'cockles'
+      - 'cockney'
+      - 'cockneys'
+      - 'cockpit'
+      - 'cockpits'
+      - 'cockroach'
+      - 'cockroaches'
+      - 'cocktail'
+      - 'cocktails'
+      - 'cocoon'
+      - 'cocoons'
+      - 'cocured'
+      - 'cocurricular'
+      - 'colossus'
+      - 'compass'
+      - 'compassed'
+      - 'compasses'
+      - 'compassing'
+      - 'concentrate'
+      - 'concentrated'
+      - 'concentrates'
+      - 'concentrating'
+      - 'concentration'
+      - 'concentrations'
+      - 'concentric'
+      - 'concept'
+      - 'conception'
+      - 'conceptions'
+      - 'concepts'
+      - 'conceptual'
+      - 'conceptualize'
+      - 'conceptualized'
+      - 'conceptualizes'
+      - 'conceptualizing'
+      - 'concern'
+      - 'concerned'
+      - 'concerning'
+      - 'concerns'
+      - 'concert'
+      - 'concerted'
+      - 'concerto'
+      - 'concertos'
+      - 'concerts'
+      - 'concession'
+      - 'concessions'
+      - 'conciliate'
+      - 'conciliation'
+      - 'concise'
+      - 'concisely'
+      - 'conciseness'
+      - 'conclave'
+      - 'conclaves'
+      - 'conclude'
+      - 'concluded'
+      - 'concludes'
+      - 'concluding'
+      - 'conclusion'
+      - 'conclusions'
+      - 'conclusive'
+      - 'conclusively'
+      - 'concoct'
+      - 'concocted'
+      - 'concocting'
+      - 'concoction'
+      - 'concoctions'
+      - 'concomitant'
+      - 'concord'
+      - 'concordance'
+      - 'concrete'
+      - 'concretely'
+      - 'concubinage'
+      - 'concubine'
+      - 'concubines'
+      - 'concur'
+      - 'concurred'
+      - 'concurrence'
+      - 'concurrent'
+      - 'concurrently'
+      - 'concurring'
+      - 'concurs'
+      - 'concussion'
+      - 'concussions'
+      - 'condominium'
+      - 'condominiums'
+      - 'condone'
+      - 'condoned'
+      - 'condones'
+      - 'condoning'
+      - 'conduct'
+      - 'conducted'
+      - 'conducting'
+      - 'conduction'
+      - 'conductive'
+      - 'conductivity'
+      - 'conductor'
+      - 'conductors'
+      - 'conducts'
+      - 'conduit'
+      - 'conduits'
+      - 'consensus'
+      - 'conspicuous'
+      - 'conspicuously'
+      - 'crepe'
+      - 'crepes'
+      - 'crepitus'
+      - 'cucumber'
+      - 'cucumbers'
+      - 'cucurbit'
+      - 'cucurbits'
+      - 'cummerbund'
+      - 'cummerbunds'
+      - 'cumulative'
+      - 'cumulatively'
+      - 'cumulonimbus'
+      - 'cumulus'
+      - 'cuspis'
+      - 'cyanosis'
+      - 'cyanotic'
+      - 'denigrate'
+      - 'denigrated'
+      - 'denigrates'
+      - 'denigrating'
+      - 'denigration'
+      - 'denigrative'
+      - 'denigrator'
+      - 'denigrators'
+      - 'denigratory'
+      - 'desiccate'
+      - 'desiccated'
+      - 'desiccates'
+      - 'desiccating'
+      - 'desiccation'
+      - 'desiccator'
+      - 'desiccators'
+      - 'despicable'
+      - 'despicably'
+      - 'dickens'
+      - 'pussywillow'
+      - 'pussywillows'
+      - 'dickey'
+      - 'dickeys'
+      - 'dicky'
+      - 'dicta'
+      - 'dictation'
+      - 'dictations'
+      - 'dictator'
+      - 'dictatorial'
+      - 'dictators'
+      - 'dictatorship'
+      - 'dictatorships'
+      - 'diction'
+      - 'dictionaries'
+      - 'dictionary'
+      - 'dictum'
+      - 'doubloon'
+      - 'doubloons'
+      - 'edict'
+      - 'edicts'
+      - 'egress'
+      - 'egressed'
+      - 'egresses'
+      - 'egressing'
+      - 'emphasis'
+      - 'emphasize'
+      - 'emphasized'
+      - 'emphasizes'
+      - 'emphasizing'
+      - 'emphatic'
+      - 'emphatically'
+      - 'encumber'
+      - 'encumbered'
+      - 'encumbering'
+      - 'encumbers'
+      - 'encumbrance'
+      - 'encumbrances'
+      - 'enigma'
+      - 'enigmas'
+      - 'enigmata'
+      - 'enigmatic'
+      - 'epicenter'
+      - 'epicenters'
+      - 'epicentral'
+      - 'episcopacy'
+      - 'episcopal'
+      - 'episcopate'
+      - 'episode'
+      - 'episodes'
+      - 'episodic'
+      - 'epistle'
+      - 'epistles'
+      - 'epistolary'
+      - 'epitaph'
+      - 'epitaphs'
+      - 'epithelial'
+      - 'epithelium'
+      - 'epitome'
+      - 'epitomes'
+      - 'epitomize'
+      - 'epitomizing'
+      - 'glass'
+      - 'grass'
+      - 'harass'
+      - 'harassed'
+      - 'harasser'
+      - 'harassers'
+      - 'harasses'
+      - 'harassing'
+      - 'harassment'
+      - 'hoe-cake'
+      - 'hoe-cakes'
+      - 'hoed'
+      - 'hoedown'
+      - 'hoedowns'
+      - 'hoeing'
+      - 'hoes'
+      - 'hospice'
+      - 'hospices'
+      - 'ignition'
+      - 'ignitions'
+      - 'ignoble'
+      - 'ignobly'
+      - 'ignominious'
+      - 'ignominiously'
+      - 'ignominy'
+      - 'ignorance'
+      - 'ignorant'
+      - 'ignorantly'
+      - 'ignore'
+      - 'ignored'
+      - 'ignores'
+      - 'ignoring'
+      - 'ignotium'
+      - 'impasse'
+      - 'impasses'
+      - 'impassioned'
+      - 'impassive'
+      - 'impassively'
+      - 'impassivity'
+      - 'inauspicious'
+      - 'incrimination'
+      - 'incriminatory'
+      - 'indiction'
+      - 'indictions'
+      - 'interdict'
+      - 'interdicted'
+      - 'interdicting'
+      - 'interdiction'
+      - 'interdicts'
+      - 'knight'
+      - 'knighted'
+      - 'knighthood'
+      - 'knighting'
+      - 'knightly'
+      - 'knights'
+      - 'lagoon'
+      - 'lagoons'
+      - 'macaroon'
+      - 'macaroons'
+      - 'mahoganies'
+      - 'mahogany'
+      - 'mahogany-colored'
+      - 'mallow'
+      - 'mallows'
+      - 'massive'
+      - 'massively'
+      - 'method'
+      - 'methodical'
+      - 'methodology'
+      - 'methods'
+      - 'misclassified'
+      - 'misclassify'
+      - 'misclassifying'
+      - 'molasses'
+      - 'molasses-like'
+      - 'monsoon'
+      - 'monsoons'
+      - 'morass'
+      - 'morasses'
+      - 'narcissus'
+      - 'nigel'
+      - 'nigella'
+      - 'niger'
+      - 'nigeria'
+      - 'nigerian'
+      - 'nigerians'
+      - 'night'
+      - 'nightmare'
+      - 'nightmares'
+      - 'nights'
+      - 'nigrescent'
+      - 'nigritude'
+      - 'omnibus'
+      - 'omnibuses'
+      - 'pass'
+      - 'passage'
+      - 'passed'
+      - 'passenger'
+      - 'passengers'
+      - 'passing'
+      - 'passingly'
+      - 'passion'
+      - 'passionate'
+      - 'passion-fruit'
+      - 'passive'
+      - 'passively'
+      - 'passiveness'
+      - 'passphrase'
+      - 'passphrases'
+      - 'password'
+      - 'passwords'
+      - 'pegasus'
+      - 'perspicacious'
+      - 'perspicacity'
+      - 'perspicuous'
+      - 'pish'
+      - 'pished'
+      - 'pishes'
+      - 'pishing'
+      - 'pisiform'
+      - 'pisiforms'
+      - 'pistil'
+      - 'pistillate'
+      - 'pistils'
+      - 'pistol'
+      - 'pistoleer'
+      - 'pistols'
+      - 'piston'
+      - 'pistons'
+      - 'platoon'
+      - 'platoons'
+      - 'potassium'
+      - 'potassium-rich'
+      - 'predict'
+      - 'predictable'
+      - 'predictably'
+      - 'predicted'
+      - 'predicting'
+      - 'prediction'
+      - 'predictions'
+      - 'predictive'
+      - 'predictor'
+      - 'predictors'
+      - 'predicts'
+      - 'raccoon'
+      - 'raccooner'
+      - 'raccoons'
+      - 'raccoon-skin'
+      - 're-assigned'
+      - 're-assignment'
+      - 're-examine'
+      - 're-examined'
+      - 'renegade'
+      - 'renegades'
+      - 'renegado'
+      - 'renegados'
+      - 're-pass'
+      - 're-passed'
+      - 're-passing'
+      - 'resuscitate'
+      - 'resuscitated'
+      - 'resuscitates'
+      - 'resuscitating'
+      - 'resuscitation'
+      - 'resuscitator'
+      - 'resuscitators'
+      - 'retardant'
+      - 'retardants'
+      - 'sheet-glass'
+      - 'spittoon'
+      - 'spittoons'
+      - 'spittoon-style'
+      - 'succumb'
+      - 'succumbed'
+      - 'succumbing'
+      - 'succumbs'
+      - 'susan'
+      - 'susannah'
+      - 'sushi'
+      - 'sushis'
+      - 'suspect'
+      - 'suspected'
+      - 'suspecting'
+      - 'suspects'
+      - 'suspend'
+      - 'suspended'
+      - 'suspending'
+      - 'suspension'
+      - 'suspensions'
+      - 'suspicion'
+      - 'suspicions'
+      - 'suspicious'
+      - 'suspiciously'
+      - 'sustain'
+      - 'sustainability'
+      - 'sustainable'
+      - 'sustained'
+      - 'sustaining'
+      - 'sustainment'
+      - 'sustains'
+      - 'titch'
+      - 'titches'
+      - 'tithe'
+      - 'tithed'
+      - 'tither'
+      - 'tithers'
+      - 'tithes'
+      - 'tithing'
+      - 'titian'
+      - 'titillate'
+      - 'titillated'
+      - 'titillates'
+      - 'titillating'
+      - 'titillation'
+      - 'titlark'
+      - 'titlarks'
+      - 'title'
+      - 'titled'
+      - 'titleholder'
+      - 'titleholders'
+      - 'titles'
+      - 'titling'
+      - 'titmice'
+      - 'titmouse'
+      - 'titrate'
+      - 'titrated'
+      - 'titrates'
+      - 'titrating'
+      - 'titration'
+      - 'titrations'
+      - 'titter'
+      - 'tittered'
+      - 'tittering'
+      - 'titters'
+      - 'tittle'
+      - 'tittles'
+      - 'tittle-tattle'
+      - 'titular'
+      - 'tweed'
+      - 'tycoon'
+      - 'tycoons'
+      - 'unassigned'
+      - 'unassisted'
+      - 'unassociated'
+      - 'unassumed'
+      - 'unassuming'
+      - 'unassured'
+      - 'among'
+      - 'amongst'
+      - 'mongoose'
+      - 'mongooses'
+      - 'mongolia'
+      - 'mongolian'
+      - 'mongolians'
+      - 'mongrel'
+      - 'mongrels'
+      - 'custard'
+      - 'mustard'
+      - 'standard'
+      - 'standards'
+      - 'substandard'
+      - 'leotard'
+      - 'leotards'
+      - 'tardy'
+      - 'tardiness'
+      - 'tardily'
+      - 'retardant'
+      - 'retardants'
+      - 'conspicuous'
+      - 'conspicuously'
+      - 'auspicious'
+      - 'auspiciously'
+      - 'pakistan'
+      - 'pakistani'
+      - 'pakistanis'
+      - 'grape'
+      - 'grapes'
+      - 'grapefruit'
+      - 'grapevine'
+      - 'drape'
+      - 'drapes'
+      - 'draped'
+      - 'draping'
+      - 'scrape'
+      - 'scraped'
+      - 'scraper'
+      - 'scrapers'
+      - 'scraping'
+      - 'scrapes'
+      - 'twinkle'
+      - 'twinkling'
+      - 'twinkles'
+      - 'twinkie'
+      - 'twinkies'
+      - 'peacock'
+      - 'peacocks'
+      - 'hitchcock'
+      - 'shuttlecock'
+      - 'shuttlecocks'
+      - 'cockatoo'
+      - 'cockatoos'
+      - 'cockatiel'
+      - 'cockatiels'
+      - 'cockroach'
+      - 'cockroaches'
+      - 'woodcock'
+      - 'gamecock'
+      - 'gamecocks'
+      - 'cockerel'
+      - 'cockerels'
+      - 'stopcock'
+      - 'banal'
+      - 'canal'
+      - 'canals'
+      - 'analog'
+      - 'analogue'
+      - 'analogy'
+      - 'analogies'
+      - 'analogous'
+      - 'tetanus'
+      - 'uranus'
     advertising:
       enabled: true
       allowed-domains: []
@@ -278,10 +1848,42 @@ chat:
       repeat-window-seconds: 30
       burst-messages: 5
       burst-seconds: 5
+    # Repeated word/advert hits file a "Chat Filter" report in /reports (the filter itself only blocks).
+    # Staff accept it (the player is punished for Filter Bypass, see punish:) or decline it (nothing).
+    reports:
+      enabled: true
+      strikes: 3
+      window-minutes: 30
+      categories: [high-risk, blocked-word, advertising]
 
 staff:
   reports:
     cooldown-seconds: 60
+
+punish:
+  # Shown on the ban and mute screens. Blank = no appeal line.
+  appeal-url: ''
+  # Discord webhook for issued/revoked punishments and staff lockouts. Blank = no Discord posts.
+  discord-webhook-url: ''
+  # How long a player's login IPs are kept, for alt-ban-evasion detection and /altcheck.
+  login-ip-retention-days: 90
+  # /warn (and the menu's own Warning button) refuse outright if the player was already warned within this
+  # many hours, and open the punish menu (with the same reason typed) so staff escalate instead of spamming
+  # warnings. 0 = off.
+  warn-cooldown-hours: 24
+  # Every named offense and its duration ladder lives in OffenseCatalog.java, not here. An accepted chat
+  # filter report (/reports accept) applies the Filter Bypass offense: 6h, 12h, 24h, then 72h mutes.
+  # A circuit breaker for a compromised or rogue staff account: too many punishments too fast from one staff
+  # name locks them out of issuing more until an admin clears it with /punish clearlockout.
+  staff-lockout:
+    enabled: true
+    window-seconds: 30
+    max-actions: 5
+  alt-ban-evasion:
+    # Auto-bans any other ONLINE account sharing an IP with a player who was just banned.
+    enabled: true
+    # Records each login's IP (needed for alt-ban-evasion and /altcheck). Off also disables both.
+    ip-tracking: true
 
 vaults:
   # Vaults everyone has. More with genscore.vaults.<number>, genscore.vaults.unlimited, or /buyvault.
@@ -556,7 +2158,7 @@ info:
     url: 'https://discord.gg/hxsmp'
     label: '&9&l[CLICK FOR DISCORD]'
     message:
-      - '&9&lDISCORD &8» &7Join the community: {discord}'
+      - '&6&lDISCORD &8» &7Join the community: {discord}'
   menus:
     rules:
       title: '&c&l❄ &f&lRULES &c&l❄'
@@ -589,13 +2191,12 @@ info:
       size: 54
       items:
         title:    { slot: 4,  material: BOOK,          glow: true, name: '&6&l❄ GUIDE ❄', lore: ['&7Click anything to use it!'] }
-        rtp:      { slot: 19, material: COMPASS,       name: '&a/rtp',      lore: ['&7Teleport somewhere random.'], command: rtp }
+        menu:     { slot: 19, material: COMPASS,       name: '&a/menu',     lore: ['&7Everything in one place.'], command: menu }
         spawn:    { slot: 20, material: ENDER_PEARL,   name: '&a/spawn',    lore: ['&7Back to spawn.'], command: spawn }
-        home:     { slot: 21, material: RED_BED,       name: '&a/sethome &7& &a/home', lore: ['&7Save your homes.'], command: home }
-        kits:     { slot: 22, material: CHEST,         name: '&a/kits',     lore: ['&7Kits you can claim.'], command: kits }
-        sell:     { slot: 23, material: HOPPER,        name: '&6/sell',     lore: ['&7Drop items in, close to sell.'], command: sell }
-        multi:    { slot: 24, material: NETHER_STAR,   name: '&e/sellmulti', lore: ['&7Your sell multipliers.'], command: sellmulti }
-        ah:       { slot: 25, material: GOLD_INGOT,    name: '&e/ah',       lore: ['&7Auction house.'], command: ah }
+        plot:     { slot: 22, material: ENDER_PEARL,   name: '&a/plot',     lore: ['&7Go to your factory.'], command: plot }
+        powers:   { slot: 23, material: BLAZE_POWDER,  name: '&6/powers',   lore: ['&7Powers for your factory.'], command: powers }
+        crates:   { slot: 24, material: ENDER_CHEST,   name: '&e/crates',   lore: ['&7Your keys and the crates.'], command: crates }
+        tokens:   { slot: 25, material: SUNFLOWER,     name: '&e/tokens',   lore: ['&7Spend your tokens.'], command: tokens }
         tags:     { slot: 29, material: NAME_TAG,      name: '&5/tags',     lore: ['&7Wear a chat tag.'], command: tags }
         lb:       { slot: 30, material: PLAYER_HEAD,   name: '&e/leaderboard', lore: ['&7Richest players and more.'], command: leaderboard }
         daily:    { slot: 31, material: CLOCK,         name: '&a/daily',    lore: ['&7Daily rewards.'], command: daily }
@@ -605,19 +2206,19 @@ info:
       chat:
         - '&8&m                                        '
         - '&6&lGUIDE'
-        - '&e/rtp   &e/spawn   &e/sethome &7+ &e/home   &e/tpa <name>'
-        - '&e/kits   &e/sell   &e/ah   &e/tags   &e/daily   &e/vote'
+        - '&e/menu   &e/plot   &e/spawn   &e/tpa <name>'
+        - '&e/powers   &e/crates   &e/tags   &e/daily   &e/vote'
         - '&8&m                                        '
     ranks:
       title: '&c&l❄ &f&lRANKS &c&l❄'
       size: 54
       items:
         title:   { slot: 4,  material: GOLD_BLOCK, glow: true, name: '&6&l❄ STORE RANKS ❄', lore: ['&7Click any rank to open the store.'] }
-        vip:     { slot: 20, material: IRON_INGOT,  name: '&b&lHexling',   command: store, lore: ['&8┃ &bHexling &7badge in chat & tab', '&8┃ &7Hexling kit every 6h'] }
-        vipplus: { slot: 21, material: GOLD_INGOT,  name: '&9&lHexbound',  command: store, lore: ['&8┃ &9Hexbound &7badge', '&8┃ &7Hexling + Hexbound kits'] }
-        mvp:     { slot: 22, material: DIAMOND,     name: '&d&lHexborn',   glow: true, command: store, lore: ['&8┃ &dHexborn &7badge', '&8┃ &7All kits up to Hexborn'] }
-        mvpplus: { slot: 23, material: EMERALD,     name: '&5&lHexlord',   glow: true, command: store, lore: ['&8┃ &5Hexlord &7badge', '&8┃ &7All kits up to Hexlord'] }
-        legend:  { slot: 24, material: NETHER_STAR, name: '&6&lHexmaster', glow: true, command: store, lore: ['&8┃ &6Hexmaster &7badge', '&8┃ &7Every kit'] }
+        vip:     { slot: 20, material: IRON_INGOT,      name: '&b&lMechanic',      command: store, lore: ['&8┃ &bMechanic &7tag in chat & tab', '&8┃ &7Turbo speed in the hub', '&8┃ &7Ironworks base style, 2 vaults'] }
+        vipplus: { slot: 21, material: COPPER_INGOT,    name: '&9&lMachinist',     command: store, lore: ['&8┃ &9Machinist &7tag', '&8┃ &7Free Foreman manager', '&8┃ &7Copperworks style, /hat, 3 vaults', '&8┃ &7Everything in Mechanic'] }
+        mvp:     { slot: 22, material: GOLD_INGOT,      name: '&d&lOverseer',      glow: true, command: store, lore: ['&8┃ &dOverseer &7tag', '&8┃ &73 pet slots, remote gate', '&8┃ &7Chat colours, Nether Forge style', '&8┃ &7Everything in Machinist'] }
+        mvpplus: { slot: 23, material: DIAMOND,         name: '&5&lIndustrialist', glow: true, command: store, lore: ['&8┃ &5Industrialist &7tag', '&8┃ &74 pet slots, free Supervisor', '&8┃ &7/craft, /enderchest, Deep Sea style', '&8┃ &7Everything in Overseer'] }
+        legend:  { slot: 24, material: NETHERITE_INGOT, name: '&6&lTycoon',        glow: true, command: store, lore: ['&8┃ &6Tycoon &7tag', '&8┃ &75 pet slots, free Director', '&8┃ &7/anvil, /nick, Royal Void style', '&8┃ &7Everything in Industrialist'] }
         media:   { slot: 31, material: PINK_DYE,    name: '&d&lMEDIA', command: discord, lore: ['&7For YouTubers & streamers.', '&7Apply in our Discord!'] }
         crates:  { slot: 40, material: ENDER_CHEST, name: '&5&lCrate keys', command: store, lore: ['&7Keys are on the store too.'] }
 
@@ -628,7 +2229,7 @@ store:
     - '&6&lSTORE &8» &7Ranks, crate keys & more: {store}'
   # Each Tebex package runs (as console):  storeadmin purchase {username} <item name>
   purchase-announce:
-    format: '&8[&6&lSTORE&8] &e{player} &7just bought {item}&7! &8» &bClick to visit the store'
+    format: '&6&lSTORE &8» &e{player} &7just bought {item}&7! &8» &bClick to visit the store'
     hover: '&7Click to open the store'
   # Completed payments are read from the Tebex plugin API with the secret key that is ALREADY in the Tebex plugin's
   # own config file. Never copy the key here. config-file is relative to the plugins folder.
@@ -648,13 +2249,14 @@ store:
     currency-symbol: '$'
   popup:
     enabled: true
-    cooldown-minutes: 10
-    title: 'STORE'
-    message: 'Crate keys, ranks and bundles - bundles save up to 40%! Every purchase helps keep the server running.'
+    cooldown-minutes: 15
+    title: 'GATEMC STORE'
+    message: 'Ranks, credits, super powers and base styles. Every purchase helps keep GateMC running!'
     open-button: 'Open store'
     close-button: 'Not now'
     chat-link: true
-    zones: []
+    zones: 
+      - { world: world, min: [1122, 60, 1122], max: [1182, 110, 1182] }
     # - { world: world, min: [-42, 158, 23], max: [-31, 176, 43] }
   # Community goal: this month's completed payments (in timezone) against target. /goal shows it.
   goal:
@@ -662,8 +2264,8 @@ store:
     target: 500.00
     timezone: 'UTC'
     bar-length: 20
-    line: '&d&lCOMMUNITY GOAL &8» &f{current} &7/ &f{target} &8[{bar}&8] &f{percent}%'
-    reached-broadcast: '&d&lCOMMUNITY GOAL &8» &7This month''s store goal of &f{target} &7was reached! Everyone online gets a reward.'
+    line: '&6&lCOMMUNITY GOAL &8» &f{current} &7/ &f{target} &8[{bar}&8] &f{percent}%'
+    reached-broadcast: '&6&lCOMMUNITY GOAL &8» &7This month''s store goal of &f{target} &7was reached! Everyone online gets a reward.'
     # Given once per month to everyone online when the goal is reached.
     reward:
       money: 0
@@ -675,8 +2277,8 @@ store:
     countdown-seconds: 10
     # Pay one account per IP address, so a party can't be multiplied with alts.
     one-per-ip: true
-    start-broadcast: '&d&lSTORE PARTY &8» &f{player} &7started a store party! Rewards in &f{seconds}s&7...'
-    done-broadcast: '&d&lSTORE PARTY &8» &7Everyone online got a reward. Say thanks to &f{player}&7!'
+    start-broadcast: '&6&lSTORE PARTY &8» &f{player} &7started a store party! Rewards in &f{seconds}s&7...'
+    done-broadcast: '&6&lSTORE PARTY &8» &7Everyone online got a reward. Say thanks to &f{player}&7!'
     reward:
       money: 250
       console-commands: []
@@ -696,11 +2298,11 @@ ranks:
     helper:   { logo: '', text: '&b&lHELPER &r' }
     guide:    { logo: '', text: '&a&lGUIDE &r' }
     media:    { logo: '', text: '&d&lMEDIA &r' }
-    legend:   { logo: '', text: '&6&lHEXMASTER &r' }
-    mvpplus:  { logo: '', text: '&5&lHEXLORD &r' }
-    mvp:      { logo: '', text: '&d&lHEXBORN &r' }
-    vipplus:  { logo: '', text: '&9&lHEXBOUND &r' }
-    vip:      { logo: '', text: '&b&lHEXLING &r' }
+    legend:   { logo: '', text: '&6&lTYCOON &r' }
+    mvpplus:  { logo: '', text: '&5&lINDUSTRIALIST &r' }
+    mvp:      { logo: '', text: '&d&lOVERSEER &r' }
+    vipplus:  { logo: '', text: '&9&lMACHINIST &r' }
+    vip:      { logo: '', text: '&b&lMECHANIC &r' }
     default:  { logo: '', text: '&7&lMEMBER &r' }   # everyone without a rank
   tags-menu-title: '&c&l❄ &f&lTAGS &c&l❄'
   # Unlocked with the permission genscore.tag.<id> (crates, store packages or LuckPerms give it).
@@ -731,14 +2333,14 @@ kitalerts:
   kits: [vip, vipplus, mvp, mvpplus, legend]
   # How each kit is named in the alert (optional; the kit id is used otherwise).
   names:
-    vip: '&b&lHexling'
-    vipplus: '&9&lHexbound'
-    mvp: '&d&lHexborn'
-    mvpplus: '&5&lHexlord'
-    legend: '&6&lHexmaster'
+    vip: '&b&lMechanic'
+    vipplus: '&9&lMachinist'
+    mvp: '&d&lOverseer'
+    mvpplus: '&5&lIndustrialist'
+    legend: '&6&lTycoon'
   title: '&a&lKIT READY'
   subtitle: '{kits} &fcan be claimed again!'
-  chat: '&a&lKITS &8» {kits} &fis ready again! &7Claim it with &e/kit'
+  chat: '&6&lKITS &8» {kits} &fis ready again! &7Claim it with &e/kit'
 # ---- group F (integration/group-f.md) ----
 # Shards: the second currency (whole numbers). They buy super powers.
 shards:
@@ -746,7 +2348,7 @@ shards:
   # The most one /shards give or take can move.
   max-admin-amount: 10000000
   earn:
-    enabled: true
+    enabled: false
     # Shards a minute, AFK or not ("anywhere", as on HXSMP). false = only while not AFK.
     count-afk: true
     base-per-minute: 0.5
@@ -771,12 +2373,12 @@ keycrates:
     crate: vote
     keys: 1
     shards: 30
-    message: '&a&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}'
+    message: '&6&lVOTE &8» &7Thanks for voting! &b+{shards} shards{keys}'
   # Every crate win is announced. Wins with a chance below broadcast-under % get the "rare" line.
   broadcast-under: 5.0
-  broadcast: '&5&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!'
+  broadcast: '&6&lCRATES &8» &f{player} &7opened a {crate} &7and won {reward}&7!'
   broadcast-rare: '&d&l✦ RARE WIN ✦ &f{player} &7won {reward} &7from the {crate}&7! &8({chance}%)'
-  broadcast-bulk: '&5&lCRATES &8» &f{player} &7opened &f{amount}x {crate}&7!'
+  broadcast-bulk: '&6&lCRATES &8» &f{player} &7opened &f{amount}x {crate}&7!'
   # On an open-all, at most this many rare lines are broadcast after the bulk line.
   bulk-rare-lines: 5
   # Rarity labels by chance %.
@@ -953,31 +2555,21 @@ worldrules:
     block-nether-portals: true
     # /worldrules spawn close|open. While closed, players without genscore.spawn.bypassclosed are random-teleported to
     # rtp.zone-destination when they enter the box, and teleports into it (/spawn, homes, tpa) are refused.
-    closed-message: '&c&lSPAWN &8» &7Spawn is &cclosed &7right now.'
+    closed-message: '&6&lSPAWN &8» &7Spawn is &cclosed &7right now.'
   end-lock:
     enabled: true
     world: world_the_end
     radius: 900                 # blocks from 0,0 that count as the dragon island
     prevent-dragon: true
-    message: '&5&lTHE END &8» &7The dragon island is &cclosed&7. Use &d/rtp end &7to visit the outer islands.'
+    message: '&6&lTHE END &8» &7The dragon island is &cclosed&7. Use &d/rtp end &7to visit the outer islands.'
 
 maintenance:
-  clear-drops:
-    enabled: true
-    every-minutes: 5
-    min-age-seconds: 60
-    xp-orbs: true
-    arrows: true                # arrows stuck in blocks only; tridents are never touched
-    warning-seconds: [60, 30, 10]
-    skip-worlds: []
-    warning: '&c&lCLEAR LAG &8» &7Items on the ground will be removed in &c{time}&7!'
-    done: '&a&lCLEAR LAG &8» &7Removed &a{count} &7items from the ground.'
   reboot:
     enabled: true
     time: '06:00'
     zone: Europe/London
     warning-seconds: [900, 600, 300, 120, 60, 30, 10, 5, 4, 3, 2, 1]
-    warning: '&4&lRESTART &8» &7The server restarts in &c{time} &7- it''ll be back in under a minute!'
+    warning: '&6&lRESTART &8» &7The server restarts in &c{time} &7- it''ll be back in under a minute!'
   mob-cap:
     enabled: true
     max-per-chunk: 40
@@ -1004,7 +2596,7 @@ sit:
     cant-sit-here: '&cYou can''t sit here.'
 # ---- group L (integration/group-l.md) ----
 sus:
-  prefix: '<red><bold>SUS</bold> <dark_gray>» '
+  prefix: '<gold><bold>SUS</bold></gold> <dark_gray>»</dark_gray> '
   alert-cooldown-seconds: 60    # one ping per player per check in this time (the list still counts them all)
   hold-millis: 2000             # how long a rate must stay over its limit
   checks: { autoclicker: true, autocrystal: true, autototem: true, nuker: true }
@@ -1020,6 +2612,36 @@ staffmode:
   # Owner only: accounts (UUIDs) whose alt lookup shows a plain result unless the viewer has genscore.hiddenalts.bypass.
   hidden-alts: []
 
+hub:
+  cloak:
+    tokens: 2                # what a Raid Cloak costs
+    seconds: 20              # how long turrets, alarms and players can't see you
+    cooldown-seconds: 240
+  turbo:
+    speed-level: 2           # Speed level for players with genscore.turbo (a donator perk; they can turn it off); 0 = off
+  events:
+    minutes: 5                # how long a random event lasts (2x money, 2x gen speed, token rush, raid frenzy)
+    gap-min-minutes: 20       # time between events, picked at random in this range
+    gap-max-minutes: 40
+  daily-tasks:
+    reward-scale: 1.0        # task rewards are minutes of the player's income times this
+    reward-floor: 150        # but never less than this
+
+gameplay:
+  no-hunger: true
+  # Players can't drop items (creative and genscore.drop.bypass can). No disposal: items stay with you.
+  no-item-drops: true
+  # Player hits deal no damage (players can't kill players); knockback still works, so the Knockback Rod still
+  # pushes. Turrets and the world still hurt.
+  no-pvp-damage: true
+  # Keep your items and XP when you die.
+  keep-inventory: true
+  knockback-stick:
+    enabled: true
+    slot: 9
+    level: 5
+    name: '&6&lKnockback Stick'
+
 modules:
   plots: true
   factory: true
@@ -1028,34 +2650,40 @@ modules:
   antihack: true
   settings: true
   trade: false        # player trading is after launch
-  mail: true
+  mail: false
   vote: true
-  polls: true
+  polls: false
   leaderboards: true
   crates: true
-  vouchers: true
-  daily: true
-  kits: true
+  vouchers: false
+  daily: false
+  kits: false
   vaults: true
   announcements: true
   economy: true
   teleport: true
   essentials: true
   chat: true
+  punish: true
   staff: true
   info: true
   store: true
   ranks: true
-  kitalerts: true
+  kitalerts: false
   shards: true
   keycrates: true
   seasonpass: false   # seasons are after launch
-  reputation: true
-  wordle: true
-  chatgames: true
+  powers: true
+  gameplay: true
+  basestyles: true
+  hub: true
+  npcs: true
+  reputation: false
+  wordle: false
+  chatgames: false
   worldrules: true
   maintenance: true
-  sit: true
-  sus: true
+  sit: false
+  sus: false
   staffmode: true
   cosmetics: true

@@ -6,56 +6,50 @@ import me.Evan52098.genscore.module.GensModule;
 import me.Evan52098.genscore.player.PlayerData;
 import me.Evan52098.genscore.player.PlayerDataService;
 import me.Evan52098.genscore.scheduler.Tasks;
+import me.Evan52098.genscore.shards.ShardsModule;
+import me.Evan52098.genscore.shards.ShardsService;
 import me.Evan52098.genscore.util.Msg;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffectType;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.function.BiPredicate;
 import java.util.function.Function;
 
 /**
- * Cosmetics (the HXSMP {@code /cosmetics} wardrobe): kill effects, explosive kills, join and leave messages, name
- * colours, walking trails and tool skins, plus kill ranks and {@code /homeicon}. Definitions are in
- * {@code modules/cosmetics/cosmetics.yml}; the idea and the join/leave message, colour and effect shapes come from
- * BlockvilleCore's bvcosmetics (joinmessages.yml, leavemessages.yml, colors.yml, effects.yml).
+ * Cosmetics ({@code /cosmetics}): join and leave messages, chat tags, name paints, chat colours, auras and glows, plus
+ * {@code /homeicon}. Definitions are in {@code modules/cosmetics/cosmetics.yml}.
  *
- * <p>Ownership: a cosmetic is owned when the player has its permission (store ranks through LuckPerms) or a stored
- * unlock row (crate rewards, {@link #grant}). One active per category.
+ * <p>Ownership: a cosmetic is owned when the player has its permission (store ranks through LuckPerms), a stored unlock
+ * row (crate rewards, {@link #grant}) or bought it with credits in the menu. One active per category.
  *
- * <p>Folia: every player's trail and tool-skin work runs in a timer on that player's own thread. Kill handling starts
- * on the victim's thread, hops to the killer's thread for the killer's data and permissions, then to the region of
- * the death location to draw the effect. Nothing here touches blocks; explosive kills are particles and sound only.
+ * <p>Name paints like {@code <#FE04FD>} are animated by the resource pack's text shader. Glows set the player glowing;
+ * the outline colour is their nametag team colour, which TAB takes from {@code %genscore_glow%} in the tag prefix.
+ *
+ * <p>Folia: every player's aura and glow work runs in a timer on that player's own thread. Chat and placeholder threads
+ * only read the resolved caches.
  */
 public final class CosmeticsModule implements GensModule, Listener {
 
@@ -64,7 +58,7 @@ public final class CosmeticsModule implements GensModule, Listener {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
     private static final LegacyComponentSerializer LEGACY_HEX = LegacyComponentSerializer.builder()
-            .character('&').hexColors().useUnusualXRepeatedCharacterHexFormat().build();
+            .character('&').hexColors().hexCharacter('#').build();
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
     private static volatile @Nullable CosmeticsModule active;
@@ -75,25 +69,21 @@ public final class CosmeticsModule implements GensModule, Listener {
     private CosmeticsMenu menus;
     private File file;
     private volatile CosmeticsConfig config;
+    private boolean homesEnabled = true;
 
-    /** Per-player ticker and its state. The state is only touched on that player's thread. */
     private final Map<UUID, Ticker> tickers = new ConcurrentHashMap<>();
-    /** Resolved name colour (owned and active), refreshed on the player's thread; read from chat/placeholder threads. */
     private final Map<UUID, String> nameColors = new ConcurrentHashMap<>();
-    /** killer|victim -> last time that pair counted as a kill (anti kill-farming). */
-    private final Map<String, Long> lastPairKill = new ConcurrentHashMap<>();
-    /** Optional: the staff module can say whether two players are the same person (alts). */
-    private volatile @Nullable BiPredicate<UUID, UUID> altCheck;
-    /** Optional: the teleport module's home names, so /homeicon only accepts real homes. */
+    private final Map<UUID, String> chatTags = new ConcurrentHashMap<>();
+    private final Map<UUID, String> chatColors = new ConcurrentHashMap<>();
+    private final Map<UUID, String> glows = new ConcurrentHashMap<>();
     private volatile @Nullable Function<Player, List<String>> homeNames;
 
     private static final class Ticker {
         @Nullable ScheduledTask task;
-        @Nullable Location lastTrail;
         int colorIndex;
-        int skinCountdown;
+        int auraStep;
         int ownershipCountdown;
-        boolean skinShown;
+        boolean glowing;
     }
 
     @Override
@@ -115,11 +105,13 @@ public final class CosmeticsModule implements GensModule, Listener {
         this.menus = new CosmeticsMenu(this);
         players.register(store);
         plugin.commands().register(new CosmeticsCommands(this));
+        this.homesEnabled = plugin.getConfig().getBoolean("teleport.homes.enabled", true);
+        if (homesEnabled) {
+            plugin.commands().register(new HomeIconCommand(this));
+        }
         Bukkit.getPluginManager().registerEvents(this, plugin);
-        // Forget old anti-farm entries now and then (plain map work, no game state).
-        Tasks.async.timer(t -> pruneKillPairs(), 5, 5, TimeUnit.MINUTES);
         for (Player p : Bukkit.getOnlinePlayers()) {
-            Tasks.onEntity(p, () -> startTicker(p)); // plugin reload with players online
+            Tasks.onEntity(p, () -> start(p));
         }
         active = this;
         plugin.getLogger().info("[cosmetics] " + countLoaded() + " cosmetics loaded");
@@ -131,8 +123,8 @@ public final class CosmeticsModule implements GensModule, Listener {
         plugin.getLogger().info("[cosmetics] reloaded, " + countLoaded() + " cosmetics");
         for (Player p : Bukkit.getOnlinePlayers()) {
             Tasks.onEntity(p, () -> {
-                stopTicker(p.getUniqueId());
-                startTicker(p);
+                stopTicker(p);
+                start(p);
             });
         }
     }
@@ -141,10 +133,21 @@ public final class CosmeticsModule implements GensModule, Listener {
     public void disable() {
         active = null;
         HandlerList.unregisterAll(this);
-        for (UUID id : tickers.keySet()) {
-            stopTicker(id);
+        for (UUID id : List.copyOf(tickers.keySet())) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && Tasks.owns(p)) {
+                stopTicker(p);
+            } else {
+                Ticker t = tickers.remove(id);
+                if (t != null && t.task != null) {
+                    t.task.cancel();
+                }
+            }
         }
         nameColors.clear();
+        chatTags.clear();
+        chatColors.clear();
+        glows.clear();
     }
 
     private int countLoaded() {
@@ -157,16 +160,13 @@ public final class CosmeticsModule implements GensModule, Listener {
 
     // =========================================================================================== API for other modules
 
-    /**
-     * Name colour of an online player as a MiniMessage opening tag ({@code <red>}, {@code <gradient:#a:#b>}), or ""
-     * when they have none. Safe from any thread (the chat module's async renderer). Used by the {@code chat} hook.
-     */
+    /** Name paint of an online player as a MiniMessage opening tag, or "" when they have none. Safe from any thread. */
     public static String nameColor(UUID player) {
         CosmeticsModule m = active;
         return m == null ? "" : m.nameColors.getOrDefault(player, "");
     }
 
-    /** The player's name in their name colour (plain name when none). Safe from any thread. */
+    /** The player's name in their name paint (plain name when none). Safe from any thread. */
     public static Component coloredName(UUID player, String name) {
         return MM.deserialize(nameColor(player) + MM.escapeTags(name));
     }
@@ -176,28 +176,44 @@ public final class CosmeticsModule implements GensModule, Listener {
         return LEGACY_HEX.serialize(coloredName(player, name));
     }
 
-    /** Total counted player kills of an online player, or -1 when not loaded. */
-    public static int kills(UUID player) {
+    /** The active chat tag in {@code &} codes, or "". Safe from any thread. */
+    public static String chatTag(UUID player) {
         CosmeticsModule m = active;
-        PlayerData data = m == null ? null : m.players.get(player);
-        return data == null ? -1 : data.get(m.store).kills();
+        return m == null ? "" : m.chatTags.getOrDefault(player, "");
     }
 
-    /** Kill rank (legacy {@code &} text, e.g. "&a⚔ Warrior") of an online player, or "" when not loaded / no tiers. */
-    public static String killRank(UUID player) {
+    /** A chat message in the player's chat colour, or null when they have none. Safe from any thread. */
+    public static @Nullable Component chatColored(UUID player, String raw) {
         CosmeticsModule m = active;
-        if (m == null) {
-            return "";
-        }
-        int k = kills(player);
-        CosmeticsConfig.KillRank r = k < 0 ? null : m.config.rankFor(k);
-        return r == null ? "" : r.display();
+        String color = m == null ? null : m.chatColors.get(player);
+        return color == null ? null : MM.deserialize(color + "<msg>", Placeholder.unparsed("msg", raw));
     }
 
     /**
-     * The icon a home shows in a homes menu: the player's choice from /homeicon, or {@code fallback}. Safe from any
-     * thread, but call it on the player's thread (it checks a permission). The one-line hook for the homes menu.
+     * The glow colour as a legacy code ({@code &b}), cycling for multi-colour glows, or {@code fallback} when the
+     * player has no glow. TAB puts it last in the nametag prefix, which makes it the team (outline) colour.
      */
+    public static String glowCode(UUID player, String fallback) {
+        CosmeticsModule m = active;
+        String codes = m == null ? null : m.glows.get(player);
+        if (codes == null || codes.isEmpty()) {
+            return fallback;
+        }
+        int i = (int) ((System.currentTimeMillis() / m.config.glowCycleMillis) % codes.length());
+        return "&" + codes.charAt(i);
+    }
+
+    /** Opens one wardrobe category (used by /tags). Player's thread. */
+    public static boolean openCategory(Player player, CosmeticCategory category) {
+        CosmeticsModule m = active;
+        if (m == null) {
+            return false;
+        }
+        m.menus.openCategory(player, category, 0);
+        return true;
+    }
+
+    /** The icon a home shows in a homes menu: the player's choice from /homeicon, or {@code fallback}. */
     public static Material homeIcon(Player player, String home, Material fallback) {
         CosmeticsModule m = active;
         PlayerData data = m == null ? null : m.players.get(player.getUniqueId());
@@ -211,15 +227,14 @@ public final class CosmeticsModule implements GensModule, Listener {
 
     /**
      * Gives a stored unlock (crate rewards, Tebex commands). Completes with true if it was new, false if already
-     * owned (the crate can then give something else). Works for offline players. Unknown cosmetics complete
-     * exceptionally.
+     * owned. Works for offline players. Unknown cosmetics complete exceptionally.
      */
     public CompletableFuture<Boolean> grant(UUID player, CosmeticCategory category, String id, String source) {
         if (config.get(category, id) == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("No " + category.key() + " cosmetic '" + id + "'"));
         }
         return store.grant(player, category, id, source).thenApply(isNew -> {
-            PlayerData data = players.get(player); // checklist 5: if they are online, show it at once
+            PlayerData data = players.get(player);
             if (data != null) {
                 data.get(store).addUnlock(category, id);
             }
@@ -233,17 +248,12 @@ public final class CosmeticsModule implements GensModule, Listener {
     public CompletableFuture<Boolean> revoke(UUID player, CosmeticCategory category, String id) {
         PlayerData data = players.get(player);
         if (data != null) {
-            data.get(store).removeUnlock(category, id); // memory first so nothing can use it during the delete
+            data.get(store).removeUnlock(category, id);
         }
         return store.revoke(player, category, id).thenApply(removed -> {
             plugin.getLogger().info("[cosmetics] revoked " + category.key() + ":" + id + " from " + player);
             return removed;
         });
-    }
-
-    /** The staff module (or anything that knows about alts) can plug in a "same person" check for kill ranks. */
-    public void setAltCheck(@Nullable BiPredicate<UUID, UUID> check) {
-        this.altCheck = check;
     }
 
     /** The teleport module can plug in the player's home names, so /homeicon only accepts existing homes. */
@@ -294,14 +304,59 @@ public final class CosmeticsModule implements GensModule, Listener {
     /** Equip or unequip (null). Called from the menu on the player's thread. */
     void setActive(Player player, PlayerCosmetics data, CosmeticCategory cat, @Nullable Cosmetic c) {
         data.setActive(cat, c == null ? null : c.id());
-        if (cat == CosmeticCategory.NAME_COLOR) {
-            refreshNameColor(player, data);
-        } else if (cat == CosmeticCategory.TOOL_SKIN) {
-            Ticker t = tickers.get(player.getUniqueId());
-            if (t != null) {
-                t.skinCountdown = 0; // apply or remove on the next tick
-            }
+        refreshCaches(player, data);
+        Ticker t = tickers.get(player.getUniqueId());
+        if (t != null && cat == CosmeticCategory.GLOW) {
+            applyGlow(player, t, data);
         }
+    }
+
+    /**
+     * Buys a cosmetic with credits. Player's thread. The unlock is put in memory before the database write so a second
+     * click in the same tick sees it as owned; a failed write refunds and takes the unlock back.
+     */
+    void buy(Player player, PlayerCosmetics data, Cosmetic c, Runnable after) {
+        if (owns(player, data, c)) {
+            after.run();
+            return;
+        }
+        if (c.price() <= 0) {
+            player.sendMessage(Msg.bad("That cosmetic isn't for sale. " + Msg.white("Find it in crates") + "."));
+            return;
+        }
+        ShardsService credits = ShardsModule.service();
+        if (credits == null) {
+            player.sendMessage(Msg.bad("Credits are not available right now."));
+            return;
+        }
+        String reason = "cosmetic " + c.category().key() + ":" + c.id();
+        if (!credits.withdraw(player.getUniqueId(), c.price(), reason)) {
+            player.sendMessage(Msg.bad("You need " + Msg.white(c.price() + " credits") + " for that."));
+            return;
+        }
+        UUID id = player.getUniqueId();
+        data.addUnlock(c.category(), c.id());
+        store.grant(id, c.category(), c.id(), "bought").whenComplete((isNew, error) -> {
+            if (error == null) {
+                plugin.getLogger().info("[cosmetics] " + player.getName() + " bought " + reason + " for " + c.price() + " credits");
+                return;
+            }
+            plugin.getLogger().warning("[cosmetics] could not save " + player.getName() + "'s purchase of " + reason + ": " + error);
+            data.removeUnlock(c.category(), c.id());
+            credits.deposit(id, c.price(), "refund " + reason);
+            Tasks.entity.run(player, () -> {
+                player.sendMessage(Msg.bad("The purchase could not be saved. Your credits were refunded."));
+                PlayerCosmetics d = data(id);
+                if (d != null) {
+                    refreshCaches(player, d);
+                }
+            });
+        });
+        setActive(player, data, c.category(), c);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.7f, 1.4f);
+        player.sendMessage(Msg.good("Bought and equipped " + Msg.white(plain(c.displayName())) + " for "
+                + Msg.white(c.price() + " credits") + "."));
+        after.run();
     }
 
     static String plain(String legacy) {
@@ -317,12 +372,10 @@ public final class CosmeticsModule implements GensModule, Listener {
         if (data == null) {
             return;
         }
-        refreshNameColor(p, data);
-        startTicker(p);
-        // Only replace a message that is there: staff vanish (HIGHEST) still removes it afterwards.
+        start(p);
         Cosmetic msg = activeOwned(p, data, CosmeticCategory.JOIN_MESSAGE);
         if (msg != null && msg.message() != null && event.joinMessage() != null) {
-            event.joinMessage(LEGACY.deserialize(msg.message().replace("{player}", p.getName())));
+            event.joinMessage(message(msg, p));
         }
     }
 
@@ -333,46 +386,85 @@ public final class CosmeticsModule implements GensModule, Listener {
         if (data != null && event.quitMessage() != null) {
             Cosmetic msg = activeOwned(p, data, CosmeticCategory.LEAVE_MESSAGE);
             if (msg != null && msg.message() != null) {
-                event.quitMessage(LEGACY.deserialize(msg.message().replace("{player}", p.getName())));
+                event.quitMessage(message(msg, p));
             }
         }
-        stopTicker(p.getUniqueId());
-        nameColors.remove(p.getUniqueId());
+        stopTicker(p);
+        UUID id = p.getUniqueId();
+        nameColors.remove(id);
+        chatTags.remove(id);
+        chatColors.remove(id);
+        glows.remove(id);
     }
 
-    private void refreshNameColor(Player p, PlayerCosmetics data) {
-        Cosmetic c = activeOwned(p, data, CosmeticCategory.NAME_COLOR);
-        if (c != null && c.color() != null) {
-            nameColors.put(p.getUniqueId(), c.color());
+    private static Component message(Cosmetic msg, Player p) {
+        String[] parts = msg.message().split("\\{player}", -1);
+        Component out = Component.empty();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                out = out.append(coloredName(p.getUniqueId(), p.getName()));
+            }
+            out = out.append(LEGACY_HEX.deserialize(parts[i]));
+        }
+        return out;
+    }
+
+    private void refreshCaches(Player p, PlayerCosmetics data) {
+        UUID id = p.getUniqueId();
+        Cosmetic paint = activeOwned(p, data, CosmeticCategory.NAME_COLOR);
+        put(nameColors, id, paint == null ? null : paint.color());
+        Cosmetic tag = activeOwned(p, data, CosmeticCategory.CHAT_TAG);
+        put(chatTags, id, tag == null ? null : tag.message());
+        Cosmetic chat = activeOwned(p, data, CosmeticCategory.CHAT_COLOR);
+        put(chatColors, id, chat == null ? null : chat.color());
+        Cosmetic glow = activeOwned(p, data, CosmeticCategory.GLOW);
+        put(glows, id, glow == null ? null : glow.color());
+    }
+
+    private static void put(Map<UUID, String> map, UUID id, @Nullable String value) {
+        if (value == null) {
+            map.remove(id);
         } else {
-            nameColors.remove(p.getUniqueId());
+            map.put(id, value);
         }
     }
 
     // =========================================================================================== per-player ticker
 
-    /** Starts this player's trail/skin timer. Player's thread. */
+    private void start(Player p) {
+        PlayerCosmetics data = data(p.getUniqueId());
+        if (data != null) {
+            refreshCaches(p, data);
+        }
+        startTicker(p);
+    }
+
     private void startTicker(Player p) {
         if (!p.isOnline() || tickers.containsKey(p.getUniqueId())) {
             return;
         }
         Ticker t = new Ticker();
         tickers.put(p.getUniqueId(), t);
-        int every = config.trailIntervalTicks;
+        int every = config.auraIntervalTicks;
         t.task = Tasks.entity.timer(p, task -> tick(p, t, every), every, every);
         if (t.task == null) {
-            tickers.remove(p.getUniqueId(), t); // player already gone
+            tickers.remove(p.getUniqueId(), t);
         }
     }
 
-    private void stopTicker(UUID id) {
-        Ticker t = tickers.remove(id);
-        if (t != null && t.task != null) {
+    private void stopTicker(Player p) {
+        Ticker t = tickers.remove(p.getUniqueId());
+        if (t == null) {
+            return;
+        }
+        if (t.task != null) {
             t.task.cancel();
         }
+        if (t.glowing && Tasks.owns(p)) {
+            p.setGlowing(false);
+        }
     }
 
-    /** Runs on the player's own thread every {@code trails.interval-ticks}. */
     private void tick(Player p, Ticker t, int every) {
         if (!p.isOnline()) {
             return;
@@ -382,32 +474,32 @@ public final class CosmeticsModule implements GensModule, Listener {
             return;
         }
         CosmeticsConfig cfg = config;
-        // Permissions can be lost (rank expired): recheck the name colour every ~5 seconds.
         t.ownershipCountdown -= every;
         if (t.ownershipCountdown <= 0) {
             t.ownershipCountdown = 100;
-            refreshNameColor(p, data);
+            refreshCaches(p, data);
+            applyGlow(p, t, data);
         }
-        Cosmetic trail = data.active(CosmeticCategory.TRAIL) == null ? null : activeOwned(p, data, CosmeticCategory.TRAIL);
-        if (trail != null && trail.effect() != null && visible(p, cfg)) {
-            Location here = p.getLocation();
-            Location last = t.lastTrail;
-            // Rate limit: only while actually moving, at most once per interval.
-            if (last == null || last.getWorld() != here.getWorld() || last.distanceSquared(here) >= cfg.trailMinMoveSquared) {
-                if (last != null && last.getWorld() == here.getWorld()) {
-                    // Drawn where the player stands now: that region is always owned by this thread (Folia rule 2);
-                    // the player walks away from it, so it still trails behind.
-                    trail.effect().play(here, p, t.colorIndex++);
+        Cosmetic aura = data.active(CosmeticCategory.AURA) == null ? null : activeOwned(p, data, CosmeticCategory.AURA);
+        if (aura != null && aura.effect() != null && visible(p, cfg)) {
+            t.auraStep++;
+            if (t.auraStep % 2 == 0) {
+                Location base = p.getLocation();
+                double phase = t.auraStep * 0.35;
+                double height = 0.15 + (Math.sin(t.auraStep * 0.12) + 1) * 0.85;
+                for (int k = 0; k < 2; k++) {
+                    double a = phase + k * Math.PI;
+                    aura.effect().play(base.clone().add(Math.cos(a) * 0.75, height, Math.sin(a) * 0.75), p, t.colorIndex++);
                 }
-                t.lastTrail = here;
             }
-        } else {
-            t.lastTrail = null;
         }
-        t.skinCountdown -= every;
-        if (t.skinCountdown <= 0) {
-            t.skinCountdown = cfg.toolSkinRefreshTicks;
-            refreshSkin(p, t, data, cfg);
+    }
+
+    private void applyGlow(Player p, Ticker t, PlayerCosmetics data) {
+        boolean want = activeOwned(p, data, CosmeticCategory.GLOW) != null && visible(p, config);
+        if (want != t.glowing) {
+            t.glowing = want;
+            p.setGlowing(want);
         }
     }
 
@@ -415,162 +507,11 @@ public final class CosmeticsModule implements GensModule, Listener {
         if (p.isDead() || p.getGameMode() == GameMode.SPECTATOR) {
             return false;
         }
-        // Never give away an invisible player's position in PvP.
-        return !cfg.trailsHideWhenInvisible || !(p.isInvisible() || p.hasPotionEffect(PotionEffectType.INVISIBILITY));
-    }
-
-    /**
-     * Tool skins, packet-level only: viewers get a fake equipment update with a copy of the held item that carries
-     * the skin's model. The real item in the inventory is never changed, so a dropped, traded, sold or stored tool is
-     * always the plain original and nothing can be duplicated. Limits: the player sees their own tool unchanged (no
-     * Bukkit API can fake a player's own hand without a packet library), and the server's own equipment updates (for
-     * example when the tool takes damage) show the plain tool until the next refresh. Player's thread.
-     */
-    private void refreshSkin(Player p, Ticker t, PlayerCosmetics data, CosmeticsConfig cfg) {
-        Cosmetic skin = cfg.toolSkinsEnabled && data.active(CosmeticCategory.TOOL_SKIN) != null
-                ? activeOwned(p, data, CosmeticCategory.TOOL_SKIN) : null;
-        ItemStack held = p.getInventory().getItemInMainHand();
-        ItemStack send;
-        if (skin != null && skin.skin() != null && skin.skin().fits(held)) {
-            send = skin.skin().displayCopy(held);
-            t.skinShown = true;
-        } else if (t.skinShown) {
-            send = held.clone(); // put the plain look back once
-            t.skinShown = false;
-        } else {
-            return;
-        }
-        Set<Player> viewers = p.getTrackedBy();
-        UUID owner = p.getUniqueId();
-        for (Player viewer : viewers) {
-            // Folia rule 3: the packet goes out from the viewer's own thread.
-            Tasks.entity.run(viewer, () -> {
-                Player o = Bukkit.getPlayer(owner);
-                if (o != null && viewer.isOnline()) {
-                    viewer.sendEquipmentChange(o, EquipmentSlot.HAND, send);
-                }
-            });
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onHeld(PlayerItemHeldEvent event) {
-        skinSoon(event.getPlayer());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onSwap(PlayerSwapHandItemsEvent event) {
-        skinSoon(event.getPlayer());
-    }
-
-    /** The held item changes after these events; refresh the skin one tick later. */
-    private void skinSoon(Player p) {
-        Ticker t = tickers.get(p.getUniqueId());
-        if (t == null) {
-            return;
-        }
-        Tasks.entity.later(p, () -> {
-            PlayerCosmetics data = data(p.getUniqueId());
-            if (data != null && tickers.get(p.getUniqueId()) == t) {
-                refreshSkin(p, t, data, config);
-            }
-        }, 1);
-    }
-
-    // =========================================================================================== kills
-
-    /** On the victim's thread. Copies what is needed, then continues on the killer's thread. */
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onDeath(PlayerDeathEvent event) {
-        Player victim = event.getEntity();
-        Player killer = victim.getKiller();
-        if (killer == null || killer.getUniqueId().equals(victim.getUniqueId())) {
-            return;
-        }
-        UUID victimId = victim.getUniqueId();
-        String victimName = victim.getName();
-        Location where = victim.getLocation();
-        String victimIp = ip(victim.getAddress());
-        UUID killerId = killer.getUniqueId();
-        Tasks.entity.run(killer, () -> onKill(killer, killerId, victimId, victimName, victimIp, where));
-    }
-
-    /** Killer's thread: count the kill (if allowed) and pick the effects, then draw them in the death region. */
-    private void onKill(Player killer, UUID killerId, UUID victimId, String victimName, @Nullable String victimIp, Location where) {
-        PlayerCosmetics data = data(killerId);
-        if (data == null || !killer.isOnline()) {
-            return;
-        }
-        CosmeticsConfig cfg = config;
-        countKill(killer, data, cfg, victimId, victimName, victimIp);
-
-        Cosmetic effect = activeOwned(killer, data, CosmeticCategory.KILL_EFFECT);
-        Cosmetic explosive = activeOwned(killer, data, CosmeticCategory.EXPLOSIVE_KILL);
-        if ((effect == null || effect.effect() == null) && (explosive == null || explosive.effect() == null)) {
-            return;
-        }
-        World world = where.getWorld();
-        if (world == null) {
-            return;
-        }
-        // Folia rule 2: draw on the thread that owns the death location. Particles, sound and a lightning effect only.
-        Tasks.region.run(where, () -> {
-            if (effect != null && effect.effect() != null) {
-                effect.effect().play(where, null, 0);
-            }
-            if (explosive != null && explosive.effect() != null) {
-                explosive.effect().play(where, null, 0);
-            }
-        });
-    }
-
-    private void countKill(Player killer, PlayerCosmetics data, CosmeticsConfig cfg, UUID victimId, String victimName,
-                           @Nullable String victimIp) {
-        if (!cfg.sameIpKillsCount && victimIp != null && victimIp.equals(ip(killer.getAddress()))) {
-            return; // same connection address: likely an alt, not counted
-        }
-        BiPredicate<UUID, UUID> alts = altCheck;
-        if (alts != null) {
-            try {
-                if (alts.test(killer.getUniqueId(), victimId)) {
-                    return;
-                }
-            } catch (RuntimeException e) {
-                plugin.getLogger().warning("[cosmetics] alt check failed: " + e);
-            }
-        }
-        String pair = killer.getUniqueId() + "|" + victimId;
-        long now = System.currentTimeMillis();
-        if (cfg.sameVictimCooldownMillis > 0) {
-            Long last = lastPairKill.get(pair);
-            if (last != null && now - last < cfg.sameVictimCooldownMillis) {
-                return; // farming the same victim
-            }
-            lastPairKill.put(pair, now);
-        }
-        int before = data.kills();
-        int after = data.addKill();
-        CosmeticsConfig.KillRank oldRank = cfg.rankFor(before);
-        CosmeticsConfig.KillRank newRank = cfg.rankFor(after);
-        if (newRank != null && !Objects.equals(oldRank, newRank)) {
-            killer.sendMessage(Msg.good("Kill rank up! You are now " + Msg.white(plain(newRank.display()))
-                    + " (" + Msg.white(String.valueOf(after)) + " kills)."));
-        }
-    }
-
-    private void pruneKillPairs() {
-        long keep = Math.max(60_000L, config.sameVictimCooldownMillis);
-        long now = System.currentTimeMillis();
-        lastPairKill.values().removeIf(t -> now - t > keep);
-    }
-
-    private static @Nullable String ip(@Nullable InetSocketAddress address) {
-        return address == null || address.getAddress() == null ? null : address.getAddress().getHostAddress();
+        return !cfg.hideWhenInvisible || !(p.isInvisible() || p.hasPotionEffect(PotionEffectType.INVISIBILITY));
     }
 
     // =========================================================================================== admin helpers
 
-    /** Finds a player (online first, then stored), completing with null if unknown. */
     CompletableFuture<UUID> resolve(String name) {
         Player online = Bukkit.getPlayerExact(name);
         if (online != null) {
@@ -579,7 +520,27 @@ public final class CosmeticsModule implements GensModule, Listener {
         return players.findUuid(name).thenApply(o -> o.orElse(null));
     }
 
-    CompletableFuture<Integer> storedKills(UUID player) {
-        return store.storedKills(player);
+    public List<String> cosmeticIds() {
+        CosmeticsConfig c = config;
+        List<String> out = new ArrayList<>();
+        if (c != null) {
+            for (Map<String, Cosmetic> m : c.cosmetics.values()) {
+                out.addAll(m.keySet());
+            }
+        }
+        out.sort(null);
+        return out;
+    }
+
+    public List<String> cosmeticCategories() {
+        List<String> out = new ArrayList<>();
+        for (CosmeticCategory c : CosmeticCategory.values()) {
+            out.add(c.key());
+        }
+        return out;
+    }
+
+    boolean homesEnabled() {
+        return homesEnabled;
     }
 }

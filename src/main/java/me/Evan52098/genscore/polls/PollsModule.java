@@ -345,7 +345,7 @@ public final class PollsModule implements GensModule, Listener {
                 int pct = percent(count, total);
                 lore.add("&7" + bar(pct) + " &f" + pct + "%&7 (" + count + ")");
             } else {
-                lore.add("&eClick to vote");
+                lore.add(me.Evan52098.genscore.menu.Lore.prompt("click to vote"));
             }
             menu.set(start + i * 2, 1, Lore.item(CHOICE_ICONS[i % CHOICE_ICONS.length],
                     CHOICE_COLOURS[i % CHOICE_COLOURS.length] + "&l" + legacySafe(options.get(i)), lore), click -> vote(player, poll, choice));

@@ -291,6 +291,9 @@ public final class VaultsModule implements GensModule, Listener {
                 holder.inventory.setItem(i, items[i]);
             }
             viewer.openInventory(holder.inventory);
+            if (viewer.getOpenInventory().getTopInventory() != holder.inventory) {
+                open.remove(key, holder);
+            }
         }, () -> open.remove(key, holder), 1));
     }
 
@@ -336,6 +339,9 @@ public final class VaultsModule implements GensModule, Listener {
             // One tick later the click has been applied; read the contents on the viewer's thread.
             Tasks.entity.later(viewer, () -> {
                 holder.saveQueued.set(false);
+                if (holder.inventory.getViewers().isEmpty()) {
+                    return;
+                }
                 save(holder, holder.inventory.getContents());
                 // The viewer's inventory changed too: write it now so vault and inventory reach disk together
                 // (milliseconds apart instead of minutes), see util/PlayerFiles.

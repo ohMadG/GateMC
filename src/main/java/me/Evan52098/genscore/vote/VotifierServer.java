@@ -238,6 +238,13 @@ public final class VotifierServer {
     }
 
     private void handleV1(byte[] block, String ip) throws Exception {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
+        String text = new String(cipher.doFinal(block), StandardCharsets.UTF_8);
+        String[] lines = text.split("\n", -1);
+        if (lines.length < 5 || !"VOTE".equals(lines[0].trim())) {
+            throw new IllegalArgumentException("not a v1 vote block");
+        }
         String fingerprint = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(block));
         long now = System.currentTimeMillis();
         Long seen = seenV1.putIfAbsent(fingerprint, now);
@@ -246,13 +253,6 @@ public final class VotifierServer {
         }
         seenV1.put(fingerprint, now);
         pruneReplays(now);
-        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        cipher.init(Cipher.DECRYPT_MODE, privateKey);
-        String text = new String(cipher.doFinal(block), StandardCharsets.UTF_8);
-        String[] lines = text.split("\n", -1);
-        if (lines.length < 5 || !"VOTE".equals(lines[0].trim())) {
-            throw new IllegalArgumentException("not a v1 vote block");
-        }
         deliver(new IncomingVote(lines[1].trim(), lines[2].trim(), lines[3].trim(), lines[4].trim(), ip, 1));
     }
 

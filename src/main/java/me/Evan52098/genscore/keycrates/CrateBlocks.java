@@ -56,6 +56,9 @@ final class CrateBlocks implements Listener {
         final String crate;
         final boolean fromConfig;
         volatile TextDisplay display;
+        volatile org.bukkit.entity.ItemDisplay base;
+        volatile org.bukkit.entity.ItemDisplay lid;
+        final java.util.concurrent.atomic.AtomicBoolean opening = new java.util.concurrent.atomic.AtomicBoolean();
 
         Spot(String crate, boolean fromConfig) {
             this.crate = crate;
@@ -185,6 +188,7 @@ final class CrateBlocks implements Listener {
             spot.display = null;
             return;
         }
+        ensureModel(pos, w, spot, crate, redraw);
         String text = String.join("\n", crate.hologram());
         if (current != null && current.isValid()) {
             if (redraw) {
@@ -202,17 +206,78 @@ final class CrateBlocks implements Listener {
         });
     }
 
+    private void ensureModel(Pos pos, World w, Spot spot, CrateConfig.Crate crate, boolean redraw) {
+        if (spot.opening.get()) {
+            return;
+        }
+        org.bukkit.NamespacedKey model = service.config().crateModel;
+        if (crate.model() == null || model == null) {
+            removeParts(spot);
+            return;
+        }
+        org.bukkit.block.Block block = w.getBlockAt(pos.x(), pos.y(), pos.z());
+        if (block.getType() != org.bukkit.Material.BARRIER) {
+            block.setType(org.bukkit.Material.BARRIER, false);
+        }
+        Location at = pos.center(w, 0.5);
+        at.setYaw((float) Math.toDegrees(Math.atan2(-Math.signum(pos.x() + 0.5 - 1152.5), Math.signum(pos.z() + 0.5 - 1152.5))) + 180f);
+        if (redraw || spot.base == null || !spot.base.isValid() || spot.lid == null || !spot.lid.isValid()) {
+            removeParts(spot);
+            spot.base = part(w, at, model, crate.model() + "_base", CrateShow.base());
+            spot.lid = part(w, at, model, crate.model() + "_lid", CrateShow.lid(0f));
+        }
+    }
+
+    private static org.bukkit.entity.ItemDisplay part(World w, Location at, org.bukkit.NamespacedKey model, String part,
+                                                      org.bukkit.util.Transformation t) {
+        return w.spawn(at, org.bukkit.entity.ItemDisplay.class, d -> {
+            d.setPersistent(false);
+            d.setItemStack(CrateShow.modelItem(model, part));
+            d.setItemDisplayTransform(org.bukkit.entity.ItemDisplay.ItemDisplayTransform.NONE);
+            d.setBrightness(new Display.Brightness(15, 15));
+            d.setTransformation(t);
+        });
+    }
+
+    private static void removeParts(Spot spot) {
+        var base = spot.base;
+        var lid = spot.lid;
+        spot.base = null;
+        spot.lid = null;
+        if (base != null && base.isValid()) {
+            base.remove();
+        }
+        if (lid != null && lid.isValid()) {
+            lid.remove();
+        }
+    }
+
+    boolean play(Pos pos, Player player, CrateConfig.Crate crate, CrateConfig.Reward won, boolean rare, Runnable done, Runnable retired) {
+        Spot spot = spots.get(pos);
+        World w = Bukkit.getWorld(pos.world());
+        if (spot == null || w == null || !spot.crate.equals(crate.id()) || crate.model() == null) {
+            return false;
+        }
+        var lid = spot.lid;
+        if (lid == null || !lid.isValid() || !spot.opening.compareAndSet(false, true)) {
+            return false;
+        }
+        CrateShow.play(pos.center(w, 0.5), lid, spot.display, crate, won, rare, player, done, retired, () -> spot.opening.set(false), logger);
+        return true;
+    }
+
     private void removeDisplay(Pos pos, Spot spot) {
         TextDisplay d = spot.display;
         World w = Bukkit.getWorld(pos.world());
         spot.display = null;
-        if (d == null || w == null) {
+        if (w == null) {
             return;
         }
         Tasks.region.run(pos.center(w, 0), () -> {
-            if (d.isValid()) {
+            if (d != null && d.isValid()) {
                 d.remove();
             }
+            removeParts(spot);
         });
     }
 
@@ -268,7 +333,7 @@ final class CrateBlocks implements Listener {
             player.sendMessage(Msg.bad("You need a key to open this crate. Earn them by playing and voting."));
             return;
         }
-        service.open(player, crate.id(), player.isSneaking() ? Integer.MAX_VALUE : 1);
+        service.open(player, crate.id(), player.isSneaking() ? Integer.MAX_VALUE : 1, Pos.of(event.getClickedBlock()));
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)

@@ -83,11 +83,11 @@ public final class WorldRulesModule implements GensModule {
         settings = new Settings(box,
                 sp == null ? Integer.MIN_VALUE : sp.getInt("fall-y", Integer.MIN_VALUE),
                 sp == null || sp.getBoolean("block-nether-portals", true),
-                sp == null ? "&c&lSPAWN &8» &7Spawn is &cclosed &7right now." : sp.getString("closed-message", "&c&lSPAWN &8» &7Spawn is &cclosed &7right now."),
+                sp == null ? "&6&lSPAWN &8» &7Spawn is &cclosed &7right now." : sp.getString("closed-message", "&6&lSPAWN &8» &7Spawn is &cclosed &7right now."),
                 end.getBoolean("enabled", false),
                 Math.max(0, end.getInt("radius", 900)),
                 end.getString("world", "world_the_end"),
-                end.getString("message", "&5&lTHE END &8» &7The dragon island is &cclosed&7. Use &d/rtp end &7to visit the outer islands."),
+                end.getString("message", "&6&lTHE END &8» &7The dragon island is &cclosed&7. Use &d/rtp end &7to visit the outer islands."),
                 end.getBoolean("prevent-dragon", true));
         if (sp != null && box == null) {
             plugin.getLogger().warning("[worldrules] spawn: needs world, min: [x, y, z] and max: [x, y, z]; spawn bounds are off.");

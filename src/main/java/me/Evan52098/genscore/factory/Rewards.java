@@ -43,8 +43,11 @@ final class Rewards {
         String text;
         Sound sound;
         if (special == Factory.TOKEN) {
-            g.addTokens(1);
-            text = "<yellow>+1 token</yellow> <gray>came off your belt (" + g.tokens() + " now)</gray>";
+            int got = java.util.concurrent.ThreadLocalRandom.current().nextDouble()
+                    < me.Evan52098.genscore.powers.PowersModule.perk(owner, "token-double") ? 2 : 1;
+            got = (int) RankPerks.tokens(owner, got);
+            g.addTokens(got);
+            text = "<yellow>+" + got + (got == 1 ? " token" : " tokens") + "</yellow> <gray>came off your belt (" + g.tokens() + " now)</gray>";
             sound = Sound.ENTITY_EXPERIENCE_ORB_PICKUP;
         } else {
             int r = special - Factory.CACHE;
@@ -166,11 +169,13 @@ final class Rewards {
         if (g == null || !g.takeCache(rarity)) { // take first
             return null;
         }
+        me.Evan52098.genscore.hub.HubModule.progress(p.getUniqueId(), "CACHE", 1);
         ProgressSettings ps = module.progress();
         ThreadLocalRandom r = ThreadLocalRandom.current();
-        long money = Math.round(ps.cacheMinutes()[rarity] * incomePerMinute(p.getUniqueId()) * (0.5 + r.nextDouble()));
+        long money = Math.round(ps.cacheMinutes()[rarity] * incomePerMinute(p.getUniqueId()) * (0.5 + r.nextDouble())
+                * (1 + me.Evan52098.genscore.powers.PowersModule.perk(p.getUniqueId(), "cache-money")));
         int[] t = ps.cacheTokens()[rarity];
-        int tokens = t[0] + r.nextInt(Math.max(1, t[1] - t[0] + 1));
+        int tokens = (int) RankPerks.tokens(p.getUniqueId(), t[0] + r.nextInt(Math.max(1, t[1] - t[0] + 1)));
         List<String> lines = new ArrayList<>();
         module.pay(p.getUniqueId(), money);
         lines.add("<green>+" + Money.compact(money) + "</green>");
@@ -182,6 +187,10 @@ final class Rewards {
                 lines.add("<aqua>+1 " + Msg.escape(crate) + " key</aqua>");
             }
         }
+        String egg = me.Evan52098.genscore.pets.PetsModule.cacheEgg(p.getUniqueId(), rarity);
+        if (egg != null) {
+            lines.add(egg);
+        }
         org.bukkit.Material icon = org.bukkit.Material.GOLD_INGOT;
         String iconName = Money.compact(money);
         if (lines.size() > 2) {
@@ -189,7 +198,7 @@ final class Rewards {
             iconName = "Crate key";
         }
         // A small chance at a better cache inside the cache.
-        if (rarity < 3 && r.nextDouble() < 0.08) {
+        if (rarity < 3 && r.nextDouble() < 0.08 + me.Evan52098.genscore.powers.PowersModule.perk(p.getUniqueId(), "cache-upgrade")) {
             g.addCache(rarity + 1, 1);
             lines.add(ProgressSettings.RARITY_COLORS[rarity + 1] + "+1 " + ProgressSettings.RARITY_NAMES[rarity + 1] + " cache");
             icon = org.bukkit.Material.ENDER_CHEST;
@@ -269,8 +278,9 @@ final class Rewards {
             if (hours > g.hoursRewarded()) {
                 int newHours = hours - g.hoursRewarded();
                 g.setHoursRewarded(hours);
-                g.addTokens(5L * newHours);
-                Tasks.entity.run(owner, () -> owner.sendMessage(Msg.parse("<yellow>+" + (5 * newHours) + " tokens</yellow> <gray>for "
+                long earned = RankPerks.tokens(owner.getUniqueId(), (2L + RankPerks.of(owner.getUniqueId()).hourlyTokens()) * newHours);
+                g.addTokens(earned);
+                Tasks.entity.run(owner, () -> owner.sendMessage(Msg.parse("<yellow>+" + earned + " tokens</yellow> <gray>for "
                         + newHours + (newHours == 1 ? " hour" : " hours") + " played.</gray>")));
             }
         }
@@ -280,13 +290,13 @@ final class Rewards {
                 continue;
             }
             any = true;
-            g.addTokens(m.tokens());
+            g.addTokens(RankPerks.tokens(owner.getUniqueId(), m.tokens()));
             String cache = "";
             if (m.cacheRarity() >= 0) {
                 g.addCache(m.cacheRarity(), 1);
                 cache = " <gray>+</gray> " + ProgressSettings.RARITY_COLORS[m.cacheRarity()] + "1 " + ProgressSettings.RARITY_NAMES[m.cacheRarity()] + " cache";
             }
-            String line = "<gold><bold>MILESTONE</bold></gold> <white>" + Msg.escape(m.name()) + "</white> <yellow>+" + m.tokens() + " tokens</yellow>" + cache;
+            String line = Msg.headerText("Milestone") + "<white>" + Msg.escape(m.name()) + "</white> <yellow>+" + m.tokens() + " tokens</yellow>" + cache;
             Tasks.entity.run(owner, () -> {
                 owner.sendMessage(Msg.parse(line));
                 module.celebrate(owner, "<gold><bold>MILESTONE", "<white>" + Msg.escape(m.name()) + " <yellow>+" + m.tokens() + " tokens", true);
@@ -300,11 +310,20 @@ final class Rewards {
     // ------------------------------------------------------------------ defence
 
     /** A turret finished off a raider: the owner defended their factory. */
+    private final java.util.Map<String, Long> defended = new java.util.concurrent.ConcurrentHashMap<>();
+
     void turretKill(UUID owner, Player raider) {
+        long now = System.currentTimeMillis();
+        defended.values().removeIf(t -> now - t > 600_000);
+        if (defended.putIfAbsent(owner + "|" + raider.getUniqueId(), now) != null) {
+            raider.sendMessage(Msg.bad("You were stopped by the factory's turrets."));
+            return;
+        }
         GensPlayer g = module.gensPlayer(owner);
         if (g != null) {
             g.addRaidDefended();
-            g.addTokens(3);
+            g.addTokens(RankPerks.tokens(owner, 3));
+            me.Evan52098.genscore.hub.HubModule.progress(owner, "DEFEND", 1);
             module.saveSoon(owner);
         }
         Player o = Bukkit.getPlayer(owner);

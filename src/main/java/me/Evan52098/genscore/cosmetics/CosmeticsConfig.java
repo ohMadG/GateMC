@@ -3,7 +3,6 @@ package me.Evan52098.genscore.cosmetics;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Color;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
@@ -14,12 +13,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -32,18 +29,10 @@ final class CosmeticsConfig {
     static final Pattern ID = Pattern.compile("[a-z0-9_-]{1,32}");
     private static final MiniMessage MM = MiniMessage.miniMessage();
 
-    record KillRank(int kills, String display) {
-    }
-
     final Map<CosmeticCategory, Map<String, Cosmetic>> cosmetics;
-    final List<KillRank> killRanks;          // sorted by kills, ascending
-    final boolean sameIpKillsCount;
-    final long sameVictimCooldownMillis;
-    final int trailIntervalTicks;
-    final double trailMinMoveSquared;
-    final boolean trailsHideWhenInvisible;
-    final boolean toolSkinsEnabled;
-    final int toolSkinRefreshTicks;
+    final int auraIntervalTicks;
+    final boolean hideWhenInvisible;
+    final long glowCycleMillis;
     final String lockedHint;
     final int homeIconMax;
     final List<Material> homeIconChoices;
@@ -51,27 +40,10 @@ final class CosmeticsConfig {
 
     private CosmeticsConfig(ConfigurationSection root, Logger log) {
         ConfigurationSection s = section(root, "settings");
-        trailIntervalTicks = clamp(s.getInt("trails.interval-ticks", 3), 2, 20);
-        double move = Math.max(0, Math.min(2, s.getDouble("trails.min-move", 0.2)));
-        trailMinMoveSquared = move * move;
-        trailsHideWhenInvisible = s.getBoolean("trails.hide-when-invisible", true);
-        toolSkinsEnabled = s.getBoolean("tool-skins.enabled", true);
-        toolSkinRefreshTicks = clamp(s.getInt("tool-skins.refresh-ticks", 10), 5, 100);
-        lockedHint = s.getString("locked-hint", "&7Unlock it on the store or from crates.");
-
-        ConfigurationSection k = section(root, "kill-ranks");
-        sameIpKillsCount = k.getBoolean("same-ip-kills-count", false);
-        sameVictimCooldownMillis = Math.max(0, k.getLong("same-victim-cooldown-minutes", 10)) * 60_000L;
-        List<KillRank> ranks = new ArrayList<>();
-        for (Map<?, ?> m : k.getMapList("tiers")) {
-            Object kills = m.get("kills");
-            Object display = m.get("display");
-            if (kills instanceof Number n && display != null && n.intValue() >= 0) {
-                ranks.add(new KillRank(n.intValue(), display.toString()));
-            }
-        }
-        ranks.sort((a, b) -> Integer.compare(a.kills(), b.kills()));
-        killRanks = List.copyOf(ranks);
+        auraIntervalTicks = clamp(s.getInt("auras.interval-ticks", 3), 2, 20);
+        hideWhenInvisible = s.getBoolean("hide-when-invisible", true);
+        glowCycleMillis = Math.max(250L, Math.round(s.getDouble("glows.cycle-seconds", 1.0) * 1000));
+        lockedHint = s.getString("locked-hint", "&7Unlock it from crates.");
 
         ConfigurationSection h = section(root, "home-icons");
         homeIconMax = clamp(h.getInt("max-per-player", 32), 1, 200);
@@ -131,26 +103,6 @@ final class CosmeticsConfig {
         return id == null ? null : cosmetics.get(category).get(id);
     }
 
-    /** The highest tier reached, or null when there are no tiers. */
-    @Nullable KillRank rankFor(int kills) {
-        KillRank best = null;
-        for (KillRank r : killRanks) {
-            if (kills >= r.kills()) {
-                best = r;
-            }
-        }
-        return best;
-    }
-
-    @Nullable KillRank nextRank(int kills) {
-        for (KillRank r : killRanks) {
-            if (r.kills() > kills) {
-                return r;
-            }
-        }
-        return null;
-    }
-
     // ------------------------------------------------------------------------------------------- parsing
 
     private static Cosmetic parse(CosmeticCategory cat, String id, ConfigurationSection c) {
@@ -170,7 +122,7 @@ final class CosmeticsConfig {
         String message = null;
         String color = null;
         Cosmetic.Effect effect = null;
-        Cosmetic.Skin skin = null;
+        long price = Math.max(0, c.getLong("price", 0));
         switch (cat) {
             case JOIN_MESSAGE, LEAVE_MESSAGE -> {
                 message = c.getString("message");
@@ -178,7 +130,19 @@ final class CosmeticsConfig {
                     throw new IllegalArgumentException("needs a message (up to 256 characters)");
                 }
             }
-            case NAME_COLOR -> {
+            case CHAT_TAG -> {
+                message = c.getString("display");
+                if (message == null || message.isBlank() || message.length() > 200) {
+                    throw new IllegalArgumentException("needs a display (the tag text, up to 200 characters)");
+                }
+            }
+            case GLOW -> {
+                color = c.getString("color", "").toLowerCase(Locale.ROOT);
+                if (!color.matches("[0-9a-f]{1,16}")) {
+                    throw new IllegalArgumentException("needs a color: legacy colour codes 0-9 and a-f, several to cycle (e.g. \"b\" or \"c6e\")");
+                }
+            }
+            case NAME_COLOR, CHAT_COLOR -> {
                 color = c.getString("color");
                 if (color == null || color.isBlank() || color.length() > 200) {
                     throw new IllegalArgumentException("needs a color (a MiniMessage tag such as <red> or <gradient:#ff0000:#ffaa00>)");
@@ -189,15 +153,13 @@ final class CosmeticsConfig {
                     throw new IllegalArgumentException("color is not valid MiniMessage");
                 }
             }
-            case KILL_EFFECT, EXPLOSIVE_KILL, TRAIL -> effect = parseEffect(cat, section(c, "effect"));
-            case TOOL_SKIN -> skin = parseSkin(c);
+            case AURA -> effect = parseEffect(section(c, "effect"));
         }
-        return new Cosmetic(cat, id, name, permission, icon, description, message, color, effect, skin);
+        return new Cosmetic(cat, id, name, permission, icon, description, message, color, effect, price);
     }
 
-    private static Cosmetic.Effect parseEffect(CosmeticCategory cat, ConfigurationSection e) {
-        boolean trail = cat == CosmeticCategory.TRAIL;
-        String particleName = e.getString("particle", cat == CosmeticCategory.EXPLOSIVE_KILL ? "EXPLOSION_EMITTER" : "FLAME");
+    private static Cosmetic.Effect parseEffect(ConfigurationSection e) {
+        String particleName = e.getString("particle", "FLAME");
         Particle particle;
         try {
             particle = Particle.valueOf(particleName.toUpperCase(Locale.ROOT));
@@ -207,11 +169,10 @@ final class CosmeticsConfig {
         if (!Cosmetic.Effect.supported(particle)) {
             throw new IllegalArgumentException("particle " + particleName + " needs block/item data, which is not supported");
         }
-        // Rate limits: trails run many times a second, so they get a much smaller cap than one-off kill effects.
-        int count = clamp(e.getInt("count", trail ? 2 : 20), 1, trail ? 6 : 60);
-        double spread = clampD(e.getDouble("spread", trail ? 0.1 : 0.6), 0, trail ? 0.5 : 3);
-        double speed = clampD(e.getDouble("speed", 0), 0, trail ? 0.1 : 1);
-        double offsetY = clampD(e.getDouble("offset-y", trail ? 0.1 : 1.0), -1, 3);
+        int count = clamp(e.getInt("count", 1), 1, 6);
+        double spread = clampD(e.getDouble("spread", 0), 0, 0.5);
+        double speed = clampD(e.getDouble("speed", 0), 0, 0.1);
+        double offsetY = clampD(e.getDouble("offset-y", 0), -1, 3);
         List<Color> colors = new ArrayList<>();
         for (String hex : e.getStringList("colors")) {
             Color col = parseColor(hex);
@@ -221,41 +182,7 @@ final class CosmeticsConfig {
             colors.add(col);
         }
         float size = (float) clampD(e.getDouble("size", 1.0), 0.1, 4);
-        String sound = trail ? null : e.getString("sound");
-        if (sound != null && (sound.isBlank() || !sound.matches("[a-z0-9_.:-]{1,100}"))) {
-            throw new IllegalArgumentException("sound must be a sound key such as entity.generic.explode");
-        }
-        float volume = (float) clampD(e.getDouble("volume", 1.0), 0, 2);
-        float pitch = (float) clampD(e.getDouble("pitch", 1.0), 0.5, 2);
-        boolean lightning = !trail && e.getBoolean("lightning", false);
-        return new Cosmetic.Effect(particle, count, spread, speed, offsetY, List.copyOf(colors), size, sound, volume, pitch, lightning);
-    }
-
-    private static Cosmetic.Skin parseSkin(ConfigurationSection c) {
-        Set<Material> materials = EnumSet.noneOf(Material.class);
-        for (String name : c.getStringList("materials")) {
-            Material m = Material.matchMaterial(name);
-            if (m == null || !m.isItem() || m.isAir()) {
-                throw new IllegalArgumentException("materials: '" + name + "' is not an item");
-            }
-            materials.add(m);
-        }
-        if (materials.isEmpty()) {
-            throw new IllegalArgumentException("needs a materials list (which tools it skins)");
-        }
-        NamespacedKey model = null;
-        String modelName = c.getString("item-model");
-        if (modelName != null && !modelName.isBlank()) {
-            model = NamespacedKey.fromString(modelName.toLowerCase(Locale.ROOT));
-            if (model == null) {
-                throw new IllegalArgumentException("item-model must look like namespace:path");
-            }
-        }
-        Integer cmd = c.isInt("custom-model-data") ? c.getInt("custom-model-data") : null;
-        if (model == null && cmd == null) {
-            throw new IllegalArgumentException("needs item-model or custom-model-data");
-        }
-        return new Cosmetic.Skin(Collections.unmodifiableSet(materials), model, cmd);
+        return new Cosmetic.Effect(particle, count, spread, speed, offsetY, List.copyOf(colors), size, null, 1f, 1f, false);
     }
 
     private static @Nullable Color parseColor(String hex) {

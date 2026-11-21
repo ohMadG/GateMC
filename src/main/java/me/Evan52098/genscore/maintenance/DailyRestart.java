@@ -27,7 +27,7 @@ final class DailyRestart {
     private volatile boolean enabled;
     private volatile @Nullable LocalTime time;
     private volatile ZoneId zone = ZoneId.systemDefault();
-    private volatile String warning = "&4&lRESTART &8» &7The server restarts in &c{time} &7- it'll be back in under a minute!";
+    private volatile String warning = "&6&lRESTART &8» &7The server restarts in &c{time} &7- it'll be back in under a minute!";
     private volatile List<Integer> warnings = DEFAULT_WARNINGS;
 
     /** Epoch millis of the next restart, or 0 for none. Changed on the global thread and by commands (volatile). */

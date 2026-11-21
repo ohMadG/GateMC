@@ -4,28 +4,25 @@ import com.destroystokyo.paper.ParticleBuilder;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * One cosmetic from cosmetics.yml. Immutable; a reload builds new ones. Which fields matter depends on the category:
- * {@code message} for join/leave messages, {@code color} for name colours, {@code effect} for kill effects, explosive
- * kills and trails, {@code skin} for tool skins.
+ * {@code message} for join/leave messages and chat tags, {@code color} for name paints and chat colours (a MiniMessage
+ * tag) and glows (legacy colour codes, several = cycling), {@code effect} for auras. {@code price} is in credits, 0 =
+ * not sold.
  *
  * @param permission store-bought unlock (LuckPerms). Owning the permission OR having a stored unlock row is enough.
  */
 public record Cosmetic(CosmeticCategory category, String id, String displayName, String permission, Material icon,
                        List<String> description, @Nullable String message, @Nullable String color,
-                       @Nullable Effect effect, @Nullable Skin skin) {
+                       @Nullable Effect effect, long price) {
 
     /**
      * Particles, a sound and optionally a lightning flash (visual only, never a real bolt). Everything here is drawn
@@ -76,35 +73,6 @@ public record Cosmetic(CosmeticCategory category, String id, String displayName,
             Class<?> type = p.getDataType();
             return type == Void.class || type == Particle.DustOptions.class || type == Particle.DustTransition.class
                     || type == Color.class;
-        }
-    }
-
-    /**
-     * A tool skin: shown to other players on a held tool of one of {@code materials}. Only a copy of the item is sent
-     * to viewers (packet-level equipment display); the real item is never changed.
-     */
-    public record Skin(Set<Material> materials, @Nullable NamespacedKey itemModel, @Nullable Integer customModelData) {
-
-        boolean fits(@Nullable ItemStack item) {
-            return item != null && !item.getType().isAir() && materials.contains(item.getType());
-        }
-
-        /** A display-only copy with the new model. The original is untouched. */
-        @SuppressWarnings("deprecation")
-        ItemStack displayCopy(ItemStack real) {
-            ItemStack copy = real.clone();
-            ItemMeta meta = copy.getItemMeta();
-            if (meta == null) {
-                return copy;
-            }
-            if (itemModel != null) {
-                meta.setItemModel(itemModel);
-            }
-            if (customModelData != null) {
-                meta.setCustomModelData(customModelData);
-            }
-            copy.setItemMeta(meta);
-            return copy;
         }
     }
 }

@@ -2,6 +2,10 @@ package me.Evan52098.genscore.sit;
 
 import me.Evan52098.genscore.GensCore;
 import me.Evan52098.genscore.module.GensModule;
+import me.Evan52098.genscore.plots.FactoryView;
+import me.Evan52098.genscore.plots.Plot;
+import me.Evan52098.genscore.plots.PlotService;
+import me.Evan52098.genscore.plots.PlotsModule;
 import me.Evan52098.genscore.scheduler.Tasks;
 import me.Evan52098.genscore.util.Msg;
 import me.Evan52098.genscore.worldrules.Text;
@@ -217,6 +221,9 @@ public final class SitModule implements GensModule, Listener {
         if (player.getLocation().distanceSquared(block.getLocation().add(0.5, 0.5, 0.5)) > 9) {
             return;
         }
+        if (!block.equals(player.getTargetBlockExact(5)) || intoOtherPlot(player, block)) {
+            return;
+        }
         Location at = block.getLocation().add(0.5, height, 0.5);
         at.setYaw(player.getLocation().getYaw());
         if (block.getBlockData() instanceof Stairs stairs) {
@@ -243,6 +250,21 @@ public final class SitModule implements GensModule, Listener {
             return 0.0625;
         }
         return Double.NaN;
+    }
+
+    private boolean intoOtherPlot(Player player, Block block) {
+        PlotsModule plots = plugin.modules().get(PlotsModule.class);
+        PlotService service = plots == null ? null : plots.service();
+        if (service == null) {
+            return false;
+        }
+        Plot plot = service.plotAt(block.getLocation());
+        if (plot == null || plot.owner().equals(player.getUniqueId())) {
+            return false;
+        }
+        FactoryView view = service.view(plot);
+        Location at = player.getLocation();
+        return view.inside(block.getX(), block.getZ()) && !view.inside(at.getBlockX(), at.getBlockZ());
     }
 
     private static boolean canSitNow(Player p, Settings s) {

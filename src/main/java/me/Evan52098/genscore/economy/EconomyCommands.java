@@ -179,6 +179,9 @@ public final class EconomyCommands {
     @CommandPermission("genscore.baltop")
     @Description("The richest players")
     public void baltop(BukkitCommandActor actor, @Named("page") @Default("1") int page) {
+        if (actor.sender() instanceof org.bukkit.entity.Player p && page == 1 && me.Evan52098.genscore.hub.HubModule.openBaltop(p)) {
+            return;
+        }
         CommandSender sender = actor.sender();
         economy.topAsync().whenComplete((list, error) -> Tasks.forSender(sender, () -> {
             if (error != null || list == null) {

@@ -1,48 +1,27 @@
-# GensCore cosmetics (/cosmetics, /wardrobe, /cos). Reload with /cosmetics reload.
+# GateMC cosmetics (/cosmetics, /wardrobe, /cos; /tags opens chat tags). Reload with /cosmetics reload.
 #
-# Ownership: a player owns a cosmetic when they have its permission (store ranks, through LuckPerms) or a stored
-# unlock (crate rewards: /cosmetics give <player> <category> <id>, or CosmeticsModule.grant from code).
-# The permission defaults to genscore.cosmetics.<category>.<id>; set "permission:" to use another one, or
-# "free: true" to give it to everyone. One cosmetic is active per category.
+# Ownership: a player owns a cosmetic when they have its permission (genscore.cosmetics.<category>.<id>, store ranks
+# through LuckPerms), a stored unlock (crates: cosmetics give <player> <category> <id>), or bought it in the menu.
+# price: credits to buy it in the menu (0 or missing = not sold, crates only). "free: true" gives it to everyone.
 #
-# Text uses & colour codes. Ids: a-z, 0-9, _ and - (up to 32).
+# Name paints and some chat colours/tags use the animated shader colours #FE04FD (1) ... #FE64FD (25): the resource
+# pack's text shader turns text in those exact colours into flowing palettes everywhere (chat, tab list, menus).
+# Text uses & colour codes (&#rrggbb for hex). Ids: a-z, 0-9, _ and - (up to 32).
 
 settings:
-  # Shown on a locked cosmetic in the menu.
-  locked-hint: "&7Unlock it on the store or from crates."
-  trails:
-    # How often each player's trail is drawn (2-20 ticks). Drawn only while moving, on the player's own thread.
+  locked-hint: "&7Unlock it from crates."
+  # Hide auras and glows while invisible (would give away a hidden player's position).
+  hide-when-invisible: true
+  auras:
+    # How often each player's aura is drawn (2-20 ticks), on the player's own thread.
     interval-ticks: 3
-    # Blocks moved before the next puff (stops standing-still spam).
-    min-move: 0.2
-    # Never draw a trail for an invisible player (would give away their position in PvP).
-    hide-when-invisible: true
-  tool-skins:
-    enabled: true
-    # How often other players are re-sent the skinned look (5-100 ticks). The server re-sends the plain tool when it
-    # takes damage, so lower = less flicker in fights, higher = fewer packets.
-    refresh-ticks: 10
-
-# Kill ranks: total player kills, shown above heads with the kill-rank placeholder. Highest reached tier wins.
-kill-ranks:
-  # Kills where killer and victim connect from the same IP address do not count (alt farming).
-  same-ip-kills-count: false
-  # The same killer -> victim pair counts once per this many minutes (0 = always counts).
-  same-victim-cooldown-minutes: 10
-  tiers:
-    - { kills: 0,   display: '&7⚔ Rookie' }
-    - { kills: 5,   display: '&f⚔ Fighter' }
-    - { kills: 15,  display: '&a⚔ Warrior' }
-    - { kills: 35,  display: '&b⚔ Gladiator' }
-    - { kills: 75,  display: '&d⚔ Champion' }
-    - { kills: 150, display: '&6⚔ Warlord' }
-    - { kills: 300, display: '&c&l⚔ Slayer' }
-    - { kills: 600, display: '&4&l⚔ IMMORTAL' }
+  glows:
+    # Multi-colour glows switch colour this often (TAB refreshes %genscore_glow% at least this fast).
+    cycle-seconds: 1.0
 
 # /homeicon (permission genscore.homeicon, for paid ranks).
 home-icons:
   max-per-player: 32
-  # Also offer "use the item in your hand" (only its type is stored, never the item).
   allow-held-item: true
   choices: [RED_BED, CHEST, ENDER_CHEST, CRAFTING_TABLE, FURNACE, ANVIL, ENCHANTING_TABLE, BEACON, DIAMOND, EMERALD,
             GOLD_INGOT, IRON_INGOT, NETHERITE_INGOT, DIAMOND_SWORD, DIAMOND_PICKAXE, BOW, SHIELD, TOTEM_OF_UNDYING,
@@ -51,169 +30,903 @@ home-icons:
             HEART_OF_THE_SEA, NETHER_STAR, ELYTRA, TRIDENT, FISHING_ROD, CAKE, BELL]
 
 cosmetics:
-
-  # ------------------------------------------------------------------ kill effects
-  # Drawn where the victim died when the owner gets a player kill. Particles, a sound and, if lightning: true, a
-  # lightning flash that does no damage and lights no fire.
-  # effect: particle (a Minecraft particle; DUST / DUST_COLOR_TRANSITION take colors: and size:), count (1-60),
-  #         spread (0-3), speed (0-1), offset-y, sound (a sound key), volume, pitch, lightning
-  kill-effects:
-    blood:
-      name: "&cBlood Burst"
-      icon: REDSTONE
-      description: ["A spray of red where they fell."]
-      effect: { particle: DUST, colors: ["#8a0303", "#d01010"], size: 1.4, count: 40, spread: 0.5, offset-y: 1.0,
-                sound: entity.player.hurt, pitch: 0.7 }
-    hearts:
-      name: "&dHeartbreaker"
-      icon: PINK_DYE
-      description: ["Leave them some love."]
-      effect: { particle: HEART, count: 12, spread: 0.6, offset-y: 1.2, sound: entity.experience_orb.pickup }
-    souls:
-      name: "&3Soul Harvest"
-      icon: SOUL_LANTERN
-      description: ["Their soul is yours."]
-      effect: { particle: SOUL, count: 25, spread: 0.4, speed: 0.05, offset-y: 0.8, sound: particle.soul_escape, volume: 1.5 }
-    thunder:
-      name: "&eThunderstruck"
-      icon: LIGHTNING_ROD
-      description: ["A lightning flash (harmless)."]
-      effect: { particle: ELECTRIC_SPARK, count: 30, spread: 0.6, offset-y: 1.0, lightning: true }
-    totem:
-      name: "&6Golden Farewell"
-      icon: TOTEM_OF_UNDYING
-      description: ["A burst of totem sparks."]
-      effect: { particle: TOTEM_OF_UNDYING, count: 50, spread: 0.3, speed: 0.4, offset-y: 1.0, sound: item.totem.use, volume: 0.6 }
-
-  # ------------------------------------------------------------------ explosive kills
-  # A blast where the victim died: particles and sound only. Nothing is ever really exploded (no block damage,
-  # no knockback, no item loss).
-  explosive-kills:
-    blast:
-      name: "&cTNT Blast"
-      icon: TNT
-      description: ["Boom. Harmless, but loud."]
-      effect: { particle: EXPLOSION_EMITTER, count: 1, spread: 0, offset-y: 0.5, sound: entity.generic.explode }
-    firework:
-      name: "&bFirework Finale"
-      icon: FIREWORK_ROCKET
-      description: ["A firework show for your victim."]
-      effect: { particle: FIREWORK, count: 60, spread: 0.2, speed: 0.25, offset-y: 1.0, sound: entity.firework_rocket.blast }
-    smoke:
-      name: "&8Smoke Bomb"
-      icon: GUNPOWDER
-      description: ["Gone in a puff of smoke."]
-      effect: { particle: LARGE_SMOKE, count: 40, spread: 0.6, speed: 0.05, offset-y: 0.8, sound: entity.generic.explode, pitch: 1.6, volume: 0.6 }
-
-  # ------------------------------------------------------------------ join and leave messages
-  # From BlockvilleCore's joinmessages.yml / leavemessages.yml. {player} is the player's name.
   join-messages:
-    stylish:
-      name: "&aStylish Entrance"
-      icon: LIME_DYE
-      description: ["Arrive with a touch of class."]
-      message: "&8[&a+&8] &e{player} &7joined with style."
-    royal:
-      name: "&6Royal Arrival"
-      icon: GOLDEN_HELMET
-      description: ["Announce yourself like royalty."]
-      message: "&8[&6✦&8] &6{player} &7has graced the server with their presence."
+    clock:
+      name: "&aClocked In"
+      icon: CLOCK
+      description: ["Punch the clock."]
+      price: 50
+      message: "&8[&a+&8] {player} &7clocked in."
+    conveyor:
+      name: "&6Conveyor"
+      icon: HOPPER
+      description: ["Ride the belt."]
+      price: 50
+      message: "&8[&6⇶&8] {player} &7rolled in on the conveyor belt."
+    overtime:
+      name: "&eOvertime"
+      icon: SUNFLOWER
+      description: ["Back for another shift."]
+      price: 60
+      message: "&8[&e⚡&8] {player} &7is back for overtime."
+    robot:
+      name: "&7Boot Up"
+      icon: OBSERVER
+      description: ["Beep boop."]
+      price: 60
+      message: "&8[&7⚙&8] &7BOOTING... {player} &7online."
+    money:
+      name: "&aPayday"
+      icon: EMERALD
+      description: ["Here for the money."]
+      price: 70
+      message: "&8[&a$&8] {player} &7came back to collect their money."
+    sunrise:
+      name: "&eGood Morning"
+      icon: DAYLIGHT_DETECTOR
+      description: ["A friendly hello and goodbye."]
+      price: 50
+      message: "&8[&e☀&8] &7Good morning, {player}&7!"
     shadow:
       name: "&5Shadow Step"
       icon: ENDER_PEARL
       description: ["Slip in unnoticed... almost."]
-      message: "&8[&5+&8] &5{player} &7slipped in from the shadows..."
+      price: 80
+      message: "&8[&5+&8] {player} &7slipped in from the shadows..."
+    ghost:
+      name: "&fHaunting"
+      icon: SKELETON_SKULL
+      description: ["Spooky arrivals."]
+      price: 80
+      message: "&8[&f☠&8] {player} &7haunts the server once more."
+    frost:
+      name: "&bCold Front"
+      icon: BLUE_ICE
+      description: ["Bring the chill."]
+      price: 80
+      message: "&8[&b❄&8] {player} &7blew in with the cold."
+    pirate:
+      name: "&6Drop Anchor"
+      icon: OAK_BOAT
+      description: ["Ahoy, matey."]
+      price: 90
+      message: "&8[&6⚓&8] &7Ahoy! {player} &7dropped anchor."
+    rocket:
+      name: "&bLaunch"
+      icon: FIREWORK_ROCKET
+      description: ["Three, two, one..."]
+      price: 90
+      message: "&8[&b➚&8] {player} &7launched in!"
     firework:
       name: "&cFirework Burst"
-      icon: FIREWORK_ROCKET
-      description: ["Make an entrance."]
-      message: "&8[&c✹&8] &c{player} &7burst onto the server!"
-  leave-messages:
-    graceful:
-      name: "&aGraceful Exit"
-      icon: LIME_DYE
-      description: ["Depart with a touch of class."]
-      message: "&8[&c-&8] &e{player} &7left with grace."
-    royal:
-      name: "&6Royal Departure"
+      icon: FIRE_CHARGE
+      description: ["Make some noise."]
+      price: 90
+      message: "&8[&c✹&8] {player} &7burst onto the server!"
+    raid:
+      name: "&cWar Drums"
+      icon: IRON_SWORD
+      description: ["Here to raid."]
+      price: 100
+      message: "&8[&c⚔&8] {player} &7is here and hungry for raids."
+    thunder:
+      name: "&eThunderclap"
+      icon: LIGHTNING_ROD
+      description: ["Arrive with a crack."]
+      price: 100
+      message: "&8[&e☇&8] &7Thunder rolls... {player} &7has arrived."
+    wizard:
+      name: "&dMagic Arrival"
+      icon: ENCHANTED_BOOK
+      description: ["A little sorcery."]
+      price: 100
+      message: "&8[&d✧&8] {player} &7teleported in with a puff of magic."
+    boss:
+      name: "&6The Boss"
       icon: GOLDEN_HELMET
-      description: ["Leave like royalty."]
-      message: "&8[&6✦&8] &6{player} &7has departed the kingdom."
+      description: ["Everyone look busy."]
+      price: 120
+      message: "&8[&6$&8] &7The boss, {player}&7, has arrived. Look busy!"
+    carpet:
+      name: "&dRed Carpet"
+      icon: RED_CARPET
+      description: ["Walk the red carpet."]
+      price: 120
+      message: "&8[&d★&8] &7Make way! {player} &7walks the red carpet."
+    dragon:
+      name: "&5Dragon Wings"
+      icon: DRAGON_BREATH
+      description: ["Descend in style."]
+      price: 140
+      message: "&8[&5☬&8] {player} &7descends on wings of fire."
+    royal:
+      name: "&6Royal Arrival"
+      icon: GOLD_BLOCK
+      description: ["Announce yourself like royalty."]
+      price: 140
+      message: "&8[&6✦&8] {player} &7has graced the factory floor."
+    king:
+      name: "&6All Hail"
+      icon: NETHER_STAR
+      description: ["Bow down."]
+      price: 160
+      message: "&8[&6♛&8] &7All hail {player}&7!"
+    legend:
+      name: "&#FE28FDLegend &7(animated)"
+      icon: TOTEM_OF_UNDYING
+      description: ["Shimmering gold that never stops."]
+      price: 200
+      message: "&8[&#FE28FD✦&8] &#FE28FD&lLEGEND &7{player} &7has joined!"
+
+  leave-messages:
+    clock:
+      name: "&cClocked Out"
+      icon: CLOCK
+      description: ["Punch the clock."]
+      price: 50
+      message: "&8[&c-&8] {player} &7clocked out."
+    conveyor:
+      name: "&6Off the Belt"
+      icon: HOPPER
+      description: ["Ride the belt."]
+      price: 50
+      message: "&8[&6⇶&8] {player} &7rode the belt out of here."
+    overtime:
+      name: "&eHome Time"
+      icon: SUNFLOWER
+      description: ["Back for another shift."]
+      price: 60
+      message: "&8[&e⚡&8] {player} &7finally went home."
+    robot:
+      name: "&7Shut Down"
+      icon: OBSERVER
+      description: ["Beep boop."]
+      price: 60
+      message: "&8[&7⚙&8] &7SHUTTING DOWN... {player} &7offline."
+    money:
+      name: "&aCash Out"
+      icon: EMERALD
+      description: ["Here for the money."]
+      price: 70
+      message: "&8[&a$&8] {player} &7cashed out."
+    sunrise:
+      name: "&9Good Night"
+      icon: DAYLIGHT_DETECTOR
+      description: ["A friendly hello and goodbye."]
+      price: 50
+      message: "&8[&9☾&8] &7Good night, {player}&7."
     shadow:
       name: "&5Vanished"
       icon: ENDER_PEARL
-      description: ["Fade into the dark."]
-      message: "&8[&5-&8] &5{player} &7vanished into the shadows..."
+      description: ["Slip in unnoticed... almost."]
+      price: 80
+      message: "&8[&5-&8] {player} &7vanished into the shadows..."
+    ghost:
+      name: "&fFaded"
+      icon: SKELETON_SKULL
+      description: ["Spooky arrivals."]
+      price: 80
+      message: "&8[&f☠&8] {player} &7faded away..."
+    frost:
+      name: "&bFrozen"
+      icon: BLUE_ICE
+      description: ["Bring the chill."]
+      price: 80
+      message: "&8[&b❄&8] {player} &7froze solid and logged off."
+    pirate:
+      name: "&6Set Sail"
+      icon: OAK_BOAT
+      description: ["Ahoy, matey."]
+      price: 90
+      message: "&8[&6⚓&8] {player} &7set sail for new seas."
+    rocket:
+      name: "&bOrbit"
+      icon: FIREWORK_ROCKET
+      description: ["Three, two, one..."]
+      price: 90
+      message: "&8[&b➘&8] {player} &7returned to orbit."
     firework:
       name: "&cBlast Off"
-      icon: FIREWORK_ROCKET
-      description: ["Leave with a bang."]
-      message: "&8[&c✹&8] &c{player} &7blasted off the server!"
+      icon: FIRE_CHARGE
+      description: ["Make some noise."]
+      price: 90
+      message: "&8[&c✹&8] {player} &7blasted off the server!"
+    raid:
+      name: "&cRetreat"
+      icon: IRON_SWORD
+      description: ["Here to raid."]
+      price: 100
+      message: "&8[&c⚔&8] {player} &7retreated from the battlefield."
+    thunder:
+      name: "&eLightning Exit"
+      icon: LIGHTNING_ROD
+      description: ["Arrive with a crack."]
+      price: 100
+      message: "&8[&e☇&8] {player} &7left in a flash."
+    wizard:
+      name: "&dPuff of Smoke"
+      icon: ENCHANTED_BOOK
+      description: ["A little sorcery."]
+      price: 100
+      message: "&8[&d✧&8] {player} &7disappeared in a puff of smoke."
+    boss:
+      name: "&6Boss Left"
+      icon: GOLDEN_HELMET
+      description: ["Everyone look busy."]
+      price: 120
+      message: "&8[&6$&8] &7The boss, {player}&7, left. Slack off!"
+    carpet:
+      name: "&dRoll It Up"
+      icon: RED_CARPET
+      description: ["Walk the red carpet."]
+      price: 120
+      message: "&8[&d★&8] {player} &7rolled up the red carpet."
+    dragon:
+      name: "&5Take Flight"
+      icon: DRAGON_BREATH
+      description: ["Descend in style."]
+      price: 140
+      message: "&8[&5☬&8] {player} &7flew off into the sky."
+    royal:
+      name: "&6Royal Departure"
+      icon: GOLD_BLOCK
+      description: ["Announce yourself like royalty."]
+      price: 140
+      message: "&8[&6✦&8] {player} &7has left the kingdom."
+    king:
+      name: "&6The Crown Leaves"
+      icon: NETHER_STAR
+      description: ["Bow down."]
+      price: 160
+      message: "&8[&6♛&8] &7The crown leaves with {player}&7."
+    legend:
+      name: "&#FE28FDLegend &7(animated)"
+      icon: TOTEM_OF_UNDYING
+      description: ["Shimmering gold that never stops."]
+      price: 200
+      message: "&8[&#FE28FD✦&8] &#FE28FD&lLEGEND &7{player} &7has left."
 
-  # ------------------------------------------------------------------ name colours
-  # color: a MiniMessage opening tag. Used by the chat module and the coloured-name placeholder.
+  # display: the tag shown in front of your name in chat.
+  chat-tags:
+    zzz:
+      name: "&#D0DAE4Z&#B0BECEZ&#8FA3B8Z"
+      icon: PAPER
+      description: ["Shows before your name in chat."]
+      price: 40
+      display: "&#D0DAE4Z&#B0BECEZ&#8FA3B8Z"
+    broke:
+      name: "&8[&7BROKE&8]"
+      icon: IRON_NUGGET
+      description: ["Shows before your name in chat."]
+      price: 40
+      display: "&8[&7BROKE&8]"
+    cog:
+      name: "&7[&f⚙&7]"
+      icon: IRON_BARS
+      description: ["Shows before your name in chat."]
+      price: 40
+      display: "&7[&f⚙&7]"
+    grinder:
+      name: "&#FFE066G&#FFD65BR&#FFCD51I&#FFC446N&#FFBA3BD&#FFB031E&#FFA726R"
+      icon: GRINDSTONE
+      description: ["Shows before your name in chat."]
+      price: 60
+      display: "&#FFE066G&#FFD65BR&#FFCD51I&#FFC446N&#FFBA3BD&#FFB031E&#FFA726R"
+    sleepwalker:
+      name: "&#AFC4FFS&#A7BDFCL&#9FB7FAE&#97B0F8E&#8FAAF5P&#87A3F2W&#7F9CF0A&#7796EEL&#6F8FEBK&#6789E8E&#5F82E6R"
+      icon: RED_BED
+      description: ["Shows before your name in chat."]
+      price: 60
+      display: "&#AFC4FFS&#A7BDFCL&#9FB7FAE&#97B0F8E&#8FAAF5P&#87A3F2W&#7F9CF0A&#7796EEL&#6F8FEBK&#6789E8E&#5F82E6R"
+    couch_potato:
+      name: "&#ECCB94C&#E7C38BO&#E2BC83U&#DCB47AC&#D7AD71H &#D2A568P&#CD9D60O&#C89657T&#C28E4EA&#BD8746T&#B87F3DO"
+      icon: BAKED_POTATO
+      description: ["Shows before your name in chat."]
+      price: 60
+      display: "&#ECCB94C&#E7C38BO&#E2BC83U&#DCB47AC&#D7AD71H &#D2A568P&#CD9D60O&#C89657T&#C28E4EA&#BD8746T&#B87F3DO"
+    sweat:
+      name: "&#7FF6FF&lS&#6AE2FF&lW&#55CEFF&lE&#40BAFF&lA&#2BA6FF&lT"
+      icon: WATER_BUCKET
+      description: ["Shows before your name in chat."]
+      price: 80
+      display: "&#7FF6FF&lS&#6AE2FF&lW&#55CEFF&lE&#40BAFF&lA&#2BA6FF&lT"
+    afk_maxxer:
+      name: "&#7FF6FF&lA&#74ECFF&lF&#6AE2FF&lK &#60D8FF&lM&#55CEFF&lA&#4AC4FF&lX&#40BAFF&lX&#36B0FF&lE&#2BA6FF&lR"
+      icon: CLOCK
+      description: ["Shows before your name in chat."]
+      price: 80
+      display: "&#7FF6FF&lA&#74ECFF&lF&#6AE2FF&lK &#60D8FF&lM&#55CEFF&lA&#4AC4FF&lX&#40BAFF&lX&#36B0FF&lE&#2BA6FF&lR"
+    no_life:
+      name: "&#FF5A5A&lN&#FF6D58&lO &#FF8056&lL&#FF9454&lI&#FFA752&lF&#FFBA50&lE"
+      icon: WITHER_ROSE
+      description: ["Shows before your name in chat."]
+      price: 80
+      display: "&#FF5A5A&lN&#FF6D58&lO &#FF8056&lL&#FF9454&lI&#FFA752&lF&#FFBA50&lE"
+    belt_boss:
+      name: "&#FFB347&lB&#FFA93D&lE&#FF9E33&lL&#FF9429&lT &#FF891E&lB&#FF7F14&lO&#FF740A&lS&#FF6A00&lS"
+      icon: HOPPER
+      description: ["Shows before your name in chat."]
+      price: 100
+      display: "&#FFB347&lB&#FFA93D&lE&#FF9E33&lL&#FF9429&lT &#FF891E&lB&#FF7F14&lO&#FF740A&lS&#FF6A00&lS"
+    menace:
+      name: "&#FF2A2A&lM&#E42225&lE&#CA1920&lN&#AF111A&lA&#950815&lC&#7A0010&lE"
+      icon: TNT
+      description: ["Shows before your name in chat."]
+      price: 100
+      display: "&#FF2A2A&lM&#E42225&lE&#CA1920&lN&#AF111A&lA&#950815&lC&#7A0010&lE"
+    raider:
+      name: "&#FF4D2E&lR&#FF6125&lA&#FF761C&lI&#FF8A12&lD&#FF9F09&lE&#FFB300&lR"
+      icon: IRON_AXE
+      description: ["Shows before your name in chat."]
+      price: 120
+      display: "&#FF4D2E&lR&#FF6125&lA&#FF761C&lI&#FF8A12&lD&#FF9F09&lE&#FFB300&lR"
+    defender:
+      name: "&#4FC3F7&lD&#48B0F8&lE&#419EF9&lF&#3A8BFA&lE&#3378FC&lN&#2C65FD&lD&#2553FE&lE&#1E40FF&lR"
+      icon: SHIELD
+      description: ["Shows before your name in chat."]
+      price: 120
+      display: "&#4FC3F7&lD&#48B0F8&lE&#419EF9&lF&#3A8BFA&lE&#3378FC&lN&#2C65FD&lD&#2553FE&lE&#1E40FF&lR"
+    gatekeeper:
+      name: "&#FFE066&lG&#FFD65E&lA&#FFCD56&lT&#FFC34E&lE&#FFBA46&lK&#FFB03F&lE&#FFA737&lE&#FF9D2F&lP&#FF9427&lE&#FF8A1F&lR"
+      icon: IRON_DOOR
+      description: ["Shows before your name in chat."]
+      price: 120
+      display: "&#FFE066&lG&#FFD65E&lA&#FFCD56&lT&#FFC34E&lE&#FFBA46&lK&#FFB03F&lE&#FFA737&lE&#FF9D2F&lP&#FF9427&lE&#FF8A1F&lR"
+    millionaire:
+      name: "&a&l$&#B6FF6E&lM&#A7F66C&lI&#98EE6A&lL&#89E668&lL&#7ADD66&lI&#6AD464&lO&#5BCC61&lN&#4CC45F&lA&#3DBB5D&lI&#2EB25B&lR&#1FAA59&lE&a&l$"
+      icon: EMERALD_BLOCK
+      description: ["Shows before your name in chat."]
+      price: 150
+      display: "&a&l$&#B6FF6E&lM&#A7F66C&lI&#98EE6A&lL&#89E668&lL&#7ADD66&lI&#6AD464&lO&#5BCC61&lN&#4CC45F&lA&#3DBB5D&lI&#2EB25B&lR&#1FAA59&lE&a&l$"
+    lucky:
+      name: "&e&l☘&#FE4CFD&lLUCKY &7(animated)"
+      icon: RABBIT_FOOT
+      description: ["Shows before your name in chat."]
+      price: 180
+      display: "&e&l☘&#FE4CFD&lLUCKY"
+    overclocked:
+      name: "&#FE40FD&lOVERCLOCKED &7(animated)"
+      icon: REPEATER
+      description: ["Shows before your name in chat."]
+      price: 200
+      display: "&#FE40FD&lOVERCLOCKED"
+    reborn:
+      name: "&d&l↻&#FE24FD&lREBORN&d&l↻ &7(animated)"
+      icon: END_CRYSTAL
+      description: ["Shows before your name in chat."]
+      price: 200
+      display: "&d&l↻&#FE24FD&lREBORN&d&l↻"
+    mogul:
+      name: "&a&l$&#FE34FD&lMOGUL&a&l$ &7(animated)"
+      icon: GOLD_INGOT
+      description: ["Shows before your name in chat."]
+      price: 250
+      display: "&a&l$&#FE34FD&lMOGUL&a&l$"
+    baron:
+      name: "&6&l✦&#FE28FD&lBARON&6&l✦ &7(animated)"
+      icon: GOLDEN_HELMET
+      description: ["Shows before your name in chat."]
+      price: 250
+      display: "&6&l✦&#FE28FD&lBARON&6&l✦"
+    og:
+      name: "&f&l✪&#FE10FD&lOG&f&l✪ &7(animated)"
+      icon: NETHER_STAR
+      description: ["Shows before your name in chat."]
+      price: 300
+      display: "&f&l✪&#FE10FD&lOG&f&l✪"
+
+  # color: a MiniMessage tag. <#FE04FD> ... <#FE54FD> are the animated shader paints 1-21.
   name-colors:
-    red:     { name: "&cRed",     icon: RED_DYE,        color: "<red>" }
-    green:   { name: "&aGreen",   icon: LIME_DYE,       color: "<green>" }
-    aqua:    { name: "&bAqua",    icon: LIGHT_BLUE_DYE, color: "<aqua>" }
-    gold:    { name: "&6Gold",    icon: ORANGE_DYE,     color: "<gold>" }
-    pink:    { name: "&dPink",    icon: PINK_DYE,       color: "<light_purple>" }
-    white:   { name: "&fWhite",   icon: WHITE_DYE,      color: "<white>" }
-    sunset:  { name: "&6S&eu&cn&4s&ce&et", icon: SUNFLOWER,  color: "<gradient:#ff7e00:#ff2f55>" }
-    ocean:   { name: "&9O&bc&3e&ba&9n",    icon: HEART_OF_THE_SEA, color: "<gradient:#1e6dff:#3ee0ff>" }
-    forest:  { name: "&2F&ao&2r&ae&2s&at", icon: OAK_SAPLING, color: "<gradient:#1b7a1b:#7be36b>" }
-    rainbow: { name: "&cR&6a&ei&an&bb&9o&dw", icon: PRISMARINE_CRYSTALS, color: "<rainbow>" }
-
-  # ------------------------------------------------------------------ trails
-  # Drawn behind the player while walking. Small caps: count 1-6, spread 0-0.5, speed 0-0.1, no sound.
-  trails:
-    flame:
-      name: "&6Flame Trail"
-      icon: BLAZE_POWDER
-      description: ["Leave fire in your wake."]
-      effect: { particle: FLAME, count: 2, spread: 0.08, offset-y: 0.1 }
-    hearts:
-      name: "&dHeart Trail"
-      icon: RED_DYE
-      description: ["Leave a little love behind you."]
-      effect: { particle: HEART, count: 1, spread: 0.1, offset-y: 0.3 }
-    sparkle:
-      name: "&eSparkle Trail"
-      icon: GLOWSTONE_DUST
-      description: ["Golden sparkles at your heels."]
-      effect: { particle: DUST, colors: ["#ffd84a", "#fff6c8"], size: 0.9, count: 2, spread: 0.12, offset-y: 0.15 }
-    soul:
-      name: "&3Soul Trail"
-      icon: SOUL_TORCH
-      description: ["Blue flames follow you."]
-      effect: { particle: SOUL_FIRE_FLAME, count: 2, spread: 0.08, offset-y: 0.1 }
-    snow:
-      name: "&fFrost Trail"
-      icon: SNOWBALL
-      description: ["Snowflakes in your footsteps."]
-      effect: { particle: SNOWFLAKE, count: 2, spread: 0.1, offset-y: 0.15 }
-    cherry:
-      name: "&dBlossom Trail"
+    royal:
+      name: "&#FE04FDRoyal &7(animated)"
+      icon: AMETHYST_SHARD
+      description: ["Purple and gold, flowing.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE04FD>"
+    aurora:
+      name: "&#FE08FDAurora &7(animated)"
+      icon: AMETHYST_CLUSTER
+      description: ["Northern lights.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE08FD>"
+    ember:
+      name: "&#FE0CFDEmber &7(animated)"
+      icon: MAGMA_CREAM
+      description: ["Burning embers, flickering.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE0CFD>"
+    prism:
+      name: "&#FE10FDPrism &7(animated)"
+      icon: PRISMARINE_CRYSTALS
+      description: ["Every colour, rolling past.", "Animated in chat and the tab list."]
+      price: 250
+      color: "<#FE10FD>"
+    ocean:
+      name: "&#FE14FDOcean &7(animated)"
+      icon: HEART_OF_THE_SEA
+      description: ["Deep blue waves.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE14FD>"
+    toxic:
+      name: "&#FE18FDToxic &7(animated)"
+      icon: SLIME_BALL
+      description: ["Glowing green waste.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE18FD>"
+    frost:
+      name: "&#FE1CFDFrost &7(animated)"
+      icon: BLUE_ICE
+      description: ["Ice crystals shimmering.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE1CFD>"
+    sunset:
+      name: "&#FE20FDSunset &7(animated)"
+      icon: ORANGE_TULIP
+      description: ["Orange into pink.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE20FD>"
+    galaxy:
+      name: "&#FE24FDGalaxy &7(animated)"
+      icon: ENDER_EYE
+      description: ["Deep space swirling.", "Animated in chat and the tab list."]
+      price: 200
+      color: "<#FE24FD>"
+    gilded:
+      name: "&#FE28FDGilded &7(animated)"
+      icon: GOLD_BLOCK
+      description: ["Pure gold, shining.", "Animated in chat and the tab list."]
+      price: 200
+      color: "<#FE28FD>"
+    candy_cane:
+      name: "&#FE2CFDCandy Cane &7(animated)"
+      icon: RED_CANDLE
+      description: ["Red and white stripes.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE2CFD>"
+    magma:
+      name: "&#FE30FDMagma &7(animated)"
+      icon: MAGMA_BLOCK
+      description: ["Molten rock, cooling.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE30FD>"
+    jackpot:
+      name: "&#FE34FDJackpot &7(animated)"
+      icon: EMERALD
+      description: ["Money green and gold.", "Animated in chat and the tab list."]
+      price: 200
+      color: "<#FE34FD>"
+    sakura:
+      name: "&#FE38FDSakura &7(animated)"
       icon: CHERRY_SAPLING
-      description: ["Petals drift behind you."]
-      effect: { particle: CHERRY_LEAVES, count: 2, spread: 0.2, offset-y: 0.6 }
+      description: ["Cherry blossom pink.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE38FD>"
+    lagoon:
+      name: "&#FE3CFDLagoon &7(animated)"
+      icon: TURTLE_SCUTE
+      description: ["Teal water, sparkling.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE3CFD>"
+    neon:
+      name: "&#FE40FDNeon &7(animated)"
+      icon: GLOW_INK_SAC
+      description: ["Bright club lights.", "Animated in chat and the tab list."]
+      price: 180
+      color: "<#FE40FD>"
+    peach:
+      name: "&#FE44FDPeach &7(animated)"
+      icon: PINK_PETALS
+      description: ["Soft peach and cream.", "Animated in chat and the tab list."]
+      price: 100
+      color: "<#FE44FD>"
+    chrome:
+      name: "&#FE48FDChrome &7(animated)"
+      icon: IRON_BLOCK
+      description: ["Polished steel with a spark.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE48FD>"
+    emerald:
+      name: "&#FE4CFDEmerald &7(animated)"
+      icon: EMERALD_BLOCK
+      description: ["Rich gem green.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE4CFD>"
+    crimson:
+      name: "&#FE50FDCrimson &7(animated)"
+      icon: REDSTONE
+      description: ["Deep red, pulsing.", "Animated in chat and the tab list."]
+      price: 150
+      color: "<#FE50FD>"
+    cotton_candy:
+      name: "&#FE54FDCotton Candy &7(animated)"
+      icon: PINK_WOOL
+      description: ["Pastel pink and blue.", "Animated in chat and the tab list."]
+      price: 120
+      color: "<#FE54FD>"
 
-  # ------------------------------------------------------------------ tool skins
-  # Other players see the skin on the held tool (one of materials:). The real item is never changed: it keeps its
-  # type, enchantments and value, and a dropped, traded or sold tool is the plain original. The owner sees their own
-  # tool unchanged (no packet library on this server).
-  # item-model: a model from the server resource pack (namespace:path), and/or custom-model-data: a number the pack
-  # uses. Without the pack, viewers see a missing-texture model, so these examples are switched off until the
-  # pack has the models. Keep skins to the same tier of tool so they never disguise what someone is holding.
-  tool-skins: {}
-  #  frost_sword:
-  #    name: "&bFrostbite Blade"
-  #    icon: DIAMOND_SWORD
-  #    description: ["An icy look for your sword."]
-  #    materials: [DIAMOND_SWORD, NETHERITE_SWORD]
-  #    item-model: "hxsmp:skins/frost_sword"
-  #  molten_pick:
-  #    name: "&6Molten Pickaxe"
-  #    icon: NETHERITE_PICKAXE
-  #    materials: [DIAMOND_PICKAXE, NETHERITE_PICKAXE]
-  #    custom-model-data: 1001
+  # color: a MiniMessage tag for your chat messages (gradients and animated paints work).
+  chat-colors:
+    classic:
+      name: "&fClassic Chat"
+      icon: PAPER
+      description: ["Crisp white."]
+      price: 40
+      color: "<white>"
+    ghost:
+      name: "&7Ghost Chat"
+      icon: GLASS_PANE
+      description: ["Soft grey, barely there."]
+      price: 40
+      color: "<#BDBDBD>"
+    frost:
+      name: "&#BFEFFFFrost Chat"
+      icon: SNOWBALL
+      description: ["Frosty pale blue."]
+      price: 60
+      color: "<#BFEFFF>"
+    mint:
+      name: "&#7DFFB0Mint Chat"
+      icon: SLIME_BALL
+      description: ["Fresh mint green."]
+      price: 60
+      color: "<#7DFFB0>"
+    ember:
+      name: "&#FF8C42Ember Chat"
+      icon: BLAZE_POWDER
+      description: ["Warm ember orange."]
+      price: 60
+      color: "<#FF8C42>"
+    gold:
+      name: "&#F2B33DGold Chat"
+      icon: GOLD_NUGGET
+      description: ["Solid gold."]
+      price: 60
+      color: "<#F2B33D>"
+    rose:
+      name: "&#FF7EB6Rose Chat"
+      icon: PINK_DYE
+      description: ["Rose pink."]
+      price: 60
+      color: "<#FF7EB6>"
+    lavender:
+      name: "&#C9A7FFLavender Chat"
+      icon: LILAC
+      description: ["Calm lavender."]
+      price: 60
+      color: "<#C9A7FF>"
+    sky:
+      name: "&#7EC8FFSky Chat"
+      icon: LIGHT_BLUE_DYE
+      description: ["Clear sky blue."]
+      price: 60
+      color: "<#7EC8FF>"
+    lime:
+      name: "&#B6FF6ELime Chat"
+      icon: LIME_DYE
+      description: ["Zesty lime."]
+      price: 60
+      color: "<#B6FF6E>"
+    copper:
+      name: "&#E08A5BCopper Chat"
+      icon: COPPER_INGOT
+      description: ["Fresh copper."]
+      price: 60
+      color: "<#E08A5B>"
+    sunset:
+      name: "&#FF7E00S&#FF6E11u&#FF5E22n&#FF4F33s&#FF3F44e&#FF2F55t Chat"
+      icon: ORANGE_DYE
+      description: ["Orange into pink."]
+      price: 100
+      color: "<gradient:#FF7E00:#FF2F55>"
+    ocean:
+      name: "&#1E6DFFO&#268AFFc&#2EA6FFe&#36C3FFa&#3EE0FFn Chat"
+      icon: HEART_OF_THE_SEA
+      description: ["Deep blue into aqua."]
+      price: 100
+      color: "<gradient:#1E6DFF:#3EE0FF>"
+    forest:
+      name: "&#1B7A1BF&#2E8F2Bo&#41A43Br&#55B94Be&#68CE5Bs&#7BE36Bt Chat"
+      icon: OAK_SAPLING
+      description: ["Shades of green."]
+      price: 100
+      color: "<gradient:#1B7A1B:#7BE36B>"
+    cotton:
+      name: "&#FF9AD5C&#EBA6DDo&#D7B3E6t&#C2BFEEt&#AECCF7o&#9AD8FFn Chat"
+      icon: PINK_WOOL
+      description: ["Pink into blue."]
+      price: 100
+      color: "<gradient:#FF9AD5:#9AD8FF>"
+    molten:
+      name: "&#FFB300M&#FF9B00o&#FF8400l&#FF6C00t&#FF5500e&#FF3D00n Chat"
+      icon: LAVA_BUCKET
+      description: ["Yellow-hot into red."]
+      price: 100
+      color: "<gradient:#FFB300:#FF3D00>"
+    rainbow:
+      name: "&cR&6a&ei&an&bb&9o&dw Chat"
+      icon: PRISMARINE_CRYSTALS
+      description: ["Every colour."]
+      price: 150
+      color: "<rainbow>"
+    mystic:
+      name: "&#FE58FDMystic &7(animated) Chat"
+      icon: AMETHYST_SHARD
+      description: ["Purple and teal, flowing."]
+      price: 200
+      color: "<#FE58FD>"
+    sunburst:
+      name: "&#FE5CFDSunburst &7(animated) Chat"
+      icon: SUNFLOWER
+      description: ["Golden sunlight, flowing."]
+      price: 200
+      color: "<#FE5CFD>"
+    sapphire:
+      name: "&#FE60FDSapphire &7(animated) Chat"
+      icon: LAPIS_LAZULI
+      description: ["Shimmering blues."]
+      price: 200
+      color: "<#FE60FD>"
+    opal:
+      name: "&#FE64FDOpal &7(animated) Chat"
+      icon: QUARTZ
+      description: ["Soft shifting pastels."]
+      price: 200
+      color: "<#FE64FD>"
+
+  # A double helix of particles around the player. effect: particle, count (1-6), spread (0-0.5), speed (0-0.1),
+  # offset-y; DUST / DUST_COLOR_TRANSITION take colors: and size:. soul_ring and static are crate rewards.
+  auras:
+    flame_halo:
+      name: "&6Flame Halo"
+      icon: BLAZE_POWDER
+      description: ["Fire circles around you."]
+      price: 80
+      effect: { particle: FLAME }
+    soul_ring:
+      name: "&bSoul Ring"
+      icon: SOUL_LANTERN
+      description: ["Blue soul fire orbits you."]
+      effect: { particle: SOUL_FIRE_FLAME }
+    static:
+      name: "&eStatic"
+      icon: LIGHTNING_ROD
+      description: ["Crackling electricity."]
+      effect: { particle: ELECTRIC_SPARK, spread: 0.02 }
+    arcane:
+      name: "&dArcane Swirl"
+      icon: ENCHANTED_BOOK
+      description: ["Witchy sparks swirl around you."]
+      price: 100
+      effect: { particle: WITCH, spread: 0.02 }
+    runes:
+      name: "&9Runes"
+      icon: ENCHANTING_TABLE
+      description: ["Enchanting runes drift by."]
+      price: 100
+      effect: { particle: ENCHANT, count: 2, spread: 0.05 }
+    starlight:
+      name: "&fStarlight"
+      icon: END_ROD
+      description: ["Little white stars."]
+      price: 100
+      effect: { particle: END_ROD }
+    frostbite:
+      name: "&bFrostbite"
+      icon: SNOWBALL
+      description: ["Snowflakes swirl around you."]
+      price: 80
+      effect: { particle: SNOWFLAKE }
+    blossom:
+      name: "&dBlossom"
+      icon: CHERRY_SAPLING
+      description: ["Cherry petals drift around you."]
+      price: 100
+      effect: { particle: CHERRY_LEAVES }
+    autumn:
+      name: "&6Autumn"
+      icon: ORANGE_TULIP
+      description: ["Falling autumn leaves."]
+      price: 100
+      effect: { particle: ORANGE_POPLAR_LEAVES }
+    hearts:
+      name: "&cLovestruck"
+      icon: RED_DYE
+      description: ["Little hearts float up."]
+      price: 120
+      effect: { particle: HEART, offset-y: 0.2 }
+    melody:
+      name: "&aMelody"
+      icon: NOTE_BLOCK
+      description: ["Music notes spin around you."]
+      price: 120
+      effect: { particle: NOTE }
+    void:
+      name: "&5Void"
+      icon: OBSIDIAN
+      description: ["Portal sparks orbit you."]
+      price: 120
+      effect: { particle: PORTAL, count: 2 }
+    sculk:
+      name: "&3Sculk Souls"
+      icon: SCULK
+      description: ["Sculk souls rise around you."]
+      price: 150
+      effect: { particle: SCULK_SOUL }
+    fireflies:
+      name: "&eFireflies"
+      icon: GLOWSTONE_DUST
+      description: ["A swarm of fireflies."]
+      price: 150
+      effect: { particle: FIREFLY }
+    copper_flame:
+      name: "&aCopper Flame"
+      icon: COPPER_TORCH
+      description: ["Green copper fire."]
+      price: 150
+      effect: { particle: COPPER_FIRE_FLAME }
+    totem:
+      name: "&eTotem"
+      icon: TOTEM_OF_UNDYING
+      description: ["The glow of a saved life."]
+      price: 180
+      effect: { particle: TOTEM_OF_UNDYING, speed: 0.02 }
+    gold_dust:
+      name: "&6Gold Dust"
+      icon: GOLD_NUGGET
+      description: ["Glittering gold flakes."]
+      price: 180
+      effect: { particle: DUST, size: 1.0, colors: ['#FFD84A', '#FFF6C8', '#E8A317'] }
+    money:
+      name: "&aMoney Cloud"
+      icon: EMERALD
+      description: ["Green cash sparkles."]
+      price: 200
+      effect: { particle: DUST, size: 1.0, colors: ['#3EE06B', '#B6FF6E', '#1FAA59'] }
+    ocean_mist:
+      name: "&9Ocean Mist"
+      icon: HEART_OF_THE_SEA
+      description: ["Blue fading into aqua."]
+      price: 200
+      effect: { particle: DUST_COLOR_TRANSITION, size: 1.0, colors: ['#1E6DFF', '#3EE0FF'] }
+    inferno:
+      name: "&cInferno"
+      icon: FIRE_CHARGE
+      description: ["Red fading into gold."]
+      price: 220
+      effect: { particle: DUST_COLOR_TRANSITION, size: 1.1, colors: ['#FF2A2A', '#FFB300'] }
+    rainbow:
+      name: "&cR&6a&ei&an&bb&9o&dw"
+      icon: PRISMARINE_CRYSTALS
+      description: ["A rainbow helix."]
+      price: 250
+      effect: { particle: DUST, size: 1.2, colors: ['#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#5AC8FA', '#AF52DE'] }
+
+  # A glowing outline (seen through walls, as vanilla glowing is). color: legacy colour codes; several cycle.
+  # The outline colour is the TAB nametag team colour: keep %genscore_glow% last in TAB's tagprefix.
+  glows:
+    white:
+      name: "&fWhite Glow"
+      icon: WHITE_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "f"
+    gray:
+      name: "&7Silver Glow"
+      icon: LIGHT_GRAY_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "7"
+    red:
+      name: "&cRed Glow"
+      icon: RED_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "c"
+    dark_red:
+      name: "&4Blood Glow"
+      icon: REDSTONE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "4"
+    gold:
+      name: "&6Gold Glow"
+      icon: ORANGE_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "6"
+    yellow:
+      name: "&eYellow Glow"
+      icon: YELLOW_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "e"
+    green:
+      name: "&aGreen Glow"
+      icon: LIME_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "a"
+    dark_green:
+      name: "&2Forest Glow"
+      icon: GREEN_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "2"
+    aqua:
+      name: "&bAqua Glow"
+      icon: LIGHT_BLUE_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "b"
+    teal:
+      name: "&3Teal Glow"
+      icon: CYAN_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "3"
+    blue:
+      name: "&9Blue Glow"
+      icon: BLUE_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "9"
+    navy:
+      name: "&1Navy Glow"
+      icon: LAPIS_LAZULI
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "1"
+    pink:
+      name: "&dPink Glow"
+      icon: PINK_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "d"
+    purple:
+      name: "&5Purple Glow"
+      icon: PURPLE_DYE
+      description: ["An outline everyone can see."]
+      price: 60
+      color: "5"
+    fire:
+      name: "&cF&6i&er&ce &7(cycling)"
+      icon: BLAZE_POWDER
+      description: ["An outline everyone can see."]
+      price: 150
+      color: "c6e"
+    ice:
+      name: "&bI&fc&3e &7(cycling)"
+      icon: PACKED_ICE
+      description: ["An outline everyone can see."]
+      price: 150
+      color: "bf3"
+    toxic:
+      name: "&aT&2o&ax&ei&ac &7(cycling)"
+      icon: SLIME_BLOCK
+      description: ["An outline everyone can see."]
+      price: 150
+      color: "a2e"
+    royal:
+      name: "&5R&6o&5y&6a&5l &7(cycling)"
+      icon: AMETHYST_CLUSTER
+      description: ["An outline everyone can see."]
+      price: 150
+      color: "56d"
+    police:
+      name: "&cPo&9li&cce &7(cycling)"
+      icon: REDSTONE_LAMP
+      description: ["An outline everyone can see."]
+      price: 180
+      color: "c9"
+    candy:
+      name: "&dC&fa&cn&dd&fy &7(cycling)"
+      icon: CAKE
+      description: ["An outline everyone can see."]
+      price: 180
+      color: "dfc"
+    rainbow:
+      name: "&cR&6a&ei&an&bb&9o&dw &7(cycling)"
+      icon: PRISMARINE_CRYSTALS
+      description: ["An outline everyone can see."]
+      price: 250
+      color: "c6eab9d"

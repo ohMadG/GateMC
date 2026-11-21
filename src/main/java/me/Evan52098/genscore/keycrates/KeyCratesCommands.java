@@ -109,7 +109,7 @@ public final class KeyCratesCommands {
             count++;
         }
         CrateConfig.Crate c = service.config().crate(id);
-        String line = "&5&lCRATES &8» &7Everyone online got &f" + amount + "x " + (c != null ? c.keyName() : id) + "&7!";
+        String line = "&6&lCRATES &8» &7Everyone online got &f" + amount + "x " + (c != null ? c.keyName() : id) + "&7!";
         for (Player p : Bukkit.getOnlinePlayers()) {
             Tasks.onEntity(p, () -> p.sendMessage(CrateConfig.text(line)));
         }

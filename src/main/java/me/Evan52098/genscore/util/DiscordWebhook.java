@@ -146,6 +146,9 @@ public final class DiscordWebhook {
         embeds.add(embed);
         JsonObject payload = new JsonObject();
         payload.add("embeds", embeds);
+        JsonObject mentions = new JsonObject();
+        mentions.add("parse", new JsonArray());
+        payload.add("allowed_mentions", mentions);
         return payload.toString();
     }
 }

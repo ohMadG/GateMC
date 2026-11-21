@@ -49,10 +49,12 @@ final class Holograms implements Listener {
         final double y;
         final double z;
         final float yaw;
+        final float scale;
         volatile TextDisplay display;
         volatile String lastText = "";
 
-        Holo(String board, String world, double x, double y, double z, float yaw) {
+        Holo(String board, String world, double x, double y, double z, float yaw, float scale) {
+            this.scale = scale;
             this.board = board;
             this.world = world;
             this.x = x;
@@ -91,7 +93,7 @@ final class Holograms implements Listener {
     void place(String board, Location at) {
         double yaw = Math.toRadians(at.getYaw());
         Location spot = at.clone().add(-Math.sin(yaw) * 2.5, 1.8, Math.cos(yaw) * 2.5);
-        Holo holo = new Holo(board.toLowerCase(Locale.ROOT), at.getWorld().getName(), spot.getX(), spot.getY(), spot.getZ(), at.getYaw() + 180f);
+        Holo holo = new Holo(board.toLowerCase(Locale.ROOT), at.getWorld().getName(), spot.getX(), spot.getY(), spot.getZ(), at.getYaw() + 180f, 1.4f);
         holos.add(holo);
         Tasks.async.run(this::save);
         refresh(holo);
@@ -175,7 +177,7 @@ final class Holograms implements Listener {
             display.setBackgroundColor(Color.fromARGB(140, 0, 0, 0));
             display.setPersistent(false);
             display.setViewRange(1.5f);
-            display.setTransformation(new Transformation(new Vector3f(), new Quaternionf(), new Vector3f(1.4f, 1.4f, 1.4f), new Quaternionf()));
+            display.setTransformation(new Transformation(new Vector3f(), new Quaternionf(), new Vector3f(holo.scale, holo.scale, holo.scale), new Quaternionf()));
             display.text(text);
         });
     }
@@ -199,7 +201,8 @@ final class Holograms implements Listener {
         for (Map<?, ?> map : YamlConfiguration.loadConfiguration(file).getMapList("boards")) {
             try {
                 holos.add(new Holo(String.valueOf(map.get("type")), String.valueOf(map.get("world")), ((Number) map.get("x")).doubleValue(),
-                        ((Number) map.get("y")).doubleValue(), ((Number) map.get("z")).doubleValue(), ((Number) map.get("yaw")).floatValue()));
+                        ((Number) map.get("y")).doubleValue(), ((Number) map.get("z")).doubleValue(), ((Number) map.get("yaw")).floatValue(),
+                        map.get("scale") instanceof Number n ? n.floatValue() : 1.4f));
             } catch (RuntimeException e) {
                 logger.warning("[leaderboards] Skipped a bad entry in holograms.yml: " + map);
             }
@@ -217,6 +220,7 @@ final class Holograms implements Listener {
             map.put("y", holo.y);
             map.put("z", holo.z);
             map.put("yaw", holo.yaw);
+            map.put("scale", holo.scale);
             list.add(map);
         }
         yaml.set("boards", list);

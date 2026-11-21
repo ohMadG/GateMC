@@ -29,7 +29,7 @@ public final class CosmeticsCommands {
 
     @Command({"cosmetics", "cosmetic", "wardrobe", "cos"})
     @CommandPermission("genscore.cosmetics")
-    @Description("Kill effects, join messages, name colours, trails and tool skins")
+    @Description("Join and leave messages, chat tags, name paints, chat colours, auras and glows")
     public void open(BukkitCommandActor actor) {
         Player player = actor.requirePlayer();
         module.menus().openMain(player);
@@ -98,68 +98,6 @@ public final class CosmeticsCommands {
     public void reload(BukkitCommandActor actor) {
         module.reload();
         actor.sender().sendMessage(Msg.good("Cosmetics reloaded."));
-    }
-
-    @Command({"cosmetics kills", "cosmetic kills", "killrank"})
-    @CommandPermission("genscore.cosmetics")
-    @Description("Show a player's kill count and kill rank")
-    public void kills(BukkitCommandActor actor, @Optional @Named("player") @Nullable String name) {
-        CommandSender sender = actor.sender();
-        if (sender instanceof Player p && !cooldowns.tryStart(p.getUniqueId(), "kills", 2_000)) {
-            return; // checklist 10: this can hit the database for offline players
-        }
-        String target = name != null ? name : sender.getName();
-        Player online = Bukkit.getPlayerExact(target);
-        if (online != null && CosmeticsModule.kills(online.getUniqueId()) >= 0) {
-            show(sender, online.getName(), CosmeticsModule.kills(online.getUniqueId()));
-            return;
-        }
-        if (name == null && !(sender instanceof Player)) {
-            sender.sendMessage(Msg.bad("Name a player."));
-            return;
-        }
-        module.resolve(target).thenCompose(uuid -> uuid == null
-                ? java.util.concurrent.CompletableFuture.completedFuture((Integer) null)
-                : module.storedKills(uuid)).whenComplete((k, e) -> Tasks.forSender(sender, () -> {
-            if (e != null || k == null) {
-                sender.sendMessage(Msg.bad("Player " + Msg.white(target) + " has never joined."));
-            } else {
-                show(sender, target, k);
-            }
-        }));
-    }
-
-    private void show(CommandSender sender, String who, int kills) {
-        CosmeticsConfig cfg = module.config();
-        CosmeticsConfig.KillRank rank = cfg.rankFor(kills);
-        CosmeticsConfig.KillRank next = cfg.nextRank(kills);
-        String line = Msg.white(who) + ": " + Msg.white(String.valueOf(kills)) + " kills"
-                + (rank == null ? "" : ", rank " + Msg.white(CosmeticsModule.plain(rank.display())))
-                + (next == null ? "" : " (" + Msg.white(String.valueOf(next.kills() - kills)) + " more for "
-                + Msg.white(CosmeticsModule.plain(next.display())) + ")");
-        sender.sendMessage(Msg.neutral(line));
-    }
-
-    @Command({"homeicon", "homeicons", "sethomeicon"})
-    @CommandPermission(CosmeticsModule.HOMEICON)
-    @Description("Choose the icon each of your homes shows in the homes menu")
-    public void homeIcon(BukkitCommandActor actor, @Optional @Named("home") @Nullable String home) {
-        Player player = actor.requirePlayer();
-        if (home == null) {
-            module.menus().openHomes(player);
-            return;
-        }
-        String normalized = Homes.normalize(home);
-        if (normalized == null) {
-            player.sendMessage(Msg.bad("Home " + Msg.white(home) + " not found."));
-            return;
-        }
-        List<String> names = module.homeNamesOf(player);
-        if (names != null && !names.contains(normalized)) {
-            player.sendMessage(Msg.bad("Home " + Msg.white(home) + " not found."));
-            return;
-        }
-        module.menus().openIconPicker(player, normalized);
     }
 
     private static @Nullable CosmeticCategory category(CommandSender sender, String key) {

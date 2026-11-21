@@ -77,7 +77,7 @@ record StoreSettings(
                 c.getString("url", ""),
                 c.getString("link-label", "&6&l[CLICK FOR STORE]"),
                 List.copyOf(storeMessage),
-                pa.getString("format", "&8[&6&lSTORE&8] &e{player} &7just bought {item}&7! &8» &bClick to visit the store"),
+                pa.getString("format", "&6&lSTORE &8» &e{player} &7just bought {item}&7! &8» &bClick to visit the store"),
                 pa.getString("hover", "&7Click to open the store"),
                 t.getBoolean("enabled", true),
                 t.getString("config-file", "Tebex/config.yml"),
@@ -146,8 +146,8 @@ record StoreSettings(
         long target = cents(g.getDouble("target", 500.0));
         return new Goal(g.getBoolean("enabled", true) && target > 0, target, zone,
                 Math.max(5, Math.min(60, g.getInt("bar-length", 20))),
-                g.getString("line", "&d&lCOMMUNITY GOAL &8» &f{current} &7/ &f{target} &8[{bar}&8] &f{percent}%"),
-                g.getString("reached-broadcast", "&d&lCOMMUNITY GOAL &8» &7This month's store goal of &f{target} &7was reached! Everyone online gets a reward."),
+                g.getString("line", "&6&lCOMMUNITY GOAL &8» &f{current} &7/ &f{target} &8[{bar}&8] &f{percent}%"),
+                g.getString("reached-broadcast", "&6&lCOMMUNITY GOAL &8» &7This month's store goal of &f{target} &7was reached! Everyone online gets a reward."),
                 reward(sub(g, "reward"), "store.goal.reward", log));
     }
 
@@ -155,8 +155,8 @@ record StoreSettings(
         return new Party(p.getBoolean("enabled", true),
                 Math.max(0, Math.min(300, p.getInt("countdown-seconds", 10))),
                 p.getBoolean("one-per-ip", true),
-                p.getString("start-broadcast", "&d&lSTORE PARTY &8» &f{player} &7started a store party! Rewards in &f{seconds}s&7..."),
-                p.getString("done-broadcast", "&d&lSTORE PARTY &8» &7Everyone online got a reward. Say thanks to &f{player}&7!"),
+                p.getString("start-broadcast", "&6&lSTORE PARTY &8» &f{player} &7started a store party! Rewards in &f{seconds}s&7..."),
+                p.getString("done-broadcast", "&6&lSTORE PARTY &8» &7Everyone online got a reward. Say thanks to &f{player}&7!"),
                 reward(sub(p, "reward"), "store.party.reward", log));
     }
 

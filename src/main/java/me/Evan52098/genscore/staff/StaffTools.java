@@ -161,6 +161,10 @@ public final class StaffTools implements Listener, TeleportGuard {
                 + (target != null ? target.getName() : player.toString())));
     }
 
+    public int frozenCount() {
+        return frozen.size();
+    }
+
     public boolean isFrozen(UUID player) {
         return frozen.contains(player);
     }

@@ -83,7 +83,7 @@ final class CrateMenus {
                 "&7Keys waiting: &f" + claimCounts[0],
                 "&7Items waiting: &f" + claimCounts[1],
                 "",
-                waiting > 0 ? "&eClick to claim" : "&8Nothing waiting")), e -> {
+                waiting > 0 ? me.Evan52098.genscore.menu.Lore.prompt("click to claim") : "&8Nothing waiting")), e -> {
             player.closeInventory();
             service.claim(player);
         });
@@ -103,9 +103,9 @@ final class CrateMenus {
         List<String> lore = new ArrayList<>();
         lore.add("&7Your keys: " + (keys > 0 ? "&a" : "&c") + keys);
         lore.add("");
-        lore.add("&eLeft-click &7to preview rewards");
+        lore.add(me.Evan52098.genscore.menu.Lore.prompt("left-click to preview rewards"));
         if (keys > 0) {
-            lore.add("&eRight-click &7to open one");
+            lore.add(me.Evan52098.genscore.menu.Lore.prompt("right-click to open one"));
             lore.add("&eShift + right-click &7to open all");
         }
         if (c.noDuplicates()) {
@@ -158,9 +158,9 @@ final class CrateMenus {
         }
         int keys = service.keys().count(player.getInventory(), live.id());
         if (keys > 0) {
-            menu.set(base + 3, item(live.keyMaterial(), "&a&lOpen one", List.of("&7Your keys: &f" + keys, "", "&eClick to open")),
+            menu.set(base + 3, item(live.keyMaterial(), "&a&lOpen one", List.of("&7Your keys: &f" + keys, "", me.Evan52098.genscore.menu.Lore.prompt("click to open"))),
                     e -> service.open(player, live.id(), 1));
-            menu.set(base + 5, item(Material.CHEST_MINECART, "&6&lOpen all", List.of("&7Opens up to &f" + Math.min(keys, cfg.openAllMax) + " &7keys at once.", "", "&eClick to open")),
+            menu.set(base + 5, item(Material.CHEST_MINECART, "&6&lOpen all", List.of("&7Opens up to &f" + Math.min(keys, cfg.openAllMax) + " &7keys at once.", "", me.Evan52098.genscore.menu.Lore.prompt("click to open"))),
                     e -> service.open(player, live.id(), Integer.MAX_VALUE));
         } else {
             menu.set(base + 4, item(Material.BARRIER, "&cNo keys", List.of("&7You need a " + live.keyName() + "&7.")));

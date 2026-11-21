@@ -60,6 +60,7 @@ public final class GensCore extends JavaPlugin {
         modules.register(new TeleportModule());
         modules.register(new EssentialsModule());
         modules.register(new ChatModule());
+        modules.register(new me.Evan52098.genscore.punish.PunishModule());
         modules.register(new StaffModule());
         modules.register(new KitsModule());
         modules.register(new VaultsModule());
@@ -93,6 +94,14 @@ public final class GensCore extends JavaPlugin {
         modules.register(new me.Evan52098.genscore.staffmode.StaffModeModule());   // needs staff
         modules.register(new me.Evan52098.genscore.seasonpass.SeasonPassModule()); // after shards, keycrates
         modules.register(new me.Evan52098.genscore.cosmetics.CosmeticsModule());   // PlayerSection "cosmetics"
+        modules.register(new me.Evan52098.genscore.powers.PowersModule());
+        modules.register(new me.Evan52098.genscore.pets.PetsModule());
+        modules.register(new me.Evan52098.genscore.gameplay.GameplayModule());
+        modules.register(new me.Evan52098.genscore.basestyles.BaseStylesModule());
+        modules.register(new me.Evan52098.genscore.hub.HubModule());
+        modules.register(new me.Evan52098.genscore.npcs.NpcsModule());
+        modules.register(new me.Evan52098.genscore.weekly.WeeklyModule());
+        modules.register(new me.Evan52098.genscore.merchant.MerchantModule());
         modules.enableAll();
         connectModules();
 

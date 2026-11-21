@@ -485,7 +485,7 @@ public final class WipeService {
 
     public void seasonConfirm(CommandSender sender) {
         if (sender instanceof Player player) {
-            player.sendMessage(LEGACY.deserialize("&cThe season wipe kicks everyone, you included: run it from the console."));
+            player.sendMessage(me.Evan52098.genscore.util.Msg.bad("The season wipe kicks everyone, you included: run it from the console."));
             return;
         }
         String actor = sender.getName();
@@ -661,7 +661,7 @@ public final class WipeService {
     /** Season restore: console only, and asked twice (the first call explains and arms, the second runs). */
     private void restoreSeason(CommandSender sender, String fileName) {
         if (sender instanceof Player player) {
-            player.sendMessage(LEGACY.deserialize("&cA season restore kicks everyone: run it from the console."));
+            player.sendMessage(me.Evan52098.genscore.util.Msg.bad("A season restore kicks everyone: run it from the console."));
             return;
         }
         String actor = sender.getName();

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "genscore:item/tools/raid_pick_2"
+  }
+}

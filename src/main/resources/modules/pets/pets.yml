@@ -1,0 +1,129 @@
+# Pets (/pets). Pets hatch from eggs, boost your factory while equipped and float next to you.
+# Reload with /pets reload.
+#
+# Each pet boosts one perk key, the same keys powers use:
+#   sale-value, belt-speed, luck, cache-money, raid-loot, raid-damage, turret-damage: 0.05 = +5%
+#   token-double: chance a belt token pays double. cache-upgrade: extra chance a cache holds a better one.
+#   raid-defense: 0.10 = raiders do 10% less damage to your belt. repair-speed: 0.10 = broken belts mend 10% sooner.
+#   gate-seconds: extra seconds your gate stays shut (a number of seconds, not a percent).
+# value is the boost at level 1. Each level adds per-level of that (0.05 = +5%), so level 20 is about 2x.
+# Golden pets (fuse 3 of the same pet) multiply the boost by golden-multiplier.
+
+slots:
+  default: 2             # pets a player can equip; more with the permission genscore.pets.slots.<n>
+  max: 5
+storage: 36              # pets a player can own
+max-level: 20
+per-level: 0.05
+golden-multiplier: 1.5
+xp:
+  per-minute: 1          # xp each equipped pet gets per minute online
+  per-level: 20          # xp to go from level n to n+1 is per-level * n
+  treat-tokens: 10       # tokens for one treat
+  treat-xp: 40           # xp one treat gives
+release-tokens: [2, 6, 15, 40]   # tokens back when releasing a common / rare / epic / legendary pet
+
+# Chance that breaking a cache also gives a pet egg, by cache rarity (common, rare, epic, legendary).
+# The egg matches the cache's rarity, with egg-upgrade-chance of being one better.
+egg-drops:
+  cache-chance: [0.04, 0.07, 0.12, 0.20]
+  egg-upgrade-chance: 0.10
+# Credits for one egg in the /pets egg shop (common, rare, epic, legendary). 0 takes that egg off sale.
+egg-prices: [100, 250, 600, 1500]
+# Hatching a legendary pet is announced to everyone.
+announce-legendary: true
+
+# The pet display in the hub: every pet floating in a row with its rarity and perk. yaw is the way it faces.
+showcase:
+  enabled: true
+  world: world
+  x: 1171.0
+  y: 66.0
+  z: 1125.05
+  yaw: 0.0
+
+pets:
+  slime:
+    name: 'Slime'
+    rarity: common
+    icon: SLIME_BLOCK
+    perk: belt-speed
+    value: 0.03
+    weight: 10
+  bee:
+    name: 'Busy Bee'
+    rarity: common
+    icon: BEE_NEST
+    perk: sale-value
+    value: 0.03
+    weight: 10
+  pumpkin:
+    name: 'Jack'
+    rarity: common
+    icon: CARVED_PUMPKIN
+    perk: luck
+    value: 0.05
+    weight: 10
+  honey:
+    name: 'Honey Cube'
+    rarity: rare
+    icon: HONEY_BLOCK
+    perk: cache-money
+    value: 0.08
+    weight: 10
+  turtle:
+    name: 'Shellguard'
+    rarity: rare
+    icon: TURTLE_EGG
+    perk: raid-defense
+    value: 0.08
+    weight: 10
+  observer:
+    name: 'Observer Bot'
+    rarity: rare
+    icon: OBSERVER
+    perk: token-double
+    value: 0.04
+    weight: 10
+  creeper:
+    name: 'Creeper'
+    rarity: epic
+    icon: CREEPER_HEAD
+    perk: raid-damage
+    value: 0.15
+    weight: 10
+  skeleton:
+    name: 'Sentry Skull'
+    rarity: epic
+    icon: SKELETON_SKULL
+    perk: turret-damage
+    value: 0.15
+    weight: 10
+  piglin:
+    name: 'Piglin Trader'
+    rarity: epic
+    icon: PIGLIN_HEAD
+    perk: sale-value
+    value: 0.08
+    weight: 10
+  wither:
+    name: 'Wither Skull'
+    rarity: legendary
+    icon: WITHER_SKELETON_SKULL
+    perk: raid-loot
+    value: 0.20
+    weight: 10
+  dragon:
+    name: 'Dragon'
+    rarity: legendary
+    icon: DRAGON_HEAD
+    perk: sale-value
+    value: 0.15
+    weight: 6
+  beacon:
+    name: 'Beacon Spirit'
+    rarity: legendary
+    icon: BEACON
+    perk: belt-speed
+    value: 0.12
+    weight: 8

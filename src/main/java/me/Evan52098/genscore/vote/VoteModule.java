@@ -467,13 +467,17 @@ public final class VoteModule implements GensModule, Listener {
         List<String> lines = List.of("", "&e&lVOTE PARTY!", "&fThe server reached &e" + c.partyGoal
                 + " votes&f - everyone online gets a reward!", "&7Vote with &f/vote &7to start the next one.", "");
         int count = 0;
+        java.util.Set<String> ips = new java.util.HashSet<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
             count++;
+            java.net.InetSocketAddress addr = player.getAddress();
+            String ip = addr == null || addr.getAddress() == null ? null : addr.getAddress().getHostAddress();
+            boolean firstOnIp = ip == null || me.Evan52098.genscore.info.Bedrock.is(player.getUniqueId()) || ips.add(ip);
             Tasks.entity.run(player, () -> {
                 for (String line : lines) {
                     player.sendMessage(LEGACY.deserialize(line));
                 }
-                if (players.get(player.getUniqueId()) != null) {
+                if (firstOnIp && players.get(player.getUniqueId()) != null) {
                     grant(player, reward, "Vote Party", "vote-party");
                     players.saveSoon(player.getUniqueId());
                 }
@@ -612,5 +616,17 @@ public final class VoteModule implements GensModule, Listener {
         actor.sender().sendMessage(Msg.neutral("Votifier: <white>" + (listening() ? "listening on port " + c.port
                 : c.listenerEnabled ? "NOT running (failed to start)" : "off on this server") + "</white>, sites: <white>"
                 + c.sites.size() + "</white>, party: <white>" + partyProgress + "/" + c.partyGoal + "</white>."));
+    }
+
+    public java.util.List<String> serviceNames() {
+        VoteConfig c = config;
+        if (c == null) {
+            return java.util.List.of();
+        }
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (VoteConfig.Site site : c.sites.values()) {
+            out.add(site.service());
+        }
+        return out;
     }
 }

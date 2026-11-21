@@ -67,6 +67,8 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     private volatile ProgressSettings progress;
     private Rewards rewards;
     private ProgressMenus menus;
+    private Managers managers;
+    private Lockpicks lockpicks;
     private final Map<UUID, Long> lastSwing = new ConcurrentHashMap<>();
     private final Map<Integer, Factory> bySlot = new ConcurrentHashMap<>();
     private final Map<UUID, Factory> byOwner = new ConcurrentHashMap<>();
@@ -79,6 +81,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Override
     public void enable(GensCore plugin) {
         this.plugin = plugin;
+        powerHooks = this;
         this.plots = plugin.modules().get(PlotsModule.class);
         if (plots == null) {
             throw new IllegalStateException("The factory module needs the plots module.");
@@ -87,6 +90,17 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         progress = ProgressSettings.from(plugin.getConfig().getConfigurationSection("factory"));
         rewards = new Rewards(this);
         menus = new ProgressMenus(this);
+        managers = new Managers(this, plugin);
+        lockpicks = new Lockpicks(this, plugin, plugin.getConfig().getConfigurationSection("factory.lockpick"));
+        RankPerks.load(plugin.getConfig().getConfigurationSection("factory.rank-perks"));
+        Tasks.global.timer(t -> {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                Tasks.onEntity(online, () -> RankPerks.refresh(online));
+            }
+        }, 1200, 1200);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            Tasks.onEntity(online, () -> managers.start(online));
+        }
         plugin.commands().register(this);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plots.service().addListener(this);
@@ -108,6 +122,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     public void reload() {
         settings = FactorySettings.from(plugin.getConfig().getConfigurationSection("factory"));
         progress = ProgressSettings.from(plugin.getConfig().getConfigurationSection("factory"));
+        RankPerks.load(plugin.getConfig().getConfigurationSection("factory.rank-perks"));
+        if (lockpicks != null) {
+            lockpicks.reload(plugin.getConfig().getConfigurationSection("factory.lockpick"));
+        }
         logTiers();
     }
 
@@ -130,7 +148,98 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     /** How long this owner's gate stays shut after a click, with their gate-time upgrade. */
     int gateSeconds(UUID owner) {
         PlotData data = plotData(owner);
-        return progress.gateSeconds(settings.gateCloseSeconds(), data == null ? 0 : data.lockLevel());
+        return progress.gateSeconds(settings.gateCloseSeconds(), data == null ? 0 : data.lockLevel())
+                + (int) Math.round(me.Evan52098.genscore.powers.PowersModule.perk(owner, "gate-seconds"));
+    }
+
+    private static volatile FactoryModule powerHooks;
+
+    public static long incomePerMinute(UUID uuid) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(uuid);
+        return f == null ? 0 : f.incomePerMinute;
+    }
+
+    public static long steadyIncomePerMinute(UUID uuid) {
+        FactoryModule m = powerHooks;
+        if (m == null) {
+            return 0;
+        }
+        Factory f = m.byOwner.get(uuid);
+        long live = f == null ? 0 : f.incomePerMinute;
+        PlotData data = m.plotData(uuid);
+        if (data == null) {
+            return live;
+        }
+        var g = m.gensPlayer(uuid);
+        FactorySettings s = m.settings;
+        int length = Math.max(1, f == null ? data.beltLength() : f.activeLength());
+        double perSecond = Math.min(s.speed(data.speedLevel()), 1.0 / Math.max(0.05, s.genIntervalSeconds()));
+        double boost = Machines.multiplier(data.machines(), length) * (1 + REBIRTH_BONUS * (g == null ? 0 : g.rebirths()))
+                * (1 + m.progress.value().perLevel() * (g == null ? 0 : g.valueLevel())) * RankPerks.sale(uuid);
+        return Math.max(live, Math.round(s.itemValue(length, data.genLevel()) * perSecond * 60 * boost));
+    }
+
+    public static @Nullable String placeholder(UUID uuid, String key) {
+        FactoryModule m = powerHooks;
+        if (m == null) {
+            return null;
+        }
+        Factory f = m.byOwner.get(uuid);
+        PlotData data = m.plotData(uuid);
+        var g = m.gensPlayer(uuid);
+        return switch (key) {
+            case "balance" -> {
+                EconomyModule eco = m.plugin.modules().get(EconomyModule.class);
+                yield eco == null || eco.service() == null ? "$0" : Money.compact(eco.service().balance(uuid));
+            }
+            case "income_hour" -> Money.compact(f == null ? 0 : f.incomePerMinute * 60);
+            case "income_min" -> Money.compact(f == null ? 0 : f.incomePerMinute);
+            case "gen_tier" -> String.valueOf((data == null ? 0 : data.genLevel()) + 1);
+            case "gen_max" -> String.valueOf(m.settings.tierCount());
+            case "rebirths" -> String.valueOf(g == null ? 0 : g.rebirths());
+            case "machines" -> String.valueOf(data == null ? 0 : data.machines());
+            case "belt" -> String.valueOf(f == null ? 0 : f.activeLength());
+            case "belt_max" -> String.valueOf(f == null ? 0 : f.path.size());
+            case "tokens" -> String.format("%,d", g == null ? 0 : g.tokens());
+            case "gate" -> f == null || !f.hasGate() ? "&7None" : f.gateClosed() ? "&aClosed &f" + f.gateSecondsLeft() + "s" : "&cOpen";
+            case "shield" -> {
+                long s = f == null ? 0 : f.shieldLeftSeconds();
+                yield s <= 0 ? "&7None" : "&b" + (s >= 60 ? s / 60 + "m " + s % 60 + "s" : s + "s");
+            }
+            default -> null;
+        };
+    }
+
+    public static boolean powerCloseGate(Player p) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(p.getUniqueId());
+        if (f == null || !f.hasGate()) {
+            return false;
+        }
+        f.requestClose();
+        return true;
+    }
+
+    public static boolean powerRepairAll(Player p) {
+        FactoryModule m = powerHooks;
+        Factory f = m == null ? null : m.byOwner.get(p.getUniqueId());
+        if (f == null) {
+            return false;
+        }
+        Tasks.region.run(f.view.center(), f::repairAll);
+        return true;
+    }
+
+    public static boolean powerShield(Player p, long seconds) {
+        FactoryModule m = powerHooks;
+        PlotData data = m == null ? null : m.plotData(p.getUniqueId());
+        if (data == null || m.byOwner.get(p.getUniqueId()) == null) {
+            return false;
+        }
+        data.setShieldUntil(Math.max(data.shieldUntil(), System.currentTimeMillis() + seconds * 1000L));
+        m.saveSoon(p.getUniqueId());
+        return true;
     }
 
     String shieldText(UUID owner) {
@@ -207,6 +316,33 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         return plots.data(owner);
     }
 
+    long steal(UUID owner, Player raider, long ownerIncomePerMinute) {
+        EconomyModule eco = plugin.modules().get(EconomyModule.class);
+        if (eco == null || eco.service() == null || eco.service().wallet(owner) == null || eco.service().wallet(raider.getUniqueId()) == null) {
+            return 0;
+        }
+        var cfg = plugin.getConfig();
+        double pct = Math.max(0, Math.min(0.5, cfg.getDouble("factory.raid.steal-percent", 0.03)));
+        double maxMinutes = Math.max(0, cfg.getDouble("factory.raid.steal-max-minutes", 10));
+        long floor = Math.round(Math.max(0, cfg.getDouble("factory.raid.steal-min", 25)) * 100);
+        long balance = eco.service().balance(owner);
+        long cap = Math.max(floor, Math.round(ownerIncomePerMinute * maxMinutes));
+        long amount = Math.min(Math.round(balance * pct), cap);
+        amount = Math.round(amount * (1 + me.Evan52098.genscore.powers.PowersModule.perk(raider.getUniqueId(), "raid-loot")));
+        amount = Math.min(amount, balance);
+        if (amount <= 0 || !eco.service().withdraw(owner, amount, "raided by " + raider.getName())) {
+            return 0;
+        }
+        eco.service().deposit(raider.getUniqueId(), amount, "raid loot");
+        Player o = Bukkit.getPlayer(owner);
+        long shown = amount;
+        if (o != null) {
+            Tasks.entity.run(o, () -> o.sendMessage(Msg.bad(Msg.white(Msg.escape(raider.getName())) + " stole "
+                    + Msg.white(Money.compact(shown)) + " from you. Close your gate!")));
+        }
+        return amount;
+    }
+
     /** Pays belt earnings into the owner's balance; one ledger entry per payment (roadmap rule 3). */
     void pay(UUID owner, long cents) {
         EconomyModule eco = plugin.modules().get(EconomyModule.class);
@@ -227,6 +363,16 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         bySlot.put(view.slot(), f);
         byOwner.put(view.owner(), f);
         f.start();
+        Player owner = Bukkit.getPlayer(view.owner());
+        if (owner != null) {
+            Tasks.entity.run(owner, () -> {
+                var key = new org.bukkit.NamespacedKey(plugin, "first_gate");
+                if (!owner.getPersistentDataContainer().has(key, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                    owner.getPersistentDataContainer().set(key, org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+                    f.closeFor(120);
+                }
+            });
+        }
     }
 
     @Override
@@ -246,7 +392,12 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     // ------------------------------------------------------------------ gate: keeping people out
 
     private boolean blockedFrom(Player p, Factory f) {
-        return f.gateClosed() && !p.getUniqueId().equals(f.view.owner()) && !p.hasPermission(BYPASS);
+        return f.gateClosed() && !p.getUniqueId().equals(f.view.owner()) && !bypasses(p);
+    }
+
+    boolean bypasses(Player p) {
+        me.Evan52098.genscore.staffmode.StaffModeModule staffMode = plugin.modules().get(me.Evan52098.genscore.staffmode.StaffModeModule.class);
+        return staffMode != null && staffMode.inStaffMode(p.getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -333,7 +484,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         event.setCancelled(true);
-        gateClicked(event.getPlayer(), f, event.getPlayer().isSneaking());
+        gateClicked(event.getPlayer(), f, event.getPlayer().isSneaking(), event.getRightClicked().getLocation());
     }
 
     /** Left-click (hitting) the gate does the same as right-click, so it is easy to use either way. */
@@ -347,7 +498,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         event.setCancelled(true);
-        gateClicked(p, f, p.isSneaking());
+        gateClicked(p, f, p.isSneaking(), event.getEntity().getLocation());
     }
 
     private @Nullable Factory gateOf(Entity e) {
@@ -358,7 +509,15 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         return f != null && f.isClickBox(e) ? f : null;
     }
 
-    private void gateClicked(Player p, Factory f, boolean sneaking) {
+    private void gateClicked(Player p, Factory f, boolean sneaking, Location at) {
+        if (!p.getUniqueId().equals(f.view.owner()) && f.gateClosed()
+                && lockpicks.isLockpick(p.getInventory().getItemInMainHand())) {
+            lockpicks.start(p, f, at);
+            return;
+        }
+        if (p.getUniqueId().equals(f.view.owner()) && f.gateClosed() && lockpicks.jam(p, f)) {
+            return;
+        }
         if (!p.getUniqueId().equals(f.view.owner())) {
             p.sendActionBar(Msg.bad(f.gateClosed() ? "This gate is closed." : "This is not your gate."));
             return;
@@ -371,12 +530,174 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         closeGate(p, f);
     }
 
+    private final Map<UUID, GateGuard> gateGuards = new ConcurrentHashMap<>();
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWalk(PlayerMoveEvent event) {
+        GateGuard g = gateGuards.get(event.getPlayer().getUniqueId());
+        if (g == null || g.walked >= GateGuard.MIN_WALK) {
+            return;
+        }
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getWorld() != to.getWorld()) {
+            return;
+        }
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double step = Math.sqrt(dx * dx + dz * dz);
+        if (step > 0.01 && step < 2.0) {
+            g.walked += step;
+        }
+    }
+
+    private static final class GateGuard {
+        static final int EARLY_LIMIT = 8;
+        static final long LOCK_MS = 60_000;
+        static final double MIN_WALK = 5.0;
+        static final int TIMED_CLOSES = 6;
+        static final long TIMED_SPREAD_MS = 800;
+        final long[] closes = new long[TIMED_CLOSES];
+        int closeCount;
+        volatile double walked = MIN_WALK;
+        final long[] clicks = new long[12];
+        int count;
+        int early;
+        long lockedUntil;
+        long lastAction;
+        String world = "";
+        double x;
+        double y;
+        double z;
+        float yaw;
+        float pitch;
+
+        boolean click(long now) {
+            System.arraycopy(clicks, 1, clicks, 0, clicks.length - 1);
+            clicks[clicks.length - 1] = now;
+            count = Math.min(clicks.length, count + 1);
+            if (count < 10 || now - clicks[clicks.length - 10] > 6000) {
+                return false;
+            }
+            double sum = 0;
+            double sq = 0;
+            int n = 9;
+            for (int i = clicks.length - 9; i < clicks.length; i++) {
+                double d = clicks[i] - clicks[i - 1];
+                sum += d;
+                sq += d * d;
+            }
+            double mean = sum / n;
+            double sd = Math.sqrt(Math.max(0, sq / n - mean * mean));
+            boolean flagged = mean < 65 || (mean < 650 && sd < 8);
+            if (flagged) {
+                count = 0;
+            }
+            return flagged;
+        }
+
+        boolean idle(long now) {
+            return lastAction != 0 && now - lastAction <= 600_000 && walked < MIN_WALK;
+        }
+
+        boolean timed(long now) {
+            System.arraycopy(closes, 1, closes, 0, closes.length - 1);
+            closes[closes.length - 1] = now;
+            closeCount = Math.min(closes.length, closeCount + 1);
+            if (closeCount < closes.length) {
+                return false;
+            }
+            long min = Long.MAX_VALUE;
+            long max = 0;
+            for (int i = 1; i < closes.length; i++) {
+                long d = closes[i] - closes[i - 1];
+                if (d > 600_000) {
+                    return false;
+                }
+                min = Math.min(min, d);
+                max = Math.max(max, d);
+            }
+            if (min >= 5_000 && max - min <= TIMED_SPREAD_MS) {
+                closeCount = 0;
+                return true;
+            }
+            return false;
+        }
+
+        void remember(Location at, long now) {
+            world = at.getWorld().getName();
+            x = at.getX();
+            y = at.getY();
+            z = at.getZ();
+            yaw = at.getYaw();
+            pitch = at.getPitch();
+            lastAction = now;
+            early = 0;
+            walked = 0;
+        }
+    }
+
+    private void lockGate(Player p, GateGuard g, long now, String why) {
+        g.lockedUntil = now + GateGuard.LOCK_MS;
+        p.sendMessage(Msg.bad("Auto-clicking detected (" + why + "). You can't close your gate for "
+                + (GateGuard.LOCK_MS / 1000) + "s."));
+        p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.5f, 0.8f);
+        net.kyori.adventure.text.Component alert = Msg.parse("<red><bold>GATE</bold></red> <white>" + Msg.escape(p.getName())
+                + "</white> <gray>may be auto-clicking their gate:</gray> <yellow>" + Msg.escape(why) + "</yellow>");
+        plugin.getLogger().info("[gate] " + p.getName() + " may be auto-clicking: " + why);
+        for (Player staff : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (staff.hasPermission("genscore.antihack.alert")) {
+                Tasks.onEntity(staff, () -> staff.sendMessage(alert));
+            }
+        }
+    }
+
     private void closeGate(Player p, Factory f) {
         if (!f.hasGate()) {
             p.sendMessage(Msg.bad("This factory has no gate."));
             return;
         }
         boolean wasClosed = f.gateClosed();
+        long now = System.currentTimeMillis();
+        GateGuard g = gateGuards.computeIfAbsent(p.getUniqueId(), k -> new GateGuard());
+        if (g.click(now)) {
+            lockGate(p, g, now, "clicking the gate with a perfectly even rhythm");
+        }
+        if (now < g.lockedUntil) {
+            p.sendActionBar(Msg.parse("<red>Gate locked: auto-clicking detected.</red> <gray>Try again in</gray> <white>"
+                    + ((g.lockedUntil - now + 999) / 1000) + "s</white>"));
+            return;
+        }
+        if (wasClosed && !f.canReup() && ++g.early >= GateGuard.EARLY_LIMIT) {
+            g.early = 0;
+            lockGate(p, g, now, "spamming the gate before the re-up window");
+            return;
+        }
+        if (wasClosed && !f.canReup()) {
+            long wait = f.gateSecondsLeft() - Factory.REUP_WINDOW;
+            p.sendActionBar(Msg.parse("<red>You can re-up your gate in the last " + Factory.REUP_WINDOW + "s</red> <gray>(" + wait + "s)</gray>"));
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
+            return;
+        }
+        long cool = f.closeCooldownLeft();
+        if (!wasClosed && cool > 0) {
+            p.sendActionBar(Msg.parse("<red>Your gate just opened.</red> <gray>You can close it in</gray> <white>" + cool + "s</white>"));
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
+            return;
+        }
+        Location at = p.getLocation();
+        if (g.idle(now)) {
+            p.sendActionBar(Msg.parse("<yellow>AFK check:</yellow> <gray>walk around (at least " + (int) GateGuard.MIN_WALK
+                    + " blocks), then close your gate again.</gray> <white>" + String.format(java.util.Locale.ROOT, "%.1f", g.walked)
+                    + "/" + (int) GateGuard.MIN_WALK + "</white>"));
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.6f, 0.8f);
+            return;
+        }
+        if (g.timed(now)) {
+            lockGate(p, g, now, "closing the gate on an exact timer");
+            return;
+        }
+        g.remember(at, now);
         f.requestClose();
         if (wasClosed) {
             p.sendMessage(Msg.good("Gate timer reset to " + Msg.white(settings.gateCloseSeconds() + "s") + "."));
@@ -402,7 +723,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Command("gate")
     @CommandPermission("genscore.belt")
     @Description("Close your factory gate (again) for 45 seconds, or /gate open")
-    public void gate(BukkitCommandActor actor, @Optional @Nullable String action) {
+    public void gate(BukkitCommandActor actor, @Optional @revxrsal.commands.annotation.Named("action") @Nullable String action) {
         Player p = actor.requirePlayer();
         Factory f = byOwner.get(p.getUniqueId());
         if (f == null) {
@@ -414,7 +735,22 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             p.sendMessage(Msg.neutral("Opening your gate."));
             return;
         }
+        if (!p.hasPermission("genscore.gate.remote") && !nearOwnGate(p, f)) {
+            p.sendMessage(Msg.bad("Walk to your gate to close it. Ranks with remote gates can close it from anywhere (" + Msg.white("/store") + ")."));
+            return;
+        }
         closeGate(p, f);
+    }
+
+    private boolean nearOwnGate(Player p, Factory f) {
+        var l = p.getLocation();
+        if (!l.getWorld().equals(f.view.world())) {
+            return false;
+        }
+        if (f.view.contains(l.getBlockX(), l.getBlockZ())) {
+            return true;
+        }
+        return l.distanceSquared(f.outsideGate()) <= 8 * 8;
     }
 
     // ------------------------------------------------------------------ raids
@@ -443,6 +779,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             p.sendActionBar(Msg.bad("You need a Raid Pick to break belts (" + Msg.white("/gear") + ")."));
             return;
         }
+        if (sameNetwork(p, Bukkit.getPlayer(f.view.owner())) && !p.hasPermission(BYPASS)) {
+            p.sendActionBar(Msg.bad("You can't raid a factory owned by someone on your connection."));
+            return;
+        }
         long now = System.currentTimeMillis();
         Long last = lastSwing.get(p.getUniqueId());
         if (last != null && now - last < progress.hitCooldownMs()) {
@@ -450,9 +790,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         lastSwing.put(p.getUniqueId(), now);
         var g = gensPlayer(p.getUniqueId());
-        int damage = progress.hitDamage(g == null ? 0 : g.gearLevel());
+        int damage = progress.hitDamage(g == null ? 0 : g.gearLevel())
+                + (int) Math.round(me.Evan52098.genscore.powers.PowersModule.perk(p.getUniqueId(), "raid-damage"));
         // Belt state belongs to the factory's region thread; the raider stands in the same region.
-        Tasks.region.run(b.getLocation(), () -> {
+        Tasks.region.run(f.view.center(), () -> {
             Factory.HitResult r = f.hit(p, index, damage);
             Tasks.entity.run(p, () -> {
                 switch (r.hit()) {
@@ -473,6 +814,19 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                 }
             });
         });
+    }
+
+    static boolean sameNetwork(Player a, @Nullable Player b) {
+        if (b == null) {
+            return false;
+        }
+        var x = a.getAddress();
+        var y = b.getAddress();
+        if (x == null || y == null || x.getAddress() == null || y.getAddress() == null) {
+            return false;
+        }
+        var ip = x.getAddress();
+        return !ip.isLoopbackAddress() && !ip.isSiteLocalAddress() && !ip.isLinkLocalAddress() && ip.equals(y.getAddress());
     }
 
     private void repair(Player p, Factory f, int index) {
@@ -504,6 +858,257 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         menus.tokens(actor.requirePlayer());
     }
 
+    static final double REBIRTH_BONUS = 0.5;
+
+    static int rebirthTier(int rebirths) {
+        return 60 + 10 * rebirths;
+    }
+
+    @Command({"rebirth", "prestige"})
+    @CommandPermission("genscore.belt")
+    @Description("Reset your factory for a permanent income boost")
+    public void rebirth(BukkitCommandActor actor) {
+        Player p = actor.requirePlayer();
+        Tasks.onEntity(p, () -> rebirthMenu(p));
+    }
+
+    void rebirthMenu(Player p) {
+        PlotData data = plotData(p.getUniqueId());
+        var g = gensPlayer(p.getUniqueId());
+        if (data == null || g == null) {
+            p.sendMessage(Msg.bad("Your factory is not ready yet."));
+            return;
+        }
+        int r = g.rebirths();
+        int need = rebirthTier(r);
+        int tier = data.genLevel() + 1;
+        boolean ready = tier >= need;
+        Menu menu = new Menu(3, me.Evan52098.genscore.menu.MenuStyle.title("Rebirth"));
+        menu.set(11, Lore.item(Material.NETHER_STAR, "&d&lRebirth " + (r + 1), Lore.builder(Lore.Accent.WHITE)
+                .description("Start your factory again,", "stronger every time.").divider()
+                .stat("Needs", "Gen tier " + need + (ready ? " &a✔" : " &c(you: " + tier + ")"))
+                .stat("Reward", "&d+" + (int) (REBIRTH_BONUS * 100) + "% &7sale value forever")
+                .stat("Bonus", "&e+25 tokens")
+                .build()));
+        menu.set(13, Lore.item(Material.BARRIER, "&c&lYou lose", Lore.builder(Lore.Accent.RED)
+                .description("Gen tier, belt speed, belt length,", "machines and your balance.").build()));
+        menu.set(15, Lore.item(Material.CHEST, "&a&lYou keep", Lore.builder(Lore.Accent.CYAN)
+                .description("Tokens, powers, defences, caches,", "cosmetics, credits and your rebirths.").divider()
+                .stat("Rebirths", String.valueOf(r))
+                .stat("Current boost", "&d+" + (int) (REBIRTH_BONUS * 100 * r) + "%").build()));
+        menu.set(22, Lore.item(ready ? Material.LIME_CONCRETE : Material.GRAY_CONCRETE, ready ? "&a&lREBIRTH NOW" : "&7&lNot yet",
+                Lore.builder(Lore.Accent.WHITE).description(ready ? "Click to rebirth." : "Reach gen tier " + need + " first.").build()), click -> {
+            if (ready) {
+                doRebirth(p);
+            }
+        });
+        me.Evan52098.genscore.menu.MenuStyle.frame(menu, 3);
+        menu.open(p);
+    }
+
+    private final Map<UUID, Long> lastCombat = new ConcurrentHashMap<>();
+
+    long lastCombatAt(UUID player) {
+        return lastCombat.getOrDefault(player, 0L);
+    }
+
+    Lockpicks lockpicks() {
+        return lockpicks;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onLockpickClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (lockpicks != null && event.getPlayer() instanceof Player p) {
+            lockpicks.closed(p, event.getInventory());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onLockpickQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        if (lockpicks != null) {
+            lockpicks.forget(event.getPlayer().getUniqueId());
+        }
+    }
+
+    void markCombat(UUID player) {
+        lastCombat.put(player, System.currentTimeMillis());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCombat(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        org.bukkit.entity.Entity damager = event.getDamager() instanceof org.bukkit.entity.Projectile proj
+                && proj.getShooter() instanceof org.bukkit.entity.Entity shooter ? shooter : event.getDamager();
+        if (event.getEntity() instanceof Player victim && damager instanceof Player attacker && !victim.equals(attacker)) {
+            markCombat(victim.getUniqueId());
+            markCombat(attacker.getUniqueId());
+        }
+    }
+
+    public @org.jetbrains.annotations.Nullable String staffModeBlock(Player p) {
+        long now = System.currentTimeMillis();
+        UUID id = p.getUniqueId();
+        if (now - lastCombat.getOrDefault(id, 0L) < 15_000) {
+            return "You were in combat in the last 15 seconds.";
+        }
+        if (now - lastSwing.getOrDefault(id, 0L) < 30_000) {
+            return "You broke a belt in the last 30 seconds.";
+        }
+        Factory inside = at(p.getLocation());
+        if (inside != null && !inside.view.owner().equals(id) && inside.view.inside(p.getLocation().getBlockX(), p.getLocation().getBlockZ())) {
+            return "You're inside someone else's factory.";
+        }
+        Factory own = byOwner.get(id);
+        if (own != null && (own.brokenCount() > 0 || now - own.lastAttackedAt() < 60_000)) {
+            return "Your factory is under attack or has broken belts. Repair it first.";
+        }
+        return null;
+    }
+
+    public boolean raidDamaged(UUID owner) {
+        Factory f = byOwner.get(owner);
+        return f != null && f.brokenCount() > 0;
+    }
+
+    private void doRebirth(Player p) {
+        PlotData data = plotData(p.getUniqueId());
+        var g = gensPlayer(p.getUniqueId());
+        if (data == null || g == null || data.genLevel() + 1 < rebirthTier(g.rebirths())) {
+            return;
+        }
+        p.closeInventory();
+        Factory belt = byOwner.get(p.getUniqueId());
+        if (belt != null) {
+            belt.wipeBelt();
+        }
+        int r = g.rebirths() + 1;
+        g.setRebirths(r);
+        me.Evan52098.genscore.hub.HubModule.progress(p.getUniqueId(), "REBIRTH", 1);
+        g.addTokens(25);
+        data.setGenLevel(0);
+        data.setSpeedLevel(0);
+        data.setMachines(0);
+        data.setBeltLength(plots.defaultBeltLength());
+        EconomyModule eco = plugin.modules().get(EconomyModule.class);
+        if (eco != null && eco.service() != null) {
+            eco.service().set(p.getUniqueId(), 0, "rebirth " + r);
+        }
+        saveSoon(p.getUniqueId());
+        plugin.playerData().saveSoon(p.getUniqueId());
+        celebrate(p, "<light_purple><bold>REBIRTH " + r, "<white>+" + (int) (REBIRTH_BONUS * 100 * r) + "% sale value forever", true);
+        net.kyori.adventure.text.Component line = Msg.parse(Msg.headerText("Rebirth") + "<white>" + Msg.escape(p.getName())
+                + "</white> <gray>reached rebirth</gray> <light_purple>" + r + "</light_purple><gray>!</gray>");
+        for (Player o : Bukkit.getOnlinePlayers()) {
+            Tasks.entity.run(o, () -> o.sendMessage(line));
+        }
+        if (plots.service() != null) {
+            plots.service().rebuildFor(p.getUniqueId());
+        }
+    }
+
+    @Command({"machines", "upgraders"})
+    @CommandPermission("genscore.belt")
+    @Description("Buy machines that boost your belt's value")
+    public void machines(BukkitCommandActor actor) {
+        Player p = actor.requirePlayer();
+        Tasks.onEntity(p, () -> machinesMenu(p));
+    }
+
+    void machinesMenu(Player p) {
+        PlotData data = plotData(p.getUniqueId());
+        Factory f = byOwner.get(p.getUniqueId());
+        if (data == null || f == null) {
+            p.sendMessage(Msg.bad("Your factory is not ready yet."));
+            return;
+        }
+        int owned = data.machines();
+        int length = f.activeLength();
+        Menu menu = new Menu(4, me.Evan52098.genscore.menu.MenuStyle.title("Machines"));
+        int[] slots = {11, 12, 13, 14, 15};
+        for (int i = 0; i < Machines.ALL.size(); i++) {
+            Machines.Machine m = Machines.ALL.get(i);
+            boolean have = i < owned;
+            boolean next = i == owned;
+            boolean reaches = m.segment() < length;
+            Lore lore = Lore.builder(have ? Lore.Accent.CYAN : Lore.Accent.WHITE).subcategory("Belt machine")
+                    .description(m.description()).divider()
+                    .stat("Value", "x" + m.multiplier())
+                    .stat("Sits at", "segment " + (m.segment() + 1));
+            if (have) {
+                lore.stat("Status", reaches ? "&aRunning" : "&cBelt too short (" + length + "/" + (m.segment() + 1) + ")");
+            } else if (next) {
+                lore.stat("Price", "&a" + Money.compact(m.priceCents())).clickPrompt("Click to build");
+            } else {
+                lore.stat("Status", "&7Build the one before first");
+            }
+            org.bukkit.inventory.ItemStack icon = Lore.item(have || next ? m.icon() : Material.GRAY_DYE, (have ? "&a" : next ? "&e" : "&7") + "&l" + m.name(), lore.build());
+            int index = i;
+            menu.set(slots[i], me.Evan52098.genscore.menu.MenuStyle.clean(icon, have && reaches), click -> {
+                if (index == data.machines()) {
+                    buyMachine(p, data, index);
+                }
+            });
+        }
+        double total = Machines.multiplier(owned, length);
+        menu.set(4, Lore.item(Material.HOPPER, "&6&lYour line", Lore.builder(Lore.Accent.WHITE)
+                .description("Every item that reaches the end", "of your belt passes your machines.").divider()
+                .stat("Machines", owned + "/" + Machines.ALL.size())
+                .stat("Total boost", "x" + String.format(java.util.Locale.ROOT, "%.2f", total)).build()));
+        menu.set(27, me.Evan52098.genscore.menu.MenuStyle.back("your belt"), click -> {
+            Menu.clearReturn(p);
+            openMenu(p, f);
+        });
+        menu.set(me.Evan52098.genscore.menu.MenuStyle.shelf(4, 4), me.Evan52098.genscore.menu.MenuStyle.close(), click -> p.closeInventory());
+        me.Evan52098.genscore.menu.MenuStyle.frame(menu, 4);
+        menu.open(p);
+    }
+
+    @Nullable Factory factoryOf(UUID owner) {
+        return byOwner.get(owner);
+    }
+
+    int defaultBeltLength() {
+        return plots.defaultBeltLength();
+    }
+
+    boolean withdrawQuiet(Player p, long price, String reason) {
+        return withdraw(p, price, reason, false);
+    }
+
+    void propsAfterGen(Player p, int from, int to) {
+        if (to <= from) {
+            return;
+        }
+        var stages = me.Evan52098.genscore.plots.PlotProps.unlockedBetween(from, to);
+        if (!stages.isEmpty() && plots.service() != null) {
+            plots.service().propsUnlocked(p.getUniqueId(), from, to);
+            for (var stage : stages) {
+                p.sendMessage(Msg.parse(Msg.headerText("Factory Upgrade") + "<gray>Your base unlocked</gray> <white>"
+                        + Msg.escape(stage.name()) + "</white><gray>.</gray>"));
+            }
+        }
+    }
+
+    @Command({"managers", "manager"})
+    @CommandPermission("genscore.belt")
+    @Description("Hire a manager that buys upgrades for you")
+    public void managersCommand(BukkitCommandActor actor) {
+        Player p = actor.requirePlayer();
+        Tasks.onEntity(p, () -> managers.open(p));
+    }
+
+    private void buyMachine(Player p, PlotData data, int index) {
+        Machines.Machine m = Machines.ALL.get(index);
+        if (data.machines() != index || !withdraw(p, m.priceCents(), "machine " + m.name())) {
+            return;
+        }
+        data.setMachines(index + 1);
+        saveSoon(p.getUniqueId());
+        celebrate(p, m.color() + "<bold>" + m.name().toUpperCase(java.util.Locale.ROOT) + " BUILT", "<white>x" + m.multiplier() + " item value", true);
+        p.sendMessage(Msg.good("Built the " + Msg.white(m.name()) + ": every item that passes it is worth " + Msg.white("x" + m.multiplier()) + "."));
+        me.Evan52098.genscore.hub.HubModule.progress(p.getUniqueId(), "UPGRADE", 1);
+        machinesMenu(p);
+    }
+
     @Command("caches")
     @CommandPermission("genscore.belt")
     @Description("Break your caches")
@@ -528,7 +1133,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Command("gensadmin tokens")
     @CommandPermission("genscore.admin.plots")
     @Description("Give tokens or a cache to an online player (tests)")
-    public void adminTokens(BukkitCommandActor actor, String player, String what, int amount) {
+    public void adminTokens(BukkitCommandActor actor, @revxrsal.commands.annotation.Named("player") String player, @revxrsal.commands.annotation.Named("what") String what, @revxrsal.commands.annotation.Named("amount") int amount) {
         Player t = Bukkit.getPlayerExact(player);
         var g = t == null ? null : gensPlayer(t.getUniqueId());
         if (g == null) {
@@ -548,6 +1153,10 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     // ------------------------------------------------------------------ belt menu
 
     private void openMenu(Player p, Factory f) {
+        openMenu(p, f, 0);
+    }
+
+    private void openMenu(Player p, Factory f, int tab) {
         boolean owner = p.getUniqueId().equals(f.view.owner());
         PlotData data = plotData(f.view.owner());
         if (data == null) {
@@ -555,77 +1164,162 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         FactorySettings s = settings;
-        String ownerName = Bukkit.getOfflinePlayer(f.view.owner()).getName();
-        Menu menu = new Menu(owner ? 4 : 3, Msg.parse(owner ? "<dark_gray>Your belt" : "<dark_gray>" + Msg.escape(String.valueOf(ownerName)) + "'s belt"));
-        if (owner) {
-            var g = gensPlayer(p.getUniqueId());
-            menu.set(28, Lore.item(Material.SUNFLOWER, "&eTokens: &f" + (g == null ? 0 : g.tokens()), Lore.builder(Lore.Accent.WHITE)
-                    .clickPrompt("open the token shop").build()), e -> menus.tokens(p));
-            int cacheCount = 0;
-            for (int r = 0; g != null && r < 4; r++) {
-                cacheCount += g.caches(r);
-            }
-            menu.set(30, Lore.item(Material.ENDER_CHEST, "&dCaches: &f" + cacheCount, Lore.builder(Lore.Accent.WHITE)
-                    .clickPrompt("break your caches").build()), e -> menus.caches(p));
-            menu.set(32, Lore.item(Material.SHIELD, "&bDefences", Lore.builder(Lore.Accent.WHITE)
-                    .stat("Gate", gateSeconds(p.getUniqueId()) + "s").stat("Shield", shieldText(p.getUniqueId()))
-                    .clickPrompt("gate time, armour, turrets, traps").build()), e -> menus.defence(p));
-            menu.set(34, Lore.item(Material.IRON_PICKAXE, "&cRaid gear", Lore.builder(Lore.Accent.WHITE)
-                    .stat("Gear level", String.valueOf(g == null ? 0 : g.gearLevel()))
-                    .clickPrompt("the Raid Pick and gear upgrades").build()), e -> menus.gear(p));
-        }
         int length = f.activeLength();
         int level = data.speedLevel();
         int tier = data.genLevel();
         FactorySettings.GenTier gen = s.tier(tier);
-        menu.set(10, Lore.item(Material.HOPPER, "&6Belt", Lore.builder(Lore.Accent.WHITE)
+        org.bukkit.inventory.ItemStack overview = Lore.item(Material.HOPPER, "&6&lBelt", Lore.builder(Lore.Accent.WHITE)
                 .stat("Length", length + " / " + f.path.size() + " segments")
                 .stat("Speed", mult(s, level) + " (" + fmt(s.speed(level)) + " segments/s)")
                 .stat("Gen", "Tier " + (tier + 1) + ": " + gen.mix())
+                .stat("Machines", data.machines() + "/" + Machines.ALL.size()
+                        + " (x" + String.format(java.util.Locale.ROOT, "%.2f", Machines.multiplier(data.machines(), length)) + ")")
                 .stat("Average item", Money.compact(s.itemValue(length, tier)))
                 .stat("Income", Money.compact(f.incomePerMinute) + " / min")
                 .stat("Items on belt", String.valueOf(f.itemsOnBelt))
                 .divider()
                 .description("Items ride the belt to the sell point.", "The longer the belt, the more each is worth.")
-                .build()), null);
-        if (owner) {
+                .build());
+        if (!owner) {
+            String ownerName = Bukkit.getOfflinePlayer(f.view.owner()).getName();
+            Menu menu = new Menu(3, me.Evan52098.genscore.menu.MenuStyle.title(ownerName + "'s belt"));
+            menu.set(13, overview, null);
+            menu.open(p);
+            return;
+        }
+        openTab(p, f, data, overview, tab);
+    }
+
+    private static final String[] TAB_NAMES = {"UPGRADES", "DEFENCE & RAIDS", "REWARDS"};
+    private static final String[] TAB_TITLES = {"Upgrades", "Defence", "Rewards"};
+    private static final String[] TAB_COLORS = {"&6", "&c", "&e"};
+    private static final Material[] TAB_ICONS = {Material.ANVIL, Material.IRON_SWORD, Material.CHEST};
+    private static final Material[] TAB_PANES = {Material.ORANGE_STAINED_GLASS_PANE, Material.RED_STAINED_GLASS_PANE,
+            Material.YELLOW_STAINED_GLASS_PANE};
+    private static final String[] TAB_LINES = {"Make every item worth more.", "Keep raiders out, go raid others.",
+            "Spend tokens, open caches, rebirth."};
+
+    private void openTab(Player p, Factory f, PlotData data, org.bukkit.inventory.ItemStack overview, int tab) {
+        FactorySettings s = settings;
+        int length = f.activeLength();
+        int level = data.speedLevel();
+        int tier = data.genLevel();
+        FactorySettings.GenTier gen = s.tier(tier);
+        String c = TAB_COLORS[tab] + "&l";
+        Menu menu = new Menu(4, me.Evan52098.genscore.menu.MenuStyle.title("Your belt", TAB_TITLES[tab])).plain();
+        for (int slot = 0; slot < 9; slot++) {
+            boolean corner = slot == 0 || slot == 8;
+            Material edge = corner ? me.Evan52098.genscore.menu.MenuStyle.ACCENT : me.Evan52098.genscore.menu.MenuStyle.FRAME;
+            menu.set(slot, me.Evan52098.genscore.menu.MenuStyle.pane(edge));
+            menu.set(9 + slot, me.Evan52098.genscore.menu.MenuStyle.pane(TAB_PANES[tab]));
+            menu.set(27 + slot, me.Evan52098.genscore.menu.MenuStyle.pane(edge));
+        }
+        for (int t = 0; t < 3; t++) {
+            int to = t;
+            boolean on = t == tab;
+            Lore lore = Lore.builder(Lore.Accent.WHITE).description(TAB_LINES[t]);
+            if (on) {
+                lore.divider().description("&aShowing now.");
+            } else {
+                lore.clickPrompt("open " + TAB_TITLES[t].toLowerCase(java.util.Locale.ROOT));
+            }
+            menu.set(2 + t * 2, me.Evan52098.genscore.menu.MenuStyle.clean(
+                    Lore.item(TAB_ICONS[t], TAB_COLORS[t] + "&l" + TAB_NAMES[t], lore.build()), on), e -> {
+                if (!on) {
+                    p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.4f);
+                    openTab(p, f, data, overview, to);
+                }
+            });
+        }
+        var g = gensPlayer(p.getUniqueId());
+        if (tab == 0) {
+            int owned = data.machines();
             long speedPrice = s.nextSpeedPrice(level);
-            menu.set(12, Lore.item(Material.SUGAR, "&bSpeed upgrade", (speedPrice < 0
-                    ? Lore.builder(Lore.Accent.CYAN).stat("Speed", mult(s, level)).description("Top speed.")
-                    : Lore.builder(Lore.Accent.CYAN).stat("Level", level + " / " + s.speedLevels().size())
-                    .stat("Now", mult(s, level)).stat("Next", mult(s, level + 1)).stat("Price", Money.compact(speedPrice))
-                    .clickPrompt("buy").description("Shift-click: buy as many as you can afford."))
-                    .build()), e -> buySpeed(p, f, e.isShiftClick()));
+            long tierPrice = s.nextTierPrice(tier);
             int done = Math.max(0, (data.beltLength() - plots.defaultBeltLength()) / Math.max(1, s.lengthStep()));
             boolean maxed = data.beltLength() >= f.path.size();
-            menu.set(14, Lore.item(Material.IRON_CHAIN, "&aLength upgrade", (maxed
-                    ? Lore.builder(Lore.Accent.GREEN).stat("Length", length + " segments").description("The belt fills the factory.")
-                    : Lore.builder(Lore.Accent.GREEN).stat("Now", length + " segments")
-                    .stat("Next", Math.min(f.path.size(), data.beltLength() + s.lengthStep()) + " segments")
-                    .stat("Item value then", Money.compact(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
-                    .stat("Price", Money.compact(s.lengthPrice(done))).clickPrompt("buy")
-                    .description("Shift-click: buy as many as you can afford."))
-                    .build()), e -> buyLength(p, f, e.isShiftClick()));
-            long tierPrice = s.nextTierPrice(tier);
-            menu.set(13, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), "&6Gen upgrade", (tierPrice < 0
+            Lore machines = Lore.builder(Lore.Accent.WHITE)
+                    .stat("Built", owned + " / " + Machines.ALL.size())
+                    .stat("Total boost", "x" + String.format(java.util.Locale.ROOT, "%.2f", Machines.multiplier(owned, length)));
+            if (owned < Machines.ALL.size()) {
+                Machines.Machine next = Machines.ALL.get(owned);
+                machines.stat("Next", next.name() + " (x" + next.multiplier() + ")").stat("Price", Money.compact(next.priceCents()));
+            } else {
+                machines.description("Every machine is built.");
+            }
+            menu.set(20, Lore.item(Material.SUGAR, c + "Speed", (speedPrice < 0
+                    ? Lore.builder(Lore.Accent.WHITE).stat("Speed", mult(s, level)).description("Top speed.")
+                    : Lore.builder(Lore.Accent.WHITE).stat("Level", level + " / " + s.speedLevels().size())
+                    .stat("Now", mult(s, level)).stat("Next", mult(s, level + 1)).stat("Price", Money.compact(speedPrice))
+                    .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
+                    .build()), e -> buySpeed(p, f, e.isShiftClick()));
+            menu.set(21, Lore.item(tierPrice < 0 ? gen.item() : s.tier(tier + 1).item(), c + "Gen", (tierPrice < 0
                     ? Lore.builder(Lore.Accent.WHITE).stat("Gen", "Tier " + (tier + 1) + ": " + gen.mix()).description("Top tier.")
                     : Lore.builder(Lore.Accent.WHITE).stat("Now", "Tier " + (tier + 1) + ": " + gen.mix())
                     .stat("Next", "Tier " + (tier + 2) + ": " + s.tier(tier + 1).mix())
                     .stat("Average item then", Money.compact(s.itemValue(length, tier + 1)))
-                    .stat("Price", Money.compact(tierPrice)).clickPrompt("buy")
-                    .description("Shift-click: buy as many as you can afford.", "Tier " + (tier + 1) + " of " + s.genTiers().size() + "."))
+                    .stat("Price", Money.compact(tierPrice))
+                    .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
                     .build()), e -> buyTier(p, f, e.isShiftClick()));
+            menu.set(22, Lore.item(Material.IRON_CHAIN, c + "Length", (maxed
+                    ? Lore.builder(Lore.Accent.WHITE).stat("Length", length + " segments").description("The belt fills the factory.")
+                    : Lore.builder(Lore.Accent.WHITE).stat("Now", length + " segments")
+                    .stat("Next", Math.min(f.path.size(), data.beltLength() + s.lengthStep()) + " segments")
+                    .stat("Item value then", Money.compact(s.itemValue(Math.min(f.path.size(), data.beltLength() + s.lengthStep()), tier)))
+                    .stat("Price", Money.compact(s.lengthPrice(done)))
+                    .description("Shift-click: buy as many as you can afford.").clickPrompt("buy"))
+                    .build()), e -> buyLength(p, f, e.isShiftClick()));
+            menu.set(23, Lore.item(Material.BLAST_FURNACE, c + "Machines", machines.clickPrompt("see your machines").build()),
+                    e -> sub(p, 0, this::machinesMenu));
+            menu.set(24, Lore.item(Material.GOLDEN_HELMET, c + "Managers", Lore.builder(Lore.Accent.WHITE)
+                    .description("Hire a manager to buy", "upgrades for you.").clickPrompt("open managers").build()),
+                    e -> sub(p, 0, managers::open));
+        } else if (tab == 1) {
             boolean shut = f.gateClosed();
-            menu.set(16, Lore.item(shut ? Material.IRON_DOOR : Material.OAK_DOOR, shut ? "&aGate closed" : "&cGate OPEN",
-                    Lore.builder(shut ? Lore.Accent.GREEN : Lore.Accent.RED)
-                            .stat("Closed for", shut ? f.gateSecondsLeft() + "s" : "-")
-                            .description("Closed: nobody else gets in.", "It opens again after " + s.gateCloseSeconds() + "s.")
-                            .clickPrompt(shut ? "close it again (reset the timer)" : "close it").build()), e -> {
+            menu.set(21, Lore.item(shut ? Material.IRON_DOOR : Material.OAK_DOOR, c + "Gate", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Status", shut ? "&aClosed (" + f.gateSecondsLeft() + "s)" : "&cOpen")
+                    .description("Closed: nobody else gets in.", "It opens again after " + s.gateCloseSeconds() + "s.")
+                    .clickPrompt(shut ? "close it again (reset the timer)" : "close it").build()), e -> {
                 closeGate(p, f);
                 p.closeInventory();
             });
+            menu.set(22, Lore.item(Material.SHIELD, c + "Defences", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Gate time", gateSeconds(p.getUniqueId()) + "s").stat("Shield", shieldText(p.getUniqueId()))
+                    .clickPrompt("gate time, armour, turrets, traps").build()), e -> sub(p, 1, menus::defence));
+            menu.set(23, Lore.item(Material.IRON_PICKAXE, c + "Raid Gear", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Gear level", String.valueOf(g == null ? 0 : g.gearLevel()))
+                    .clickPrompt("the Raid Pick and gear upgrades").build()), e -> sub(p, 1, menus::gear));
+        } else {
+            int cacheCount = 0;
+            for (int r = 0; g != null && r < 4; r++) {
+                cacheCount += g.caches(r);
+            }
+            int rebirths = g == null ? 0 : g.rebirths();
+            int need = rebirthTier(rebirths);
+            menu.set(21, Lore.item(Material.SUNFLOWER, c + "Tokens", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Tokens", String.valueOf(g == null ? 0 : g.tokens()))
+                    .clickPrompt("open the token shop").build()), e -> sub(p, 2, menus::tokens));
+            menu.set(22, Lore.item(Material.ENDER_CHEST, c + "Caches", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Unopened", String.valueOf(cacheCount))
+                    .clickPrompt("break your caches").build()), e -> sub(p, 2, menus::caches));
+            menu.set(23, Lore.item(Material.NETHER_STAR, c + "Rebirth", Lore.builder(Lore.Accent.WHITE)
+                    .stat("Rebirths", String.valueOf(rebirths))
+                    .stat("Next needs", "Gen tier " + need + (tier + 1 >= need ? " &a✔" : " &7(you: " + (tier + 1) + ")"))
+                    .clickPrompt("see rebirth").build()), e -> sub(p, 2, this::rebirthMenu));
         }
+        menu.set(31, overview, null);
+        menu.set(35, me.Evan52098.genscore.menu.MenuStyle.close(), e -> p.closeInventory());
         menu.open(p);
+    }
+
+    private void sub(Player p, int tab, java.util.function.Consumer<Player> open) {
+        Menu.setReturn(p, "your belt", x -> {
+            Factory back = byOwner.get(x.getUniqueId());
+            if (back != null) {
+                openMenu(x, back, tab);
+            }
+        });
+        open.accept(p);
     }
 
     private void buySpeed(Player p, Factory f, boolean many) {
@@ -677,6 +1371,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
                         .flicker(true).trail(true).build());
                 fw.setFireworkMeta(meta);
                 fw.setPersistent(false);
+                fw.addScoreboardTag("genscore_harmless");
                 fw.detonate();
             });
         }
@@ -688,6 +1383,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             return;
         }
         int bought = 0;
+        int startLevel = data.genLevel();
         while (true) {
             int tier = data.genLevel();
             long price = settings.nextTierPrice(tier);
@@ -711,6 +1407,15 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
         plugin.playerData().saveSoon(p.getUniqueId());
         int now = data.genLevel();
+        var stages = me.Evan52098.genscore.plots.PlotProps.unlockedBetween(startLevel, now);
+        if (!stages.isEmpty() && plots.service() != null) {
+            plots.service().propsUnlocked(p.getUniqueId(), startLevel, now);
+            for (var stage : stages) {
+                p.sendMessage(Msg.parse(Msg.headerText("Factory Upgrade") + "<gray>Your base unlocked</gray> <white>"
+                        + Msg.escape(stage.name()) + "</white><gray>.</gray>"));
+            }
+            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_ANVIL_USE, 0.6f, 1.2f);
+        }
         p.sendMessage(Msg.good("Gen upgraded" + (bought > 1 ? " " + bought + " tiers" : "") + " to tier " + (now + 1) + ": it now makes "
                 + Msg.white(settings.tier(now).mix()) + "."));
         celebrate(p, "<gold><bold>GEN TIER " + (now + 1), "<yellow>" + Msg.escape(settings.tier(now).mix()), bought > 1 || now % 10 == 0);
@@ -768,6 +1473,9 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
             }
             return false;
         }
+        if (reason.startsWith("gen tier") || reason.startsWith("belt speed") || reason.startsWith("belt length")) {
+            me.Evan52098.genscore.hub.HubModule.progress(p.getUniqueId(), "UPGRADE", 1);
+        }
         return true;
     }
 
@@ -801,6 +1509,9 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         if (f != null) {
             f.ownerJoined();
         }
+        Tasks.entity.later(p, () -> menus.restylePicks(p), 20L);
+        RankPerks.refresh(p);
+        managers.start(p);
         var pd = plugin.playerData().get(p.getUniqueId());
         PlotData data = plotData(p.getUniqueId());
         if (pd != null && pd.isFirstTime() && data != null && progress.newPlayerShieldMinutes() > 0) {
@@ -837,7 +1548,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     @Command("gensadmin factory gate")
     @CommandPermission("genscore.admin.plots")
     @Description("Close or open a factory's gate (tests)")
-    public void adminGate(BukkitCommandActor actor, int slot, String action) {
+    public void adminGate(BukkitCommandActor actor, @revxrsal.commands.annotation.Named("slot") int slot, @revxrsal.commands.annotation.Named("action") String action) {
         Factory f = bySlot.get(slot);
         if (f == null) {
             actor.sender().sendMessage(Msg.bad("No factory on slot " + slot + "."));

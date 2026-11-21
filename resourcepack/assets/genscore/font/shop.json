@@ -1,0 +1,407 @@
+{
+ "providers": [
+  {
+   "type": "space",
+   "advances": {
+    "\uf801": -1,
+    "\uf821": 1,
+    "\uf802": -2,
+    "\uf822": 2,
+    "\uf803": -4,
+    "\uf823": 4,
+    "\uf804": -8,
+    "\uf824": 8,
+    "\uf805": -16,
+    "\uf825": 16,
+    "\uf806": -32,
+    "\uf826": 32,
+    "\uf807": -64,
+    "\uf827": 64,
+    "\uf808": -128,
+    "\uf828": 128,
+    "\uf809": -256,
+    "\uf829": 256,
+    "\uf80a": -512,
+    "\uf82a": 512
+   }
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/tab.png",
+   "height": 39,
+   "ascent": 7,
+   "chars": [
+    "\ue200"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/tab_selected.png",
+   "height": 39,
+   "ascent": 7,
+   "chars": [
+    "\ue201"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/badge.png",
+   "height": 12,
+   "ascent": -37,
+   "chars": [
+    "\ue202"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/card_top.png",
+   "height": 136,
+   "ascent": -42,
+   "chars": [
+    "\ue203"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/card_body.png",
+   "height": 235,
+   "ascent": -178,
+   "chars": [
+    "\ue204"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/slot.png",
+   "height": 20,
+   "ascent": -336,
+   "chars": [
+    "\ue205"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/rewards.png",
+   "height": 160,
+   "ascent": -42,
+   "chars": [
+    "\ue206"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/cart.png",
+   "height": 206,
+   "ascent": -207,
+   "chars": [
+    "\ue207"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/track.png",
+   "height": 6,
+   "ascent": -67,
+   "chars": [
+    "\ue208"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/fill.png",
+   "height": 4,
+   "ascent": -68,
+   "chars": [
+    "\ue209"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/marker.png",
+   "height": 18,
+   "ascent": -59,
+   "chars": [
+    "\ue20a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/lock.png",
+   "height": 8,
+   "ascent": -70,
+   "chars": [
+    "\ue20b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/gift.png",
+   "height": 9,
+   "ascent": -45,
+   "chars": [
+    "\ue20c"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/cart_icon.png",
+   "height": 8,
+   "ascent": -211,
+   "chars": [
+    "\ue20d"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/reward_box.png",
+   "height": 36,
+   "ascent": -101,
+   "chars": [
+    "\ue20e"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/reward_box.png",
+   "height": 36,
+   "ascent": -151,
+   "chars": [
+    "\ue20f"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/lock.png",
+   "height": 8,
+   "ascent": -128,
+   "chars": [
+    "\ue210"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/lock.png",
+   "height": 8,
+   "ascent": -178,
+   "chars": [
+    "\ue211"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/btn_view.png",
+   "height": 20,
+   "ascent": 13,
+   "chars": [
+    "\ue220"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/btn_buy.png",
+   "height": 20,
+   "ascent": 13,
+   "chars": [
+    "\ue221"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/btn_total.png",
+   "height": 20,
+   "ascent": 13,
+   "chars": [
+    "\ue222"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/btn_checkout.png",
+   "height": 20,
+   "ascent": 13,
+   "chars": [
+    "\ue223"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -202,
+   "chars": [
+    "\ue240"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -213,
+   "chars": [
+    "\ue241"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -224,
+   "chars": [
+    "\ue242"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -235,
+   "chars": [
+    "\ue243"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -246,
+   "chars": [
+    "\ue244"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -257,
+   "chars": [
+    "\ue245"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -268,
+   "chars": [
+    "\ue246"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -279,
+   "chars": [
+    "\ue247"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -290,
+   "chars": [
+    "\ue248"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/bullet.png",
+   "height": 5,
+   "ascent": -301,
+   "chars": [
+    "\ue249"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -203,
+   "chars": [
+    "\ue260"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -214,
+   "chars": [
+    "\ue261"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -225,
+   "chars": [
+    "\ue262"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -236,
+   "chars": [
+    "\ue263"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -247,
+   "chars": [
+    "\ue264"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -258,
+   "chars": [
+    "\ue265"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -269,
+   "chars": [
+    "\ue266"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -280,
+   "chars": [
+    "\ue267"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -291,
+   "chars": [
+    "\ue268"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "genscore:gui/shop/subdot.png",
+   "height": 2,
+   "ascent": -302,
+   "chars": [
+    "\ue269"
+   ]
+  }
+ ]
+}

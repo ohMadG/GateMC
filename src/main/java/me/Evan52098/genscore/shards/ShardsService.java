@@ -68,7 +68,7 @@ public final class ShardsService {
     /** The wallet of an online player, or null. */
     @Nullable ShardWallet wallet(UUID uuid) {
         PlayerData data = players.get(uuid);
-        return data == null ? null : data.get(section);
+        return data == null || !data.hasJoined() ? null : data.get(section);
     }
 
     /**
@@ -90,7 +90,7 @@ public final class ShardsService {
         try {
             return db.sync(c -> stored(c, uuid));
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Could not read the shards of " + uuid, e);
+            logger.log(Level.WARNING, "Could not read the credits of " + uuid, e);
             return 0;
         }
     }
@@ -122,6 +122,9 @@ public final class ShardsService {
             players.saveSoon(uuid);
             return true;
         }
+        if (players.hasPendingSave(uuid)) {
+            return false;
+        }
         try {
             boolean ok = db.sync(c -> Database.transaction(c, tx -> {
                 if (stored(tx, uuid) < amount) {
@@ -135,7 +138,7 @@ public final class ShardsService {
             }
             return ok;
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Could not take shards from offline player " + uuid, e);
+            logger.log(Level.WARNING, "Could not take credits from offline player " + uuid, e);
             return false;
         }
     }
@@ -168,7 +171,7 @@ public final class ShardsService {
             }
             return ok;
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Could not give shards to offline player " + uuid, e);
+            logger.log(Level.WARNING, "Could not give credits to offline player " + uuid, e);
             return false;
         }
     }
@@ -196,7 +199,7 @@ public final class ShardsService {
             ledger(uuid, delta, reason);
             return true;
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Could not set the shards of offline player " + uuid, e);
+            logger.log(Level.WARNING, "Could not set the credits of offline player " + uuid, e);
             return false;
         }
     }
@@ -227,7 +230,7 @@ public final class ShardsService {
                 return list;
             });
         } catch (SQLException e) {
-            logger.log(Level.WARNING, "Could not check for pending shard changes", e);
+            logger.log(Level.WARNING, "Could not check for pending credit changes", e);
             return;
         }
         for (UUID uuid : withPending) {
@@ -250,7 +253,7 @@ public final class ShardsService {
                 }
                 return null;
             })).exceptionally(e -> {
-                logger.log(Level.WARNING, "Could not apply pending shard changes for " + uuid, e);
+                logger.log(Level.WARNING, "Could not apply pending credit changes for " + uuid, e);
                 return null;
             });
         }
@@ -285,7 +288,7 @@ public final class ShardsService {
         }).handle((list, e) -> {
             topRefreshing.set(false);
             if (e != null) {
-                logger.log(Level.WARNING, "Could not load the shards top list", e);
+                logger.log(Level.WARNING, "Could not load the credits top list", e);
                 return top;
             }
             top = list;
@@ -346,7 +349,7 @@ public final class ShardsService {
         }
         long at = System.currentTimeMillis();
         db.asyncRun(c -> insertLedger(c, uuid, delta, reason, at)).exceptionally(e -> {
-            logger.log(Level.WARNING, "Could not write a shards ledger row", e);
+            logger.log(Level.WARNING, "Could not write a credits ledger row", e);
             return null;
         });
     }
