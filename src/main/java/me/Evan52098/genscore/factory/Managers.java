@@ -29,7 +29,7 @@ final class Managers {
                     "Buys belt speed and length."),
             new Tier("Supervisor", "<aqua>", Material.IRON_HELMET, 1000, 0, 5, 6, true, false,
                     "Also buys gen tiers, twice as fast."),
-            new Tier("Director", "<gold>", Material.GOLDEN_HELMET, 0, 400, 2, 12, true, true,
+            new Tier("Director", "<gold>", Material.GOLDEN_HELMET, 0, 2500, 2, 12, true, true,
                     "Also builds machines, five times as fast."));
 
     private static final int[] RESERVES = {0, 25, 50, 75};

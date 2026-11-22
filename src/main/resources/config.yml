@@ -2261,8 +2261,8 @@ info:
       size: 54
       items:
         title:   { slot: 4,  material: GOLD_BLOCK, glow: true, name: '&6&l❄ STORE RANKS ❄', lore: ['&7Click any rank to open the store.'] }
-        vip:     { slot: 20, material: IRON_INGOT,      name: '&b&lMechanic',      command: store, lore: ['&8┃ &bMechanic &7tag in chat & tab', '&8┃ &7Turbo speed in the hub', '&8┃ &7Ironworks base style, 2 vaults'] }
-        vipplus: { slot: 21, material: COPPER_INGOT,    name: '&9&lMachinist',     command: store, lore: ['&8┃ &9Machinist &7tag', '&8┃ &7Free Foreman manager', '&8┃ &7Copperworks style, /hat, 3 vaults', '&8┃ &7Everything in Mechanic'] }
+        vip:     { slot: 20, material: IRON_INGOT,      name: '&b&lMechanic',      command: store, lore: ['&8┃ &bMechanic &7tag in chat & tab', '&8┃ &7Turbo speed in the hub', '&8┃ &7Ironworks base style'] }
+        vipplus: { slot: 21, material: COPPER_INGOT,    name: '&9&lMachinist',     command: store, lore: ['&8┃ &9Machinist &7tag', '&8┃ &7Free Foreman manager', '&8┃ &7Copperworks style, /hat', '&8┃ &7Everything in Mechanic'] }
         mvp:     { slot: 22, material: GOLD_INGOT,      name: '&d&lOverseer',      glow: true, command: store, lore: ['&8┃ &dOverseer &7tag', '&8┃ &73 pet slots, remote gate', '&8┃ &7Chat colours, Nether Forge style', '&8┃ &7Everything in Machinist'] }
         mvpplus: { slot: 23, material: DIAMOND,         name: '&5&lIndustrialist', glow: true, command: store, lore: ['&8┃ &5Industrialist &7tag', '&8┃ &74 pet slots, free Supervisor', '&8┃ &7/craft, /enderchest, Deep Sea style', '&8┃ &7Everything in Overseer'] }
         legend:  { slot: 24, material: NETHERITE_INGOT, name: '&6&lTycoon',        glow: true, command: store, lore: ['&8┃ &6Tycoon &7tag', '&8┃ &75 pet slots, free Director', '&8┃ &7/anvil, /nick, Royal Void style', '&8┃ &7Everything in Industrialist'] }
