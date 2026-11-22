@@ -122,7 +122,7 @@ final class PetFollower {
         double fz = Math.cos(yaw);
         double bob = Math.sin(ticks / 9.0 + i * 1.7) * 0.08;
         Location to = base.clone().add(rx * o[0] + fx * o[2], 1.25 + o[1] + bob, rz * o[0] + fz * o[2]);
-        to.setYaw(base.getYaw());
+        to.setYaw(base.getYaw() + 180f);
         to.setPitch(0);
         return to;
     }

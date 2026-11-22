@@ -153,6 +153,15 @@ final class Factory {
     private final Set<UUID> intruders = new HashSet<>();
     private int trapPulse;
     private int turretTick;
+    private volatile long empUntil;
+
+    void emp(long until) {
+        empUntil = Math.max(empUntil, until);
+    }
+
+    private boolean jammed() {
+        return empUntil > System.currentTimeMillis();
+    }
 
     // ---- effects (region thread)
     private boolean emitted;        // the gen made an item this tick: pulse the machine
@@ -1932,14 +1941,17 @@ final class Factory {
         intruders.addAll(now);
         // Traps: slow intruders inside the walls; strong traps also throw them back toward the gate.
         int traps = data == null ? 0 : Math.min(data.trapLevel(), module.progress().traps().max());
-        if (traps > 0 && !inside.isEmpty()) {
+        if (traps > 0 && !inside.isEmpty() && !jammed()) {
             boolean shove = traps >= 3 && ++trapPulse % 4 == 0;
             Location gate = outsideGate();
             for (Player p : inside) {
                 Tasks.entity.run(p, () -> {
-                    p.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 30,
-                            Math.min(traps - 1, 3), false, true, true));
-                    if (shove) {
+                    int amp = Math.min(traps - 1, 3) - module.raidTools().trapCut(p);
+                    if (amp >= 0) {
+                        p.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS, 30,
+                                amp, false, true, true));
+                    }
+                    if (shove && !module.raidTools().noShove(p)) {
                         Vector push = gate.toVector().subtract(p.getLocation().toVector()).setY(0);
                         if (push.lengthSquared() > 0.01) {
                             p.setVelocity(push.normalize().multiply(0.9).setY(0.35));
@@ -1957,12 +1969,12 @@ final class Factory {
         int level = data == null ? 0 : data.turretLevel();
         List<BlockVector> spots = view.marker("turret");
         int active = Math.min(level, spots.size());
-        if (active <= 0 || intruders.isEmpty()) {
+        if (active <= 0 || intruders.isEmpty() || jammed()) {
             return;
         }
         ProgressSettings ps = module.progress();
         long now = System.currentTimeMillis();
-        long cooldownMs = Math.max(250, (ps.turretCooldownTicks() - 3L * (level - 1)) * 50L);
+        long cooldownMs = Math.max(250, (ps.turretCooldownTicks() - 3L * Math.min(level - 1, 7)) * 50L);
         double damage = (ps.turretDamage() + ps.turretDamagePerLevel() * (level - 1))
                 * (1 + me.Evan52098.genscore.powers.PowersModule.perk(view.owner(), "turret-damage"));
         for (int t = 0; t < active; t++) {
@@ -1976,7 +1988,7 @@ final class Factory {
             double best = ps.turretRange() * ps.turretRange();
             for (UUID id : intruders) {
                 Player p = Bukkit.getPlayer(id);
-                if (p == null || !p.getWorld().equals(view.world())) {
+                if (p == null || !p.getWorld().equals(view.world()) || module.raidTools().cloaked(id)) {
                     continue;
                 }
                 double d = p.getEyeLocation().distanceSquared(muzzle);
@@ -2011,7 +2023,7 @@ final class Factory {
                     return;
                 }
                 module.markCombat(victim.getUniqueId());
-                victim.damage(damage);
+                victim.damage(damage * module.raidTools().turretFactor(victim));
                 if (raiding && (victim.isDead() || victim.getHealth() <= 0)) {
                     module.rewards().turretKill(owner, victim);
                 }

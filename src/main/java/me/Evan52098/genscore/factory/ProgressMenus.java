@@ -217,7 +217,7 @@ final class ProgressMenus {
         ProgressSettings ps = module.progress();
         int level = g.gearLevel();
         long price = ps.gear().price(level);
-        Menu menu = new Menu(3, Msg.parse("<dark_gray>Raid gear"));
+        Menu menu = new Menu(4, Msg.parse("<dark_gray>Raid gear"));
         menu.set(10, raidPick(level), e -> {
             giveRaidPick(p);
             p.closeInventory();
@@ -279,11 +279,19 @@ final class ProgressMenus {
                 gear(p);
             });
         }
-        menu.set(22, Lore.item(Material.PAPER, "&fHow raiding works", Lore.builder(Lore.Accent.WHITE)
+        RaidTools tools = module.raidTools();
+        menu.set(20, tools.armorIcon(p), e -> {
+            tools.upgradeArmor(p);
+            gear(p);
+        });
+        menu.set(24, Lore.item(Material.ECHO_SHARD, "&b&lRaid Tools", Lore.builder(Lore.Accent.WHITE)
+                .description("Speed Coils, Grapple Hooks, Shadow", "Cloaks, EMPs, Web Bombs and Stun Guns.",
+                        "Bought with tokens, used up on use.").clickPrompt("open").build()), e -> tools.menu(p));
+        menu.set(31, Lore.item(Material.PAPER, "&fHow raiding works", Lore.builder(Lore.Accent.WHITE)
                 .description("Walk into a factory whose gate is open.", "Hit its belt with the Raid Pick to break",
                         "segments. Items on a broken segment spill:", "you take a share, the rest is lost.",
                         "After " + ps.segmentsPerRaid() + " segments the factory gets a " + ps.shieldMinutes() + " min shield.",
-                        "Watch out for turrets and traps.").build()), null);
+                        "Watch out for turrets and traps: raid armour", "and raid tools help you get through.").build()), null);
         menu.open(p);
     }
 

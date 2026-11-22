@@ -69,6 +69,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
     private ProgressMenus menus;
     private Managers managers;
     private Lockpicks lockpicks;
+    private RaidTools raidTools;
     private Trust trust;
     private final Map<UUID, Long> lastSwing = new ConcurrentHashMap<>();
     private final Map<Integer, Factory> bySlot = new ConcurrentHashMap<>();
@@ -94,6 +95,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         managers = new Managers(this, plugin);
         lockpicks = new Lockpicks(this, plugin, plugin.getConfig().getConfigurationSection("factory.lockpick"));
         trust = new Trust(plugin);
+        raidTools = new RaidTools(this, plugin);
         RankPerks.load(plugin.getConfig().getConfigurationSection("factory.rank-perks"));
         Tasks.global.timer(t -> {
             for (Player online : Bukkit.getOnlinePlayers()) {
@@ -106,6 +108,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         plugin.commands().register(this);
         plugin.commands().register(trust);
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(raidTools, plugin);
         plots.service().addListener(this);
         plugin.getLogger().info("Factory: gate closes for " + settings.gateCloseSeconds() + "s, belt starts at "
                 + settings.startSpeed() + " segments/s, resource pack " + (settings.pack().enabled() ? settings.pack().url() : "off") + ".");
@@ -412,7 +415,7 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         }
     }
 
-    private @Nullable Factory at(Location l) {
+    @Nullable Factory at(Location l) {
         Plot plot = plots.service().plotAt(l);
         return plot == null ? null : bySlot.get(plot.slot());
     }
@@ -992,6 +995,14 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
 
     long lastCombatAt(UUID player) {
         return lastCombat.getOrDefault(player, 0L);
+    }
+
+    RaidTools raidTools() {
+        return raidTools;
+    }
+
+    ProgressMenus menus() {
+        return menus;
     }
 
     Lockpicks lockpicks() {

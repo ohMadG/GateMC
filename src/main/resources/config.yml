@@ -213,7 +213,7 @@ factory:
   defences:                  # prices in tokens
     gate-time: {max-level: 15, base-price: 5, price-growth: 1.35, per-level: 5}   # +5s closed a level (45s to 120s)
     armor: {max-level: 10, base-price: 8, price-growth: 1.4, per-level: 0.5}      # +50% segment health a level
-    turrets: {max-level: 8, base-price: 15, price-growth: 1.45, per-level: 1}     # levels 1-4 add turrets; all levels add damage
+    turrets: {max-level: 16, base-price: 15, price-growth: 1.45, per-level: 1}    # levels 1-4 add turrets; all levels add damage, 1-8 fire faster
     traps: {max-level: 5, base-price: 10, price-growth: 1.5, per-level: 1}        # slowness; level 3+ throws raiders out
     turret-range: 18
     turret-damage: 2         # half-hearts a shot at level 1

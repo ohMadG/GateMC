@@ -99,7 +99,7 @@ record ProgressSettings(
                 Math.max(1, s.getLong("token-shop.cache-price", 25)),
                 Upgrade.from(s, "defences.gate-time", 15, 5, 1.35, 5),
                 Upgrade.from(s, "defences.armor", 10, 8, 1.4, 0.5),
-                Upgrade.from(s, "defences.turrets", 8, 15, 1.45, 1),
+                Upgrade.from(s, "defences.turrets", 16, 15, 1.45, 1),
                 Upgrade.from(s, "defences.traps", 5, 10, 1.5, 1),
                 Math.max(1, s.getInt("raid.segment-health", 6)),
                 Math.max(50, s.getLong("raid.hit-cooldown-ms", 250)),
