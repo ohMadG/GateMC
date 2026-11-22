@@ -1233,6 +1233,39 @@ public final class FactoryModule implements GensModule, Listener, PlotListener {
         actor.sender().sendMessage(Msg.good("Gave " + amount + " " + (rarity >= 0 ? what + " cache(s)" : "tokens") + " to " + t.getName() + "."));
     }
 
+    @Command("gensadmin tokensall")
+    @CommandPermission("genscore.admin.plots")
+    @Description("Give tokens or a cache to everyone online")
+    public void adminTokensAll(BukkitCommandActor actor, @revxrsal.commands.annotation.Named("what") String what, @revxrsal.commands.annotation.Named("amount") int amount) {
+        if (amount < 1 || amount > 10_000) {
+            actor.sender().sendMessage(Msg.bad("Amount must be 1 to 10,000."));
+            return;
+        }
+        int rarity = java.util.Arrays.asList(me.Evan52098.genscore.plots.GensPlayer.RARITIES).indexOf(what.toLowerCase(java.util.Locale.ROOT));
+        if (rarity < 0 && !what.equalsIgnoreCase("tokens")) {
+            actor.sender().sendMessage(Msg.bad("Give tokens, or a common, rare, epic or legendary cache."));
+            return;
+        }
+        String label = rarity >= 0 ? amount + "x " + what.toLowerCase(java.util.Locale.ROOT) + " cache" : amount + " tokens";
+        int count = 0;
+        for (Player t : List.copyOf(Bukkit.getOnlinePlayers())) {
+            var g = gensPlayer(t.getUniqueId());
+            if (g == null) {
+                continue;
+            }
+            if (rarity >= 0) {
+                g.addCache(rarity, amount);
+            } else {
+                g.addTokens(amount);
+            }
+            saveSoon(t.getUniqueId());
+            count++;
+            Tasks.onEntity(t, () -> t.sendMessage(Msg.parse("<gold><bold>TOKENS <dark_gray>» <gray>Everyone online got <white>" + label + "<gray>!")));
+        }
+        plugin.getLogger().info("[tokens] " + actor.sender().getName() + " gave " + label + " to " + count + " online players");
+        actor.sender().sendMessage(Msg.good("Gave " + label + " to " + count + " players."));
+    }
+
     // ------------------------------------------------------------------ belt menu
 
     private void openMenu(Player p, Factory f) {

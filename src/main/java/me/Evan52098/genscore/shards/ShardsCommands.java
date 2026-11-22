@@ -94,6 +94,31 @@ public final class ShardsCommands {
         change(actor.sender(), name, amount, Op.SET);
     }
 
+    @Command("credits giveall")
+    @CommandPermission("genscore.credits.admin")
+    @Description("Give credits to everyone online")
+    public void giveAll(BukkitCommandActor actor, @Named("amount") String amountText) {
+        CommandSender sender = actor.sender();
+        long amount = parse(amountText, false);
+        long cap = shards.settings().maxAdminAmount();
+        if (amount < 1 || amount > cap) {
+            sender.sendMessage(Msg.bad("Enter a whole number from 1 to " + fmt(cap) + "."));
+            return;
+        }
+        String by = sender.getName();
+        List<Player> online = List.copyOf(Bukkit.getOnlinePlayers());
+        int count = 0;
+        for (Player p : online) {
+            if (shards.deposit(p.getUniqueId(), amount, "giveall by " + by)) {
+                count++;
+                Tasks.onEntity(p, () -> p.sendMessage(Msg.parse("<aqua><bold>CREDITS <dark_gray>» <gray>Everyone online got <white>"
+                        + fmt(amount) + " credits<gray>!")));
+            }
+        }
+        LOG.info("[credits] " + by + " gave " + amount + " credits to " + count + " online players");
+        sender.sendMessage(Msg.good("Gave " + Msg.white(fmt(amount)) + " credits to " + count + " players."));
+    }
+
     private enum Op { GIVE, TAKE, SET }
 
     private void change(CommandSender sender, String name, String amountText, Op op) {
