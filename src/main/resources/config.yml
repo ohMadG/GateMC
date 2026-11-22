@@ -255,7 +255,7 @@ economy:
   currency-plural: Dollars
   pay:
     min-amount: 1.0
-    max-amount: 1000000.0
+    max-amount: 25000000.0
     # Payments this large ask for /pay confirm (players can turn this off with /pay confirmtoggle).
     confirm-threshold: 10000.0
   balance-top:
