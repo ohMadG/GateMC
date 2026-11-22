@@ -37,7 +37,10 @@ public final class EconomyCommands {
     private final PlayerDataService players;
     private final Map<UUID, PendingPay> pendingPays = new ConcurrentHashMap<>();
 
-    EconomyCommands(EconomyService economy, PlayerDataService players) {
+    private final me.Evan52098.genscore.GensCore plugin;
+
+    EconomyCommands(me.Evan52098.genscore.GensCore plugin, EconomyService economy, PlayerDataService players) {
+        this.plugin = plugin;
         this.economy = economy;
         this.players = players;
     }
@@ -91,6 +94,18 @@ public final class EconomyCommands {
             sender.sendMessage(Msg.bad("Amount cannot exceed " + Msg.white(Money.format(s.payMaxCents())) + "."));
             return;
         }
+        altLinked(sender, target).whenComplete((linked, error) -> Tasks.onEntity(sender, () -> {
+            if (Boolean.TRUE.equals(linked)) {
+                sender.sendMessage(Msg.bad("You can't pay " + Msg.white(target.getName())
+                        + ": your accounts share an IP address. Ask staff if this is a mistake."));
+                plugin.getLogger().info("[pay] blocked " + sender.getName() + " -> " + target.getName() + " (" + Money.format(cents) + "): shared IP");
+                return;
+            }
+            startPay(sender, target, cents, s);
+        }));
+    }
+
+    private void startPay(Player sender, Player target, long cents, EconomySettings s) {
         Wallet own = economy.wallet(sender.getUniqueId());
         if (own != null && own.payConfirm() && cents >= s.payConfirmCents()) {
             pendingPays.put(sender.getUniqueId(), new PendingPay(target.getUniqueId(), target.getName(), cents,
@@ -101,6 +116,25 @@ public final class EconomyCommands {
             return;
         }
         completePay(sender, target.getUniqueId(), target.getName(), cents);
+    }
+
+    private CompletableFuture<Boolean> altLinked(Player sender, Player target) {
+        if (sender.hasPermission("genscore.pay.alts")) {
+            return CompletableFuture.completedFuture(false);
+        }
+        me.Evan52098.genscore.punish.PunishModule punish = plugin.modules().get(me.Evan52098.genscore.punish.PunishModule.class);
+        me.Evan52098.genscore.punish.PunishmentService service = punish == null ? null : punish.service();
+        var a = sender.getAddress();
+        var b = target.getAddress();
+        boolean sameNow = a != null && b != null && a.getAddress() != null && a.getAddress().equals(b.getAddress());
+        if (service == null) {
+            return CompletableFuture.completedFuture(sameNow);
+        }
+        CompletableFuture<Boolean> shared = sameNow ? CompletableFuture.completedFuture(true)
+                : service.findAltAccounts(sender.getUniqueId()).thenApply(alts -> alts.contains(target.getUniqueId()));
+        return shared.thenCompose(linked -> !linked ? CompletableFuture.completedFuture(false)
+                : service.isAltBanExempt(sender.getUniqueId()).thenCombine(service.isAltBanExempt(target.getUniqueId()),
+                        (x, y) -> !(x || y)));
     }
 
     @Command("pay confirm")

@@ -53,7 +53,7 @@ public final class EconomyModule implements GensModule {
         plugin.playerData().register(section);
         service = new EconomyService(db, plugin.playerData(), section, settings, plugin.getLogger());
 
-        plugin.commands().register(new EconomyCommands(service, plugin.playerData()));
+        plugin.commands().register(new EconomyCommands(plugin, service, plugin.playerData()));
 
         // Money sent to someone in the moment they were logging in reaches them within 10 seconds.
         Tasks.async.timer(task -> service.sweepPending(), 10, 10, TimeUnit.SECONDS);

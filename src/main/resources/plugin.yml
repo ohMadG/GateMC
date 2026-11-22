@@ -25,6 +25,7 @@ permissions:
   genscore.admin.retention: {default: op}
   genscore.balance: {default: true}
   genscore.pay: {default: true}
+  genscore.pay.alts: {default: false}
   genscore.pay.toggle: {default: true}
   genscore.pay.confirm.toggle: {default: true}
   genscore.baltop: {default: true}
