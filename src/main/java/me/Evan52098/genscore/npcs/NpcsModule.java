@@ -305,6 +305,11 @@ public final class NpcsModule implements GensModule, Listener {
             return;
         }
         p.getPersistentDataContainer().set(introKey, PersistentDataType.BYTE, (byte) 1);
+        me.Evan52098.genscore.player.PlayerData data = plugin.playerData().get(p.getUniqueId());
+        boolean first = data != null ? data.isFirstTime() : !p.hasPlayedBefore();
+        if (!first) {
+            return;
+        }
         Tasks.entity.later(p, () -> startCutscene(p), 60L);
     }
 
