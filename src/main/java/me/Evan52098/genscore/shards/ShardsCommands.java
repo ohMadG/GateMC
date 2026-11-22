@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import revxrsal.commands.annotation.Command;
 import revxrsal.commands.annotation.Description;
 import revxrsal.commands.annotation.Named;
+import revxrsal.commands.annotation.Single;
 import revxrsal.commands.bukkit.actor.BukkitCommandActor;
 import revxrsal.commands.bukkit.annotation.CommandPermission;
 
@@ -44,7 +45,7 @@ public final class ShardsCommands {
     @Command("credits")
     @CommandPermission("genscore.credits.others")
     @Description("Check another player's credits")
-    public void other(BukkitCommandActor actor, @Named("player") String name) {
+    public void other(BukkitCommandActor actor, @Named("player") @Single String name) {
         CommandSender sender = actor.sender();
         if (!rateLimit(sender)) {
             return;
@@ -76,28 +77,28 @@ public final class ShardsCommands {
     @Command({"credits give", "credits add"})
     @CommandPermission("genscore.credits.admin")
     @Description("Give a player credits")
-    public void give(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
+    public void give(BukkitCommandActor actor, @Named("player") @Single String name, @Named("amount") @Single String amount) {
         change(actor.sender(), name, amount, Op.GIVE);
     }
 
     @Command({"credits take", "credits remove"})
     @CommandPermission("genscore.credits.admin")
     @Description("Take credits from a player")
-    public void take(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
+    public void take(BukkitCommandActor actor, @Named("player") @Single String name, @Named("amount") @Single String amount) {
         change(actor.sender(), name, amount, Op.TAKE);
     }
 
     @Command("credits set")
     @CommandPermission("genscore.credits.admin")
     @Description("Set a player's credits")
-    public void set(BukkitCommandActor actor, @Named("player") String name, @Named("amount") String amount) {
+    public void set(BukkitCommandActor actor, @Named("player") @Single String name, @Named("amount") @Single String amount) {
         change(actor.sender(), name, amount, Op.SET);
     }
 
     @Command("credits giveall")
     @CommandPermission("genscore.credits.admin")
     @Description("Give credits to everyone online")
-    public void giveAll(BukkitCommandActor actor, @Named("amount") String amountText) {
+    public void giveAll(BukkitCommandActor actor, @Named("amount") @Single String amountText) {
         CommandSender sender = actor.sender();
         long amount = parse(amountText, false);
         long cap = shards.settings().maxAdminAmount();
