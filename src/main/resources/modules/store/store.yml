@@ -103,7 +103,7 @@ categories:
         art: item/iron_ingot
         icon: { material: IRON_INGOT }
         view-button: 'View Rank'
-        highlights: ['* &bMechanic &fchat tag', '* &e+10% &ftokens', '* &a+5% &fsale value', '* &e+1 &ftoken per hour', '* Aqua glow', '* Sky chat colour', '* Turbo hub speed', '* Ironworks style', '* 2 vaults']
+        highlights: ['* &bMechanic &fchat tag', '* &e+10% &ftokens', '* &a+5% &fsale value', '* &e+1 &ftoken per hour', '* Aqua glow', '* Sky chat colour', '* Turbo hub speed', '* Ironworks style']
         contents: [{ art: item/name_tag, name: 'Mechanic Tag' }, { art: block/iron_block, name: 'Ironworks Style' }]
         lore: ['&7Permanent rank.', '&7Every token you earn is worth 10% more,', '&7and your belt sells for 5% more.']
         package: 7825791
@@ -115,7 +115,7 @@ categories:
         art: item/copper_ingot
         icon: { material: COPPER_INGOT }
         view-button: 'View Rank'
-        highlights: ['* &9Machinist &fchat tag', '* &e+20% &ftokens', '* &a+10% &fsale value', '* &e+2 &ftokens per hour', '* Free Foreman', '* Blue glow', '* BELT BOSS tag', '* /hat, 3 vaults', '* All Mechanic perks']
+        highlights: ['* &9Machinist &fchat tag', '* &e+20% &ftokens', '* &a+10% &fsale value', '* &e+2 &ftokens per hour', '* Free Foreman', '* Blue glow', '* BELT BOSS tag', '* /hat', '* All Mechanic perks']
         contents: [{ art: item/name_tag, name: 'Machinist Tag' }, { art: item/leather_helmet, name: 'Foreman' }]
         lore: ['&7Permanent rank. Includes Mechanic.', '&7Copperworks base style.']
         package: 7825792
@@ -130,7 +130,7 @@ categories:
         view-button: 'View Rank'
         highlights: ['* &dOverseer &fchat tag', '* &e+35% &ftokens', '* &a+15% &fsale value', '* &e+3 &ftokens per hour', '* Sunset name paint', '* Flame Halo aura', '* 3 pet slots', '* Remote gate', '* All Machinist perks']
         contents: [{ art: item/name_tag, name: 'Overseer Tag' }, { art: item/blaze_powder, name: 'Nether Forge Style' }]
-        lore: ['&7Permanent rank. Includes Machinist.', '&7Chat colours, 4 vaults, Nether Forge base style.']
+        lore: ['&7Permanent rank. Includes Machinist.', '&7Chat colours, Nether Forge base style.']
         package: 7825793
       mvpplus:
         name: 'Industrialist'
@@ -140,7 +140,7 @@ categories:
         art: item/diamond
         icon: { material: DIAMOND }
         view-button: 'View Rank'
-        highlights: ['* &5Industrialist &fchat tag', '* &e+50% &ftokens', '* &a+20% &fsale value', '* &e+4 &ftokens per hour', '* Free Supervisor', '* Galaxy name paint', '* Runes aura, Fire glow', '* 4 pets, 6 vaults', '* All Overseer perks']
+        highlights: ['* &5Industrialist &fchat tag', '* &e+50% &ftokens', '* &a+20% &fsale value', '* &e+4 &ftokens per hour', '* Free Supervisor', '* Galaxy name paint', '* Runes aura, Fire glow', '* 4 pet slots', '* All Overseer perks']
         contents: [{ art: item/name_tag, name: 'Industrialist Tag' }, { art: item/iron_helmet, name: 'Supervisor' }]
         lore: ['&7Permanent rank. Includes Overseer.', '&7/craft, /enderchest, Deep Sea base style.']
         package: 7825794
@@ -153,7 +153,7 @@ categories:
         art: item/netherite_ingot
         icon: { material: NETHERITE_INGOT, glint: true }
         view-button: 'View Rank'
-        highlights: ['* &6Tycoon &fchat tag', '* &e+75% &ftokens', '* &a+25% &fsale value', '* &e+6 &ftokens per hour', '* Free Director', '* Gilded name paint', '* BARON tag, Gold Dust', '* 5 pets, 8 vaults', '* All Industrialist']
+        highlights: ['* &6Tycoon &fchat tag', '* &e+75% &ftokens', '* &a+25% &fsale value', '* &e+6 &ftokens per hour', '* Free Director', '* Gilded name paint', '* BARON tag, Gold Dust', '* 5 pet slots', '* All Industrialist']
         contents: [{ art: item/name_tag, name: 'Tycoon Tag' }, { art: item/golden_helmet, name: 'Director' }]
         lore: ['&7Permanent rank. Includes Industrialist.', '&7Rainbow glow, Legend join & leave messages,', '&7/anvil, /nick, Royal Void base style.']
         package: 7825795

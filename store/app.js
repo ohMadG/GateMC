@@ -11,27 +11,27 @@
     Mechanic: {
       cls: "mechanic", boost: "+10% tokens · +5% sale value",
       perks: ["+10% tokens", "+5% sale value", "+1 token every hour", "Mechanic chat tag", "Aqua glow and Sky chat colour",
-        "Turbo speed in the hub", "Ironworks base style", "2 vaults"]
+        "Turbo speed in the hub", "Ironworks base style"]
     },
     Machinist: {
       cls: "machinist", boost: "+20% tokens · +10% sale value",
       perks: ["!Everything in Mechanic", "+20% tokens", "+10% sale value", "+2 tokens every hour", "Free Foreman",
-        "Blue glow and BELT BOSS tag", "Copperworks base style", "/hat and 3 vaults"]
+        "Blue glow and BELT BOSS tag", "Copperworks base style", "/hat"]
     },
     Overseer: {
       cls: "overseer", boost: "+35% tokens · +15% sale value", flag: "POPULAR",
       perks: ["!Everything in Machinist", "+35% tokens", "+15% sale value", "+3 tokens every hour", "Remote gate", "Chat colours",
-        "3 pet slots and 4 vaults", "Nether Forge base style", "Sunset name paint and Flame Halo aura"]
+        "3 pet slots", "Nether Forge base style", "Sunset name paint and Flame Halo aura"]
     },
     Industrialist: {
       cls: "industrialist", boost: "+50% tokens · +20% sale value",
       perks: ["!Everything in Overseer", "+50% tokens", "+20% sale value", "+4 tokens every hour", "Free Supervisor",
-        "/craft and /enderchest", "4 pet slots and 6 vaults", "Deep Sea base style", "Galaxy name paint, Runes aura and Fire glow"]
+        "/craft and /enderchest", "4 pet slots", "Deep Sea base style", "Galaxy name paint, Runes aura and Fire glow"]
     },
     Tycoon: {
       cls: "tycoon", boost: "+75% tokens · +25% sale value", flag: "BEST VALUE",
       perks: ["!Everything in Industrialist", "+75% tokens", "+25% sale value", "+6 tokens every hour", "Free Director",
-        "/anvil and /nick", "5 pet slots and 8 vaults", "Royal Void base style", "Gilded name paint, BARON tag and Gold Dust",
+        "/anvil and /nick", "5 pet slots", "Royal Void base style", "Gilded name paint, BARON tag and Gold Dust",
         "Rainbow glow and Legend join and leave messages"]
     }
   };
@@ -42,7 +42,6 @@
     ["Token bonus", "+10%", "+20%", "+35%", "+50%", "+75%"],
     ["Sale value bonus", "+5%", "+10%", "+15%", "+20%", "+25%"],
     ["Tokens every hour", "+1", "+2", "+3", "+4", "+6"],
-    ["Vaults", "2", "3", "4", "6", "8"],
     ["Pet slots", false, false, "3", "4", "5"],
     ["Free unlock", false, "Foreman", "Foreman", "Supervisor", "Director"],
     ["New base style", "Ironworks", "Copperworks", "Nether Forge", "Deep Sea", "Royal Void"],
